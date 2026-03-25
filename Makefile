@@ -1,4 +1,4 @@
-.PHONY: help setup setup-db migrate seed dev build start clean reset install logs docker-up docker-down docker-logs docker-reset
+.PHONY: help setup migrate seed dev build start clean reset install logs docker-up docker-down docker-logs docker-reset
 
 # Colors for output
 BLUE := \033[0;34m
@@ -14,9 +14,8 @@ help:
 	@echo "$(BLUE)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(GREEN)Targets:$(NC)"
-	@echo "  $(YELLOW)make setup$(NC)              - Full initial setup (install, create DB, migrate, seed)"
+	@echo "  $(YELLOW)make setup$(NC)              - Full initial setup (install, migrate, seed)"
 	@echo "  $(YELLOW)make install$(NC)            - Install dependencies"
-	@echo "  $(YELLOW)make setup-db$(NC)           - Create PostgreSQL database with two schemas"
 	@echo "  $(YELLOW)make migrate$(NC)            - Run Prisma migrations for both schemas"
 	@echo "  $(YELLOW)make seed$(NC)               - Seed the database with initial data"
 	@echo "  $(YELLOW)make dev$(NC)                - Start development server"
@@ -40,57 +39,35 @@ install:
 	cd general && npm install
 	@echo "$(GREEN)✓ Dependencies installed$(NC)"
 
-# Create PostgreSQL database with two schemas
-setup-db:
-	@echo "$(GREEN)Setting up PostgreSQL database with two schemas...$(NC)"
-	@command -v psql >/dev/null 2>&1 || { echo "$(RED)Error: psql is not installed$(NC)"; exit 1; }
-	@if [ -z "$(POSTGRES_USER)" ]; then \
-		echo "$(YELLOW)Enter PostgreSQL username [postgres]:$(NC)"; \
-		read -r pg_user; \
-		POSTGRES_USER="$$pg_user"; \
-	fi; \
-	if [ -z "$(POSTGRES_PASSWORD)" ]; then \
-		echo "$(YELLOW)Enter PostgreSQL password:$(NC)"; \
-		read -rs pg_pass; \
-		POSTGRES_PASSWORD="$$pg_pass"; \
-	fi; \
-	if [ -z "$(POSTGRES_HOST)" ]; then \
-		POSTGRES_HOST="localhost"; \
-	fi; \
-	if [ -z "$(POSTGRES_PORT)" ]; then \
-		POSTGRES_PORT="5432"; \
-	fi; \
-	echo "$(YELLOW)Creating database: clm_platform...$(NC)"; \
-	psql -h $$POSTGRES_HOST -U $$POSTGRES_USER -p $$POSTGRES_PORT -c "CREATE DATABASE clm_platform;" 2>/dev/null || echo "$(YELLOW)Database clm_platform already exists$(NC)"; \
-	echo "$(YELLOW)Creating schemas: public (default) and contracts...$(NC)"; \
-	psql -h $$POSTGRES_HOST -U $$POSTGRES_USER -p $$POSTGRES_PORT -d clm_platform -c "CREATE SCHEMA IF NOT EXISTS contracts;" 2>/dev/null || true; \
-	@echo "$(GREEN)✓ Database and schemas created successfully$(NC)"
+
 
 # Run Prisma migrations for both schemas
 migrate:
 	@echo "$(GREEN)Running Prisma migrations for general schema (public)...$(NC)"
-	cd general && npx prisma migrate deploy
-	@echo "$(GREEN)Running Prisma migrations for contracts schema...$(NC)"
-	cd contracts && npx prisma migrate deploy
-	@echo "$(GREEN)✓ All migrations completed$(NC)"
+	cd general && set -a && source .env.local && set +a && npx prisma migrate deploy
+	@echo "$(GREEN)✓ General schema migrations completed$(NC)"
+	@echo "$(YELLOW)Note: Contracts schema is managed by Spring Boot service (not migrated here)$(NC)"
 
 # Seed the database
 seed:
 	@echo "$(GREEN)Seeding databases with initial data...$(NC)"
-	cd general && npx prisma db seed
+	cd general && set -a && source .env.local && set +a && npx prisma db seed
 	@echo "$(GREEN)✓ Database seeded$(NC)"
 
-# Full initial setup
-setup: install setup-db migrate seed
+# Full initial setup (Docker must be running: make docker-up)
+setup: install migrate seed
 	@echo ""
 	@echo "$(GREEN)╔════════════════════════════════════════════════════════════════╗$(NC)"
 	@echo "$(GREEN)║               ✓ Setup completed successfully!                   ║$(NC)"
 	@echo "$(GREEN)╚════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
+	@echo "$(YELLOW)Prerequisites:$(NC)"
+	@echo "  • Docker container must be running: $(BLUE)make docker-up$(NC)"
+	@echo "  • Environment variables in: general/.env.local"
+	@echo ""
 	@echo "$(YELLOW)Next steps:$(NC)"
-	@echo "  1. Check your environment variables in: general/.env.local"
-	@echo "  2. Start development: $(BLUE)make dev$(NC)"
-	@echo "  3. Open browser: $(BLUE)http://localhost:3000$(NC)"
+	@echo "  1. Start development: $(BLUE)make dev$(NC)"
+	@echo "  2. Open browser: $(BLUE)http://localhost:3000$(NC)"
 	@echo ""
 
 # Start development server
