@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with CLM Platform schema
+  postgres:
+    image: postgres:16-alpine
+    container_name: clm_postgres
+    environment:
+      POSTGRES_USER: clm_user
+      POSTGRES_PASSWORD: clm_password
+      POSTGRES_DB: clm_platform
+      POSTGRES_INITDB_ARGS: "-c max_connections=200"
+    ports:
+      - "5432:5432"
+    volumes:
+      # Persist database data
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize contracts schema on startup
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clm_user -d clm_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - clm-network
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  clm-network:
+    driver: bridge
