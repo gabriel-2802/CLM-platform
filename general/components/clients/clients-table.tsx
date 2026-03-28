@@ -11,6 +11,7 @@ import { DataTable, type ColumnDef } from "@/components/data-table";
 import ClientRow from "@/components/clients/client-row";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
+import { GenerateContractModal } from "@/components/clients/generate-contract-modal";
 
 export default function ClientsTable({ rows }: { rows: Row[] }) {
   const router = useRouter();
@@ -113,7 +114,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
             <Link href="#">{row.original.contractGen}</Link>
           </span>
         ) : (
-          <Button variant="outline" size="sm">gen.</Button>
+          <GenerateContractModal client={row.original} />
         ),
     },
     {
