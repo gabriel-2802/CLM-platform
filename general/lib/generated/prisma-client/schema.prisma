@@ -430,3 +430,14 @@ model UserClient {
 
   @@unique([userId, clientId]) // Ensure unique user-client pairs
 }
+
+// ====================== CONTRACT TEMPLATES ======================
+
+model ContractTemplate {
+  id        Int      @id @default(autoincrement())
+  name      String
+  fileName  String
+  filePath  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
