@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
  */
 @Slf4j
 @Service
-public class FileService {
+public class FileParserService {
 
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\.{2,}");
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024;
