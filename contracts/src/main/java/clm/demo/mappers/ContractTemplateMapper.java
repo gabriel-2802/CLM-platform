@@ -13,6 +13,7 @@ import org.mapstruct.Mapping;
 public interface ContractTemplateMapper {
 
     @Mapping(source = "id", target = "templateId")
+    @Mapping(source = "isFullyMapped", target = "fullyMapped")
     @Mapping(source = "templateFields", target = "fields")
     TemplateResponseDTO toResponseDTO(ContractTemplate entity);
 }

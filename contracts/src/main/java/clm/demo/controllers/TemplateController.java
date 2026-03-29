@@ -100,5 +100,43 @@ public class TemplateController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Downloads a template in DOCX format.
+     * If the template is stored in another format, automatically converts it.
+     *
+     * @param templateId the template ID to download
+     * @return 200 OK with the DOCX file as binary attachment
+     * @throws IOException if decompression or conversion fails
+     * @throws RuntimeException if template not found
+     */
+    @GetMapping("/download/docx/{templateId}")
+    public ResponseEntity<byte[]> downloadTemplateDocx(@PathVariable @NotNull Long templateId) throws IOException {
+        byte[] documentContent = templateService.downloadTemplateAsDocx(templateId);
+        
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=template-" + templateId + ".docx")
+                .header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                .body(documentContent);
+    }
+
+    /**
+     * Downloads a template in PDF format.
+     * If the template is stored in another format, automatically converts it.
+     *
+     * @param templateId the template ID to download
+     * @return 200 OK with the PDF file as binary attachment
+     * @throws IOException if decompression or conversion fails
+     * @throws RuntimeException if template not found
+     */
+    @GetMapping("/download/pdf/{templateId}")
+    public ResponseEntity<byte[]> downloadTemplatePdf(@PathVariable @NotNull Long templateId) throws IOException {
+        byte[] documentContent = templateService.downloadTemplateAsPdf(templateId);
+        
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=template-" + templateId + ".pdf")
+                .header("Content-Type", "application/pdf")
+                .body(documentContent);
+    }
 
 }
+

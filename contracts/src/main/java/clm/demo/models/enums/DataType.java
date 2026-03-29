@@ -6,5 +6,4 @@ public enum DataType {
     NUMBER,
     BOOLEAN,
     CURRENCY,
-    ENUM
 }

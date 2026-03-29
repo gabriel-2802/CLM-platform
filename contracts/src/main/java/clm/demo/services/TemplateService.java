@@ -16,7 +16,6 @@ import clm.demo.models.enums.DocumentFormat;
 
 import clm.demo.repositories.ContractTemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.security.InvalidParameterException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -43,6 +43,7 @@ public class TemplateService {
     private final ContractTemplateMapper contractTemplateMapper;
     private final ParsedDocumentMapper parsedDocumentMapper;
     private final FileZipService zipService;
+    private final FileConverterService fileConverterService;
 
     /**
      * Generates (uploads and parses) a new contract template from an uploaded file.
@@ -83,7 +84,6 @@ public class TemplateService {
         List<TemplateField> fields = parsedDoc.getPlaceholders().stream()
                 .map(placeholder -> TemplateField.builder()
                         .contractTemplate(finalTemplate)
-                        .fieldLabel("Field " + (placeholder.getPosition() + 1))
                         .fieldPosition(placeholder.getPosition())
                         .placeholderText(placeholder.getPlaceholderText())
                         .build())
@@ -103,6 +103,7 @@ public class TemplateService {
     /**
      * Updates the label for a specific field in a template.
      * Called by Client Management Service to set display labels.
+     * Automatically checks if all fields are now mapped and updates the template status.
      *
      * @param templateId the template ID
      * @param fieldId the field ID
@@ -128,6 +129,10 @@ public class TemplateService {
         field = templateFieldRepository.save(field);
         
         log.info("Field label updated: {}", fieldId);
+
+        // Check if all fields are now mapped and update the template status
+        updateTemplateFullyMappedStatus(templateId);
+
         return new TemplateFieldResponseDTO(field);
     }
 
@@ -145,7 +150,7 @@ public class TemplateService {
                 .map(contractTemplateMapper::toResponseDTO)
                 .orElseThrow(() -> {
                     log.warn("Template not found: {}", templateId);
-                    return new RuntimeException("Template not found: " + templateId);
+                    return new ResourceNotFoundException("Template not found: " + templateId);
                 });
     }
 
@@ -178,6 +183,72 @@ public class TemplateService {
         }
 
         templateRepository.deleteById(templateId);
+    }
+
+    /**
+     * Downloads a template in DOCX format.
+     * If the template is stored in another format, automatically converts it.
+     * The document is decompressed from GZIP before being returned.
+     *
+     * @param templateId the template ID to download
+     * @return decompressed document bytes in DOCX format
+     * @throws ResourceNotFoundException if template not found
+     * @throws IOException if decompression or conversion fails
+     */
+    @Transactional(readOnly = true)
+    public byte[] downloadTemplateAsDocx(Long templateId) throws IOException {
+
+        ContractTemplate template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
+
+        // decompress the stored document content
+        byte[] decompressedContent = zipService.decompress(template.getDocumentContent());
+
+        // if already in DOCX format, return directly
+        if (template.getDocumentFormat() == DocumentFormat.DOCX) {
+            return decompressedContent;
+        }
+
+        // convert from other format to DOCX
+        return fileConverterService.convert(
+                decompressedContent,
+                template.getDocumentFormat(),
+                DocumentFormat.DOCX
+        );
+    }
+
+    /**
+     * Downloads a template in PDF format.
+     * If the template is stored in another format, automatically converts it.
+     * The document is decompressed from GZIP before being returned.
+     *
+     * @param templateId the template ID to download
+     * @return decompressed document bytes in PDF format
+     * @throws ResourceNotFoundException if template not found
+     * @throws IOException if decompression or conversion fails
+     */
+    @Transactional(readOnly = true)
+    public byte[] downloadTemplateAsPdf(Long templateId) throws IOException {
+        ContractTemplate template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
+
+        // decompress the stored document content
+        byte[] decompressedContent = zipService.decompress(template.getDocumentContent());
+
+        // if already in PDF format, return directly
+        if (template.getDocumentFormat() == DocumentFormat.PDF) {
+            log.debug("Template already in PDF format, returning directly");
+            return decompressedContent;
+        }
+
+        // convert from other format to PDF
+        log.info("Converting template from {} to PDF", template.getDocumentFormat());
+
+        return fileConverterService.convert(
+                decompressedContent,
+                template.getDocumentFormat(),
+                DocumentFormat.PDF
+        );
     }
 
     /**
@@ -221,7 +292,7 @@ public class TemplateService {
             // verify field belongs to the template
             if (!field.getContractTemplate().getId().equals(request.getTemplateId())) {
                 log.warn("Field {} does not belong to template {}", mapping.getFieldId(), request.getTemplateId());
-                throw new RuntimeException("Field does not belong to this template");
+                throw new InvalidParameterException("Field does not belong to this template");
             }
 
             // update field properties
@@ -236,6 +307,9 @@ public class TemplateService {
         }
 
         log.info("Successfully updated {} fields for template: {}", request.getMappings().size(), request.getTemplateId());
+
+        // check if all fields are now mapped and update the template status
+        updateTemplateFullyMappedStatus(request.getTemplateId());
 
         // return the list of updated fields as response DTOs
         return updatedFields.stream()
@@ -252,6 +326,22 @@ public class TemplateService {
         } catch (IllegalArgumentException e) {
             log.warn("Invalid data type: {}, defaulting to STRING", dataTypeStr);
             return DataType.STRING;
+        }
+    }
+
+    /**
+     * Checks if all fields in a template are mapped (have labels) and updates the template's isFullyMapped status.
+     * Uses an efficient database-level query to determine if all fields have non-null labels.
+     * This is called automatically after field updates to maintain consistency.
+     *
+     * @param templateId the template ID to check and update
+     */
+    private void updateTemplateFullyMappedStatus(Long templateId) {
+        try {
+            boolean allFieldsMapped = templateFieldRepository.areAllFieldsMapped(templateId);
+            templateRepository.updateFullyMappedStatus(templateId, allFieldsMapped);
+        } catch (Exception e) {
+            log.warn("Failed to update fully mapped status for template {}: {}", templateId, e.getMessage());
         }
     }
 }

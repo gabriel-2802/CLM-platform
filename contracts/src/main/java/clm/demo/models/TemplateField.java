@@ -30,7 +30,8 @@ public class TemplateField {
 
     /** Display name used in the admin mapping UI (e.g., "Client Name"). */
     @Column(name = "field_label", length = 255)
-    private String fieldLabel;
+    @Builder.Default
+    private String fieldLabel = null;
 
     /** Expected format (STRING, DATE, etc.) used for validation and parsing logic. */
     @Enumerated(EnumType.STRING)
