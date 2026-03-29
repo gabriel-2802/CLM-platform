@@ -130,6 +130,21 @@ public class TemplateService {
     }
 
     /**
+     * Retrieves all available templates with their metadata.
+     * Returns a list of all templates sorted by creation date (newest first).
+     *
+     * @return List of TemplateResponseDTO containing all templates
+     */
+    @Transactional(readOnly = true)
+    public List<TemplateResponseDTO> getAllTemplates() {
+        log.info("Fetching all templates");
+        return templateRepository.findAll()
+                .stream()
+                .map(contractTemplateMapper::toResponseDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Deletes a template by ID along with all associated fields and mappings.
      *
      * @param templateId the template ID

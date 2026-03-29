@@ -4,7 +4,10 @@ import clm.demo.dto.responses.ErrorResponseDTO;
 import clm.demo.exceptions.EmptyFileNameException;
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.UnsupportedFileException;
+import clm.demo.exceptions.DatabaseValidationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -61,6 +64,53 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException e) {
         log.warn("Resource not found: {}", e.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, "Resource not found", e.getMessage());
+    }
+
+    /**
+     * Handles database validation constraint violations (CHECK constraints, triggers, etc.).
+     */
+    @ExceptionHandler(DatabaseValidationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDatabaseValidationException(DatabaseValidationException e) {
+        log.warn("Database validation failed: {} - {}", e.getConstraintName(), e.getMessage());
+        String details = e.getDetails() != null ? e.getDetails() : e.getMessage();
+        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation failed", details);
+    }
+
+    /**
+     * Handles data access exceptions from the database layer (constraint violations, type mismatches, etc.).
+     */
+    @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidDataAccessException(InvalidDataAccessResourceUsageException e) {
+        log.error("Data access error occurred: ", e);
+        
+        String message = e.getMessage();
+        String details = "A data validation error occurred. Please check your input data.";
+        
+        // Check for specific constraint or type errors
+        if (message != null) {
+            if (message.contains("CHECK constraint")) {
+                details = "Data violates validation constraints.";
+            } else if (message.contains("UNIQUE constraint")) {
+                details = "A record with this value already exists.";
+            } else if (message.contains("FOREIGN KEY constraint")) {
+                details = "Referenced record does not exist.";
+            } else if (message.contains("NOT NULL constraint")) {
+                details = "Required fields are missing.";
+            } else if (message.contains("type") && message.contains("bytea")) {
+                details = "Invalid file data format. Please ensure the file is properly formatted.";
+            }
+        }
+        
+        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation error", details);
+    }
+
+    /**
+     * Handles generic data access exceptions.
+     */
+    @ExceptionHandler(DataAccessException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDataAccessException(DataAccessException e) {
+        log.error("Database access error: ", e);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", "A database error occurred. Please contact support.");
     }
 
     /**

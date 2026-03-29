@@ -60,6 +60,20 @@ public class TemplateController {
     }
 
     /**
+     * Retrieves all available templates with their metadata and field counts.
+     * This endpoint is called before the individual template endpoint
+     * to properly route "/all" requests.
+     *
+     * @return 200 OK with list of all templates
+     */
+    @GetMapping
+    public ResponseEntity<?> getAllTemplates() {
+        // Return all templates - you can add pagination if needed
+        var templates = templateService.getAllTemplates();
+        return ResponseEntity.ok(templates);
+    }
+
+    /**
      * Updates multiple field mappings for a template in a single batch operation.
      * Maps multiple template fields to their corresponding database columns.
      * Called after user selects database columns for all template placeholders.

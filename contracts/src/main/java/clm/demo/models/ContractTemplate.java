@@ -5,6 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -45,11 +47,12 @@ public class ContractTemplate {
     private DocumentFormat documentFormat;
 
     /** * The raw source file.
-     * <b>Note:</b> Lazy loaded as BYTEA to prevent memory spikes during list queries.
+     * <b>Note:</b> Stored as BYTEA to prevent memory spikes during list queries.
+     * Not lazily loaded - better handled at service layer if needed.
      */
     @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "document_content", columnDefinition = "BYTEA")
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 
     /** Cached count of markers found in the doc; used for UI validation and mapping progress. */

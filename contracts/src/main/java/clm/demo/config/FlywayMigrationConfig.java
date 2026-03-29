@@ -34,21 +34,25 @@ public class FlywayMigrationConfig {
                     .locations("classpath:db/migration")
                     .baselineOnMigrate(true)
                     .baselineVersion("0")
-                    .validateOnMigrate(false)
+                    .validateOnMigrate(true)
+                    .outOfOrder(false)
+                    .failOnMissingLocations(false)
+                    .cleanDisabled(true)
                     .load();
+            
+            // Repair flyway metadata if needed (useful during development)
+            try {
+                flyway.repair();
+            } catch (Exception e) {
+                // repair might fail in some cases, that's ok
+            }
+            
             flyway.migrate();
-
             return flyway;
         } catch (FlywayException e) {
-            System.err.println("Flyway migration warning: " + e.getMessage());
-
-            return Flyway.configure()
-                    .dataSource(dataSource)
-                    .locations("classpath:db/migration")
-                    .baselineOnMigrate(true)
-                    .baselineVersion("0")
-                    .validateOnMigrate(false)
-                    .load();
+            System.err.println("Flyway migration failed: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Database migration failed. Please check your database connection and migration files.", e);
         }
     }
 }

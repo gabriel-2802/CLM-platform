@@ -4,6 +4,8 @@ import clm.demo.models.enums.ContractGenerationStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -56,11 +58,11 @@ public class GeneratedContract {
     private Integer generatedBy;
 
     /** * The final filled document.
-     * <b>Note:</b> Lazy loaded as BYTEA to prevent memory exhaustion during list views.
+     * <b>Note:</b> Stored as BYTEA. Not lazily loaded - better handled at service layer if needed.
      */
     @Lob
-    @Basic(fetch = FetchType.LAZY)
-    @Column(name = "document_content", columnDefinition = "BYTEA")
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 
     /** Monetary value of the contract for reporting and filtering. */

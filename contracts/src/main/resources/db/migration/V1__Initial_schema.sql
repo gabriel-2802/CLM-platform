@@ -23,13 +23,14 @@ CREATE TABLE IF NOT EXISTS contracts.contract_template (
     description VARCHAR(500),
 
     -- Document format (PDF, DOCX)
-    document_format VARCHAR(10) NOT NULL,
+    document_format VARCHAR(10) NOT NULL CHECK (document_format IN ('PDF', 'DOCX', 'WORD')),
 
     -- Binary template content (large - lazily loaded)
-    document_content BYTEA,
+    -- Explicitly set to BYTEA to avoid type coercion issues
+    document_content BYTEA NOT NULL,
 
     -- Field extraction metadata
-    field_count INTEGER NOT NULL DEFAULT 0,
+    field_count INTEGER NOT NULL DEFAULT 0 CHECK (field_count >= 0),
     is_fully_mapped BOOLEAN NOT NULL DEFAULT FALSE,
 
     -- Audit timestamps
@@ -55,10 +56,14 @@ CREATE TABLE IF NOT EXISTS contracts.template_field (
     field_name VARCHAR(255) NOT NULL,
     field_label VARCHAR(255),
 
+    -- The actual placeholder text captured from document (e.g., ".......")
+    placeholder_text VARCHAR(255),
+
     -- Field metadata
-    data_type VARCHAR(50) NOT NULL DEFAULT 'STRING',
-    field_position INTEGER,
-    page_number INTEGER,
+    data_type VARCHAR(50) NOT NULL DEFAULT 'STRING'
+        CHECK (data_type IN ('STRING', 'INTEGER', 'DATE', 'DECIMAL', 'BOOLEAN', 'TEXT')),
+    field_position INTEGER CHECK (field_position IS NULL OR field_position >= 0),
+    page_number INTEGER CHECK (page_number IS NULL OR page_number >= 0),
 
     -- Field requirements and formatting
     is_required BOOLEAN NOT NULL DEFAULT TRUE,
@@ -89,7 +94,8 @@ CREATE TABLE IF NOT EXISTS contracts.field_mapping (
 
     -- Transformation rules
     data_transformation VARCHAR(255),
-    mapping_status VARCHAR(50) NOT NULL DEFAULT 'MAPPED',
+    mapping_status VARCHAR(50) NOT NULL DEFAULT 'MAPPED'
+        CHECK (mapping_status IN ('MAPPED', 'UNMAPPED', 'PENDING', 'ERROR')),
 
     -- Notes and metadata
     notes VARCHAR(500),
@@ -118,23 +124,27 @@ CREATE TABLE IF NOT EXISTS contracts.generated_contract (
     template_id BIGINT NOT NULL REFERENCES contracts.contract_template(id) ON DELETE CASCADE,
 
     -- Client and user references (cross-schema - no FK constraint)
-    client_id INTEGER NOT NULL,
-    generated_by INTEGER,
+    client_id INTEGER NOT NULL CHECK (client_id > 0),
+    generated_by INTEGER CHECK (generated_by IS NULL OR generated_by > 0),
 
     -- Contract status and lifecycle
-    contract_status VARCHAR(50) NOT NULL DEFAULT 'GENERATED',
+    contract_status VARCHAR(50) NOT NULL DEFAULT 'GENERATED'
+        CHECK (contract_status IN ('GENERATED', 'SENT', 'SIGNED', 'EXECUTED', 'ARCHIVED', 'CANCELLED')),
 
     -- Contract content (large - lazily loaded)
-    document_content BYTEA,
+    document_content BYTEA NOT NULL,
 
     -- Contract business data
-    contract_value NUMERIC(12, 2),
+    contract_value NUMERIC(12, 2) CHECK (contract_value IS NULL OR contract_value > 0),
     contract_start_date DATE,
     contract_end_date DATE,
 
     -- Audit trail
     notes VARCHAR(1000),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT chk_contract_dates_order
+        CHECK (contract_start_date IS NULL OR contract_end_date IS NULL OR contract_start_date <= contract_end_date)
 );
 
 -- Create indexes on generated_contract
@@ -169,19 +179,6 @@ CREATE INDEX idx_contract_field_value_contract ON contracts.contract_field_value
 CREATE INDEX idx_contract_field_value_field ON contracts.contract_field_value(template_field_id);
 CREATE INDEX idx_contract_field_value_created_at ON contracts.contract_field_value(created_at);
 
--- ============================================================================
--- CONSTRAINTS AND VALIDATION
--- ============================================================================
-
--- Ensure contract dates are logically ordered
-ALTER TABLE contracts.generated_contract
-ADD CONSTRAINT chk_contract_dates_order
-CHECK (contract_start_date IS NULL OR contract_end_date IS NULL OR contract_start_date <= contract_end_date);
-
--- Ensure contract value is positive
-ALTER TABLE contracts.generated_contract
-ADD CONSTRAINT chk_contract_value_positive
-CHECK (contract_value IS NULL OR contract_value > 0);
 
 -- ============================================================================
 -- COMMENTS AND DOCUMENTATION
