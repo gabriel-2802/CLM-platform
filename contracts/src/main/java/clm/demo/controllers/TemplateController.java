@@ -17,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * REST controller for contract template lifecycle operations.
@@ -47,6 +48,18 @@ public class TemplateController {
     }
 
     /**
+     * Retrieves all available templates with their metadata and field counts.
+     * This endpoint must come before /{templateId} to properly route "/all" requests.
+     *
+     * @return 200 OK with list of all templates
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<TemplateResponseDTO>> getAllTemplates() {
+        var templates = templateService.getAllTemplates();
+        return ResponseEntity.ok(templates);
+    }
+
+    /**
      * Retrieves a template by ID with all its parsed fields and current mappings.
      *
      * @param templateId the template ID
@@ -59,19 +72,6 @@ public class TemplateController {
         return ResponseEntity.ok(response);
     }
 
-    /**
-     * Retrieves all available templates with their metadata and field counts.
-     * This endpoint is called before the individual template endpoint
-     * to properly route "/all" requests.
-     *
-     * @return 200 OK with list of all templates
-     */
-    @GetMapping
-    public ResponseEntity<?> getAllTemplates() {
-        // Return all templates - you can add pagination if needed
-        var templates = templateService.getAllTemplates();
-        return ResponseEntity.ok(templates);
-    }
 
     /**
      * Updates multiple field mappings for a template in a single batch operation.
