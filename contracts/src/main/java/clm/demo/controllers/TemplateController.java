@@ -3,13 +3,12 @@ package clm.demo.controllers;
 import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.responses.ParsedTemplateResponseDTO;
+import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
-import clm.demo.dto.responses.BatchFieldMappingResponseDTO;
 import clm.demo.services.TemplateService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -81,9 +80,9 @@ public class TemplateController {
      * @param request containing template ID and a list of field mapping definitions
      * @return 200 OK with batch mapping results and status for each field
      */
-    @PutMapping("/mappings")
-    public ResponseEntity<BatchFieldMappingResponseDTO> updateFieldMappings(@RequestBody @Valid FieldMappingRequest request) {
-        BatchFieldMappingResponseDTO response = templateService.updateFieldMappings(request);
+    @PutMapping("/{templateId}/labels")
+    public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(@RequestBody @Valid FieldMappingRequest request) {
+       var response = templateService.updateFieldLabels(request);
         return ResponseEntity.ok(response);
     }
 

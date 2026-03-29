@@ -24,4 +24,3 @@ public class UploadTemplateRequest {
 
     private String description;
 }
-

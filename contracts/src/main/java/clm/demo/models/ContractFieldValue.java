@@ -42,17 +42,9 @@ public class ContractFieldValue {
     @JoinColumn(name = "template_field_id", nullable = false)
     private TemplateField templateField;
 
-    /** Final value inserted into the contract document (may be transformed from sourceValue). */
+    /** Final value inserted into the contract document */
     @Column(name = "field_value", nullable = false, columnDefinition = "TEXT")
     private String fieldValue;
-
-    /** Original value fetched from the database before any transformation. */
-    @Column(name = "source_value", length = 1000)
-    private String sourceValue;
-
-    /** Name of the transformation applied (e.g., "UPPERCASE", "DATE_FORMAT_DD_MM_YYYY"). Null if no transformation. */
-    @Column(name = "transformation_applied", length = 255)
-    private String transformationApplied;
 
     /** Timestamp when this field was filled into the contract. */
     @CreationTimestamp

@@ -12,7 +12,7 @@ import java.util.List;
 
 /**
  * Request DTO for batch updating field mappings.
- * Allows mapping multiple template fields to database columns in a single request.
+ * Allows configuring multiple template fields in a single request.
  */
 @Data
 @NoArgsConstructor
@@ -27,9 +27,6 @@ public class FieldMappingRequest {
     @Valid
     private List<FieldMappingDefinition> mappings;
 
-    /**
-     * Individual field mapping definition within the batch.
-     */
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -39,15 +36,16 @@ public class FieldMappingRequest {
         @NotNull(message = "Field ID cannot be null")
         private Long fieldId;
 
-        @NotNull(message = "Source table cannot be null")
-        private String sourceTable;
+        @NotNull(message = "Field label cannot be null")
+        private String fieldLabel;
 
-        @NotNull(message = "Source column cannot be null")
-        private String sourceColumn;
+        @Builder.Default
+        private String dataType = "STRING";
 
-        private String dataTransformation;
+        @Builder.Default
+        private boolean isRequired = true;
 
-        private String description;
+        @Builder.Default
+        private String formatPattern = "";
     }
 }
-

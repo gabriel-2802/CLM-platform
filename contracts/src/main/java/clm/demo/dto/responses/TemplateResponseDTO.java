@@ -1,6 +1,5 @@
 package clm.demo.dto.responses;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,31 +18,20 @@ import java.util.List;
 @Builder
 public class TemplateResponseDTO {
 
-    @JsonProperty("id")
     private Long templateId;
 
-    @JsonProperty("templateName")
     private String templateName;
 
-    @JsonProperty("description")
     private String description;
 
-    @JsonProperty("documentFormat")
-    private String documentFormat;
-
-    @JsonProperty("fieldCount")
     private Integer fieldCount;
 
-    @JsonProperty("isFullyMapped")
-    private Boolean isFullyMapped;
+    private Boolean fullyMapped;
 
-    @JsonProperty("createdAt")
     private LocalDateTime createdAt;
 
-    @JsonProperty("updatedAt")
     private LocalDateTime updatedAt;
 
-    @JsonProperty("fields")
     private List<TemplateFieldDTO> fields;
 
     /**
@@ -55,11 +43,10 @@ public class TemplateResponseDTO {
     @Builder
     public static class TemplateFieldDTO {
         private Long id;
-        private String fieldName;
         private String fieldLabel;
+        private String placeholderText;
         private String dataType;
         private Integer fieldPosition;
-        private Integer pageNumber;
         private Boolean isRequired;
         private String formatPattern;
     }

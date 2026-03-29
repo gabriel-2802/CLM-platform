@@ -15,7 +15,5 @@ public interface ContractTemplateMapper {
     @Mapping(source = "id", target = "templateId")
     @Mapping(source = "templateFields", target = "fields")
     TemplateResponseDTO toResponseDTO(ContractTemplate entity);
-
-    ContractTemplate toEntity(TemplateResponseDTO dto);
 }
 

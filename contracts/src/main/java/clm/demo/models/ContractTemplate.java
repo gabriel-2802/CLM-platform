@@ -4,9 +4,9 @@ import clm.demo.models.enums.DocumentFormat;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
-import org.hibernate.annotations.JdbcTypeCode;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,11 +14,10 @@ import java.util.List;
 
 /**
  * Entity representing a contract blueprint used for automated generation.
- * * <p><b>Workflow:</b>
+ * <p><b>Workflow:</b>
  * <ul>
  * <li><b>Parse:</b> Extracts placeholders (e.g., '.....') from uploaded ZIP/PDF/DOCX.</li>
- * <li><b>Map:</b> Links placeholders to system data (e.g., "ClientName" → User Table).</li>
- * <li><b>Fill:</b> Merges template bytes with client data to produce a final contract.</li>
+ * <li><b>Generate:</b> Merges template with client data provided at generation time.</li>
  * </ul>
  */
 @Entity
@@ -55,7 +54,7 @@ public class ContractTemplate {
     @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 
-    /** Cached count of markers found in the doc; used for UI validation and mapping progress. */
+    /** Cached count of markers found in the doc. */
     @Column(name = "field_count", nullable = false)
     @Builder.Default
     private Integer fieldCount = 0;
@@ -78,10 +77,6 @@ public class ContractTemplate {
     @Builder.Default
     private List<TemplateField> templateFields = new ArrayList<>();
 
-    /** The logic defining how to inject data into this template's placeholders. */
-    @OneToMany(mappedBy = "contractTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<FieldMapping> fieldMappings = new ArrayList<>();
 
     /** Audit trail of every contract generated using this specific template. */
     @OneToMany(mappedBy = "contractTemplate", cascade = CascadeType.ALL, orphanRemoval = true)

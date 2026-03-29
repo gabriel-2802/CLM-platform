@@ -1,7 +1,8 @@
 package clm.demo.services;
 
-import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.requests.FieldMappingRequest;
+import clm.demo.dto.requests.UploadTemplateRequest;
+import clm.demo.dto.requests.UpdateFieldLabelRequest;
 import clm.demo.dto.responses.*;
 import clm.demo.exceptions.EmptyFileNameException;
 import clm.demo.exceptions.ResourceNotFoundException;
@@ -10,10 +11,12 @@ import clm.demo.mappers.ContractTemplateMapper;
 import clm.demo.mappers.ParsedDocumentMapper;
 import clm.demo.models.ContractTemplate;
 import clm.demo.models.TemplateField;
+import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
 
 import clm.demo.repositories.ContractTemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -70,7 +73,6 @@ public class TemplateService {
                 .documentFormat(format)
                 .documentContent(zipService.compress(request.getFile().getBytes()))
                 .fieldCount(parsedDoc.getPlaceholderCount())
-                .isFullyMapped(false)
                 .build();
 
         template = templateRepository.save(template);
@@ -81,7 +83,6 @@ public class TemplateService {
         List<TemplateField> fields = parsedDoc.getPlaceholders().stream()
                 .map(placeholder -> TemplateField.builder()
                         .contractTemplate(finalTemplate)
-                        .fieldName("field_" + placeholder.getPosition())
                         .fieldLabel("Field " + (placeholder.getPosition() + 1))
                         .fieldPosition(placeholder.getPosition())
                         .placeholderText(placeholder.getPlaceholderText())
@@ -100,15 +101,34 @@ public class TemplateService {
     }
 
     /**
-     * Updates multiple field mappings for a template in a batch operation.
-     * Maps all provided template fields to their respective database columns.
+     * Updates the label for a specific field in a template.
+     * Called by Client Management Service to set display labels.
      *
-     * @param request containing template ID and list of field mapping definitions
-     * @return BatchFieldMappingResponseDTO with status for each mapping
+     * @param templateId the template ID
+     * @param fieldId the field ID
+     * @param request containing the new label
+     * @return TemplateFieldResponseDTO with updated field
+     * @throws ResourceNotFoundException if template or field not found
      */
-    public BatchFieldMappingResponseDTO updateFieldMappings(FieldMappingRequest request) {
-        // Implementation will be added
-        return null;
+    public TemplateFieldResponseDTO updateFieldLabel(Long templateId, Long fieldId, UpdateFieldLabelRequest request) {
+        log.info("Updating field label: template={}, field={}, label={}", templateId, fieldId, request.getFieldLabel());
+        
+        ContractTemplate template = templateRepository.findById(templateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
+        
+        TemplateField field = templateFieldRepository.findById(fieldId)
+                .orElseThrow(() -> new ResourceNotFoundException("Field not found: " + fieldId));
+        
+        // Verify field belongs to the template
+        if (!field.getContractTemplate().getId().equals(templateId)) {
+            throw new RuntimeException("Field does not belong to this template");
+        }
+        
+        field.setFieldLabel(request.getFieldLabel());
+        field = templateFieldRepository.save(field);
+        
+        log.info("Field label updated: {}", fieldId);
+        return new TemplateFieldResponseDTO(field);
     }
 
     /**
@@ -175,6 +195,63 @@ public class TemplateService {
             return DocumentFormat.DOCX;
         } else {
             throw new UnsupportedFileException();
+        }
+    }
+    
+    
+    /**
+     * Batch updates field mappings for a template.
+     * Allows setting labels, data types, required status, and format patterns for multiple fields at once.
+     *
+     * @param request containing templateId and list of field mapping definitions
+     * @return List of TemplateFieldResponseDTO with all updated fields
+     * @throws ResourceNotFoundException if template or any field not found
+     */
+    public List<TemplateFieldResponseDTO> updateFieldLabels(FieldMappingRequest request) {
+
+        ContractTemplate template = templateRepository.findById(request.getTemplateId())
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
+
+        // update each field with the provided label
+        List<TemplateField> updatedFields = new java.util.ArrayList<>();
+        for (FieldMappingRequest.FieldMappingDefinition mapping : request.getMappings()) {
+            TemplateField field = templateFieldRepository.findById(mapping.getFieldId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Field not found: " + mapping.getFieldId()));
+
+            // verify field belongs to the template
+            if (!field.getContractTemplate().getId().equals(request.getTemplateId())) {
+                log.warn("Field {} does not belong to template {}", mapping.getFieldId(), request.getTemplateId());
+                throw new RuntimeException("Field does not belong to this template");
+            }
+
+            // update field properties
+            field.setFieldLabel(mapping.getFieldLabel());
+            field.setDataType(convertStringToDataType(mapping.getDataType()));
+            field.setIsRequired(mapping.isRequired());
+            field.setFormatPattern(mapping.getFormatPattern());
+
+            TemplateField savedField = templateFieldRepository.save(field);
+            updatedFields.add(savedField);
+            log.debug("Field updated: {} with label: {}", mapping.getFieldId(), mapping.getFieldLabel());
+        }
+
+        log.info("Successfully updated {} fields for template: {}", request.getMappings().size(), request.getTemplateId());
+
+        // return the list of updated fields as response DTOs
+        return updatedFields.stream()
+                .map(TemplateFieldResponseDTO::new)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper method to convert string data type to enum.
+     */
+    private DataType convertStringToDataType(String dataTypeStr) {
+        try {
+            return DataType.valueOf(dataTypeStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid data type: {}, defaulting to STRING", dataTypeStr);
+            return DataType.STRING;
         }
     }
 }

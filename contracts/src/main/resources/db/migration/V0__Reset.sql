@@ -1,13 +1,10 @@
--- ============================================================================
--- RESET SCRIPT - Clean up corrupted migration history
--- ============================================================================
+-- V0__Reset.sql
+-- Fresh start: drop all existing schemas and objects, then recreate contracts schema
 
--- This script is intentionally empty and is only used to mark a point
--- in the migration history. The actual reset is handled by the application.
+DROP SCHEMA IF EXISTS contracts CASCADE;
 
--- If you need to clean up the migration history, run these commands manually:
--- DROP TABLE IF EXISTS public.flyway_schema_history CASCADE;
--- DROP SCHEMA IF EXISTS contracts CASCADE;
+CREATE SCHEMA contracts;
 
--- Then restart the application to re-run all migrations from scratch.
-
+-- Ensure the schema exists before proceeding
+-- (This helps with any transaction isolation issues)
+GRANT USAGE ON SCHEMA contracts TO PUBLIC;

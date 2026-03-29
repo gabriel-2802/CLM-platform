@@ -135,7 +135,6 @@ public class TemplateServiceTest {
                 .documentFormat(DocumentFormat.PDF)
                 .documentContent(compressedContent)
                 .fieldCount(2)
-                .isFullyMapped(false)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -171,9 +170,7 @@ public class TemplateServiceTest {
         verify(templateFieldRepository).saveAll(fieldsCaptor.capture());
         List<TemplateField> savedFields = fieldsCaptor.getValue();
         assertEquals(2, savedFields.size());
-        assertEquals("field_0", savedFields.get(0).getFieldName());
         assertEquals("Field 1", savedFields.get(0).getFieldLabel());
-        assertEquals("field_1", savedFields.get(1).getFieldName());
         assertEquals("Field 2", savedFields.get(1).getFieldLabel());
     }
 
@@ -505,7 +502,6 @@ public class TemplateServiceTest {
         assertEquals(5, savedFields.size());
         
         for (int i = 0; i < 5; i++) {
-            assertEquals("field_" + i, savedFields.get(i).getFieldName());
             assertEquals("Field " + (i + 1), savedFields.get(i).getFieldLabel());
             assertEquals(i, savedFields.get(i).getFieldPosition());
         }
@@ -555,7 +551,6 @@ public class TemplateServiceTest {
         assertEquals(templateName, capturedTemplate.getTemplateName());
         assertEquals(description, capturedTemplate.getDescription());
         assertEquals(DocumentFormat.PDF, capturedTemplate.getDocumentFormat());
-        assertFalse(capturedTemplate.getIsFullyMapped());
     }
 
     private FileParserService.PlaceholderInfo createPlaceholder(int position, int startIndex, int endIndex) {
