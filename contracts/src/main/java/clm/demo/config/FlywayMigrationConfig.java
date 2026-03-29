@@ -1,6 +1,8 @@
 package clm.demo.config;
 
+import clm.demo.exceptions.DatabaseValidationException;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.springframework.context.annotation.Bean;
@@ -15,6 +17,7 @@ import javax.sql.DataSource;
  */
 @Configuration
 @AllArgsConstructor
+@Slf4j
 public class FlywayMigrationConfig {
 
     private final Environment environment;
@@ -40,19 +43,18 @@ public class FlywayMigrationConfig {
                     .cleanDisabled(true)
                     .load();
             
-            // Repair flyway metadata if needed (useful during development)
+            // repair flyway metadata if needed
             try {
                 flyway.repair();
             } catch (Exception e) {
-                // repair might fail in some cases, that's ok
+                log.info("Flyway repair failed (might be expected if no issues): {}", e.getMessage());
             }
             
             flyway.migrate();
             return flyway;
         } catch (FlywayException e) {
-            System.err.println("Flyway migration failed: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Database migration failed. Please check your database connection and migration files.", e);
+            log.error("Flyway migration failed: {}", e.getMessage(), e);
+            throw new DatabaseValidationException("Database migration failed: " + e.getMessage(), e);
         }
     }
 }

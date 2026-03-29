@@ -85,8 +85,7 @@ public class GlobalExceptionHandler {
         
         String message = e.getMessage();
         String details = "A data validation error occurred. Please check your input data.";
-        
-        // Check for specific constraint or type errors
+
         if (message != null) {
             if (message.contains("CHECK constraint")) {
                 details = "Data violates validation constraints.";
