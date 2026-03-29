@@ -4,6 +4,7 @@ import clm.demo.dto.responses.FieldMappingResponseDTO;
 import clm.demo.models.FieldMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 /**
  * MapStruct mapper for FieldMapping entity to DTO conversions.
@@ -21,6 +22,7 @@ public interface FieldMappingMapper {
 
     FieldMapping toEntity(FieldMappingResponseDTO dto);
 
+    @Named("enumToString")
     default String enumToString(Enum<?> enumValue) {
         return enumValue != null ? enumValue.toString() : null;
     }

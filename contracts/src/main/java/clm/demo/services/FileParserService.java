@@ -1,6 +1,10 @@
 package clm.demo.services;
 
 import clm.demo.models.enums.DocumentFormat;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -125,10 +129,10 @@ public class FileParserService {
         log.debug("File validated: {} ({} bytes)", name, file.getSize());
     }
 
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class ParsedDocumentResponse {
         /** Full plain-text content of the document for frontend rendering. */
         private String documentText;
@@ -143,10 +147,10 @@ public class FileParserService {
      * {@code startIndex}/{@code endIndex} point into {@code ParsedDocumentResponse.documentText}
      * and are used by the frontend to render each {@code ......} as a clickable span.
      */
-    @lombok.Data
-    @lombok.Builder
-    @lombok.NoArgsConstructor
-    @lombok.AllArgsConstructor
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class PlaceholderInfo {
         /** Zero-based occurrence index in document order. Maps to {@code TemplateField.fieldPosition}. */
         private int position;
