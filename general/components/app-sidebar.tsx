@@ -37,6 +37,7 @@ const data = {
     { title: "Clienti", url: "/clients", icon: IconFolder },
     { title: "Tasks", url: "/taskuri", icon: IconListDetails },
     { title: "Reports", url: "/situatie", icon: IconChartBar },
+    { title: "Contract Templates", url: "/contract-templates", icon: IconFileDescription },
   ],
   navClouds: [
     {
