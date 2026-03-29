@@ -32,7 +32,7 @@ public class TemplateField {
     @JoinColumn(name = "template_id", nullable = false)
     private ContractTemplate contractTemplate;
 
-    /** Programmatic ID used for mapping (e.g., "client_name"). snake_case recommended. */
+    /** Programmatic ID used for mapping (e.g., "client_name") */
     @Column(name = "field_name", nullable = false, length = 255)
     private String fieldName;
 
@@ -45,6 +45,10 @@ public class TemplateField {
     @Column(name = "data_type", nullable = false, length = 50)
     @Builder.Default
     private DataType dataType = DataType.STRING;
+
+    /** The actual placeholder text captured from document (e.g., "......"). */
+    @Column(name = "placeholder_text", length = 255)
+    private String placeholderText;
 
     /** * Zero-based index of appearance in the document.
      * Essential for DOCX where fixed coordinates aren't available.

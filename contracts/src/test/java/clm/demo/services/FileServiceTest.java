@@ -1,15 +1,14 @@
 package clm.demo.services;
 
 import clm.demo.models.enums.DocumentFormat;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -19,105 +18,116 @@ import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest
-@TestPropertySource(locations = "classpath:application-test.properties")
-@DisplayName("FileService Integration Tests")
+@ExtendWith(MockitoExtension.class)
+@DisplayName("FileParserService Unit Tests")
 @Slf4j
 class FileServiceTest {
 
-    @Autowired
+    @InjectMocks
     private FileParserService fileService;
 
-    private ObjectMapper objectMapper;
     private static final String TEST_RESOURCES_PATH = "src/test/resources";
-    private static final String OUTPUT_PATH = "target/test-results";
 
-    /**
-     *  Create output directory if it doesn't exist
-     * @throws IOException if unable
-     */
+    private MultipartFile pdfFile;
+    private MultipartFile docxFile;
+    private MultipartFile emptyFile;
+    private MultipartFile invalidFile;
+
     @BeforeEach
     void setUp() throws IOException {
-        objectMapper = new ObjectMapper();
-        Files.createDirectories(Paths.get(OUTPUT_PATH));
+        pdfFile = loadTestFile(
+                TEST_RESOURCES_PATH + "/pdf_file.pdf",
+                "pdf_file.pdf",
+                "application/pdf"
+        );
+        docxFile = loadTestFile(
+                TEST_RESOURCES_PATH + "/doc_file.docx",
+                "doc_file.docx",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+        emptyFile = new MockMultipartFile(
+                "file", "empty.pdf", "application/pdf", new byte[0]
+        );
+        invalidFile = new MockMultipartFile(
+                "file", "invalid.txt", "text/plain", "Some text content".getBytes()
+        );
     }
 
     @Test
-    @DisplayName("Should parse DOCX file and save results as JSON")
+    @DisplayName("Should parse DOCX file and extract placeholders")
     void testParseDocxFile() throws IOException {
-        // mock file received via http
-        String docxFilePath = TEST_RESOURCES_PATH + "/doc_file.docx";
-        MultipartFile multipartFile = loadTestFile(docxFilePath, "doc_file.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-
-        FileParserService.ParsedDocumentResponse response = fileService.parseTemplate(multipartFile, DocumentFormat.DOCX);
+        FileParserService.ParsedDocumentResponse response =
+                fileService.parseTemplate(docxFile, DocumentFormat.DOCX);
 
         assertNotNull(response);
         assertNotNull(response.getDocumentText());
         assertFalse(response.getDocumentText().isBlank());
         assertTrue(response.getPlaceholderCount() >= 0);
         assertNotNull(response.getPlaceholders());
+        assertEquals(response.getPlaceholderCount(), response.getPlaceholders().size());
 
-        // save results as JSON
-        String outputPath = OUTPUT_PATH + "/docx-parse-result.json";
-        saveResultsAsJson(response, outputPath);
-        log.info("DOCX test results saved to: {}", outputPath);
-
+        log.info("DOCX: {} chars, {} placeholders",
+                response.getDocumentText().length(), response.getPlaceholderCount());
     }
 
     @Test
-    @DisplayName("Should parse PDF file and save results as JSON")
+    @DisplayName("Should parse PDF file and extract placeholders")
     void testParsePdfFile() throws IOException {
-        // mock file received via http
-        String pdfFilePath = TEST_RESOURCES_PATH + "/pdf_file.pdf";
-        MultipartFile multipartFile = loadTestFile(pdfFilePath, "pdf_file.pdf", "application/pdf");
-
-        FileParserService.ParsedDocumentResponse response = fileService.parseTemplate(multipartFile, DocumentFormat.PDF);
+        FileParserService.ParsedDocumentResponse response =
+                fileService.parseTemplate(pdfFile, DocumentFormat.PDF);
 
         assertNotNull(response);
         assertNotNull(response.getDocumentText());
         assertFalse(response.getDocumentText().isBlank());
         assertTrue(response.getPlaceholderCount() >= 0);
         assertNotNull(response.getPlaceholders());
+        assertEquals(response.getPlaceholderCount(), response.getPlaceholders().size());
 
-        // save results as JSON
-        String outputPath = OUTPUT_PATH + "/pdf-parse-result.json";
-        saveResultsAsJson(response, outputPath);
-        log.info("PDF test results saved to: {}", outputPath);
+        log.info("PDF: {} chars, {} placeholders",
+                response.getDocumentText().length(), response.getPlaceholderCount());
     }
 
-    /**
-     * Loads a test file from the test resources directory and creates a MockMultipartFile.
-     *
-     * @param filePath   the path to the file relative to the project root
-     * @param fileName   the name of the file
-     * @param contentType the MIME type of the file
-     * @return MockMultipartFile instance
-     * @throws IOException if file cannot be read
-     */
-    private MultipartFile loadTestFile(String filePath, String fileName, String contentType) throws IOException {
+    @Test
+    @DisplayName("Should throw IllegalArgumentException for empty file")
+    void testEmptyFile_ThrowsException() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> fileService.parseTemplate(emptyFile, DocumentFormat.PDF)
+        );
+    }
+
+    @Test
+    @DisplayName("Should throw IllegalArgumentException for file with no name")
+    void testNoFileName_ThrowsException() {
+        MultipartFile noNameFile = new MockMultipartFile(
+                "file", "", "application/pdf", "content".getBytes()
+        );
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> fileService.parseTemplate(noNameFile, DocumentFormat.PDF)
+        );
+    }
+
+    @Test
+    @DisplayName("Placeholder indices should be consistent with document text")
+    void testPlaceholderIndicesMatchDocumentText() throws IOException {
+        FileParserService.ParsedDocumentResponse response =
+                fileService.parseTemplate(docxFile, DocumentFormat.DOCX);
+
+        String text = response.getDocumentText();
+        response.getPlaceholders().forEach(ph -> {
+            String extracted = text.substring(ph.getStartIndex(), ph.getEndIndex());
+            assertEquals(ph.getPlaceholderText(), extracted,
+                    "Placeholder at position " + ph.getPosition() + " does not match indices");
+        });
+    }
+
+    private MultipartFile loadTestFile(String filePath, String fileName, String contentType)
+            throws IOException {
         Path path = Paths.get(filePath);
         if (!Files.exists(path)) {
             throw new IOException("Test file not found: " + path.toAbsolutePath());
         }
-        byte[] fileContent = Files.readAllBytes(path);
-        return new MockMultipartFile(
-                "file",
-                fileName,
-                contentType,
-                fileContent
-        );
-    }
-
-    /**
-     * Saves the parsed document response as a formatted JSON file.
-     *
-     * @param response the ParsedDocumentResponse to serialize
-     * @param outputPath the file path where JSON should be saved
-     * @throws IOException if the file cannot be written
-     */
-    private void saveResultsAsJson(FileParserService.ParsedDocumentResponse response, String outputPath) throws IOException {
-        String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(response);
-        Files.writeString(Paths.get(outputPath), json);
+        return new MockMultipartFile("file", fileName, contentType, Files.readAllBytes(path));
     }
 }
-

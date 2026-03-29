@@ -4,6 +4,8 @@ import clm.demo.models.ContractTemplate;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 
 /**
  * Repository for ContractTemplate entity.
@@ -11,6 +13,5 @@ import org.springframework.stereotype.Repository;
  */
 @Repository
 public interface ContractTemplateRepository extends JpaRepository<ContractTemplate, Long> {
-
 }
 
