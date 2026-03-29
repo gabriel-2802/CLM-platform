@@ -1,40 +1,36 @@
 -- ============================================================================
--- CLM Platform: Contracts Module - Add missing placeholder_text column
--- Version: 4.0
+-- CLM Platform: Contracts Module - Remove page_number column
+-- Version: 5.0
 -- Created: 2026-03-29
--- Purpose: Adds placeholder_text column to template_field table
+-- Purpose: Removes the page_number column from template_field table
 -- ============================================================================
 
 SET search_path TO contracts;
 
 -- ============================================================================
--- ADD MISSING COLUMN TO TEMPLATE_FIELD
+-- REMOVE PAGE_NUMBER COLUMN
 -- ============================================================================
 
--- Add placeholder_text column if it doesn't exist
+-- Drop the page_number column if it exists
 DO $$
 BEGIN
-    IF NOT EXISTS (
+    IF EXISTS (
         SELECT 1 FROM information_schema.columns
         WHERE table_schema = 'contracts'
         AND table_name = 'template_field'
-        AND column_name = 'placeholder_text'
+        AND column_name = 'page_number'
     ) THEN
         ALTER TABLE contracts.template_field
-        ADD COLUMN placeholder_text VARCHAR(255);
-
-        -- Add a comment explaining the column
-        COMMENT ON COLUMN contracts.template_field.placeholder_text IS
-        'The actual placeholder text captured from the document (e.g., "......" or similar pattern)';
+        DROP COLUMN page_number;
     END IF;
 END
 $$;
 
 -- ============================================================================
--- UPDATE VALIDATION TRIGGER FOR TEMPLATE_FIELD IF NEEDED
+-- UPDATE VALIDATION TRIGGER
 -- ============================================================================
 
--- Re-create or update the validation trigger to handle the new column
+-- Re-create the validation trigger without page_number validation
 CREATE OR REPLACE FUNCTION contracts.validate_template_field()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -53,17 +49,7 @@ BEGIN
         RAISE EXCEPTION 'field_position cannot be negative';
     END IF;
 
-
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
--- ============================================================================
--- ENSURE INDEXES ARE CREATED
--- ============================================================================
-
--- Create index on placeholder_text if it doesn't exist (for searching by pattern)
-CREATE INDEX IF NOT EXISTS idx_template_field_placeholder_text
-ON contracts.template_field(placeholder_text)
-WHERE placeholder_text IS NOT NULL;
 

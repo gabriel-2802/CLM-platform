@@ -50,15 +50,10 @@ public class TemplateField {
     @Column(name = "placeholder_text", length = 255)
     private String placeholderText;
 
-    /** * Zero-based index of appearance in the document.
-     * Essential for DOCX where fixed coordinates aren't available.
-     */
+    /** Zero-based index of appearance in the document.*/
     @Column(name = "field_position")
     private Integer fieldPosition;
 
-    /** 1-based page index. Populated for PDF templates; usually null for DOCX. */
-    @Column(name = "page_number")
-    private Integer pageNumber;
 
     /** If true, generation fails if no value is resolved via FieldMapping. */
     @Column(name = "is_required", nullable = false)
