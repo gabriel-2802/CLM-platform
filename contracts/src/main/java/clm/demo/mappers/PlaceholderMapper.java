@@ -1,7 +1,7 @@
 package clm.demo.mappers;
 
 import clm.demo.dto.responses.ParsedTemplateResponseDTO;
-import clm.demo.services.FileParserService;
+import clm.demo.services.file.actions.FileParserService;
 import org.mapstruct.Mapper;
 
 /**

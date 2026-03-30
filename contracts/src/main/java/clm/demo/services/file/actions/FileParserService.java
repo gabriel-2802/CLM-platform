@@ -1,4 +1,4 @@
-package clm.demo.services;
+package clm.demo.services.file.actions;
 
 import clm.demo.models.enums.DocumentFormat;
 import lombok.AllArgsConstructor;

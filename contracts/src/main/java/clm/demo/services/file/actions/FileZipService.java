@@ -1,4 +1,4 @@
-package clm.demo.services;
+package clm.demo.services.file.actions;
 
 import org.springframework.stereotype.Service;
 

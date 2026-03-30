@@ -19,7 +19,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class GeneratedContractResponseDTO {
+public class ContractResponseDTO {
 
     private Long id;
 
