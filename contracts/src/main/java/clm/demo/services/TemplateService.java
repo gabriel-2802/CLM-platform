@@ -89,13 +89,23 @@ public class TemplateService {
                         .build())
                 .collect(Collectors.toList());
 
-        templateFieldRepository.saveAll(fields);
-        log.info("Created {} template fields", fields.size());
+        var savedFields = templateFieldRepository.saveAll(fields);
+
+        // set field IDs on placeholders for client-side reference
+        for (int i = 0; i < parsedDoc.getPlaceholders().size(); i++) {
+            Long fieldId = savedFields.get(i).getId();
+            parsedDoc.getPlaceholders().get(i).setFieldId(fieldId);
+        }
 
         // map parsed document to response DTO using mapper
         ParsedTemplateResponseDTO response = parsedDocumentMapper.toResponseDTO(parsedDoc);
         response.setTemplateId(template.getId());
         response.setTemplateName(template.getTemplateName());
+        
+        // Log response placeholders
+        for (int i = 0; i < response.getPlaceholders().size(); i++) {
+            log.debug("Response placeholder {} fieldId: {}", i, response.getPlaceholders().get(i).getFieldId());
+        }
 
         return response;
     }

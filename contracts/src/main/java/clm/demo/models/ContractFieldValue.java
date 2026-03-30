@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  * Audit trail record for each field value inserted into a generated contract.
  * Tracks the original database value, final transformed value, and transformation applied.
  * 
- * @see GeneratedContract
+ * @see Contract
  * @see TemplateField
  */
 @Entity
@@ -35,7 +35,7 @@ public class ContractFieldValue {
     /** Reference to the generated contract this field value belongs to. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "generated_contract_id", nullable = false)
-    private GeneratedContract generatedContract;
+    private Contract contract;
 
     /** Reference to the template field that was filled. */
     @ManyToOne(fetch = FetchType.LAZY)

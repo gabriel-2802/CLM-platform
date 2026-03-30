@@ -81,5 +81,5 @@ public class ContractTemplate {
     /** Audit trail of every contract generated using this specific template. */
     @OneToMany(mappedBy = "contractTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
-    private List<GeneratedContract> generatedContracts = new ArrayList<>();
+    private List<Contract> contracts = new ArrayList<>();
 }

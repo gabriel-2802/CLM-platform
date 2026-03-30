@@ -38,6 +38,7 @@ public class ParsedTemplateResponseDTO {
         private String placeholderText;
         private int startIndex;
         private int endIndex;
+        private Long fieldId;
     }
 }
 

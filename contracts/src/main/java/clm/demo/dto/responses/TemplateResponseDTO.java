@@ -44,7 +44,6 @@ public class TemplateResponseDTO {
     public static class TemplateFieldDTO {
         private Long id;
         private String fieldLabel;
-        private String placeholderText;
         private String dataType;
         private Integer fieldPosition;
         private Boolean isRequired;

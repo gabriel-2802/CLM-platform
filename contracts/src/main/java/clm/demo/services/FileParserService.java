@@ -160,5 +160,7 @@ public class FileParserService {
         private int startIndex;
         /** End char index (exclusive) in {@code documentText}. */
         private int endIndex;
+        /** ID of the corresponding TemplateField (set after field creation). */
+        private Long fieldId;
     }
 }

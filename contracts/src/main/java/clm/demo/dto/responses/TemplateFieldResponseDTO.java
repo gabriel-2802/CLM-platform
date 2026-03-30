@@ -20,7 +20,6 @@ public class TemplateFieldResponseDTO {
     private Long id;
     private String fieldLabel;
     private DataType dataType;
-    private String placeholderText;
     private Integer fieldPosition;
     private Boolean isRequired;
     private String formatPattern;
@@ -32,7 +31,6 @@ public class TemplateFieldResponseDTO {
         this.id = field.getId();
         this.fieldLabel = field.getFieldLabel();
         this.dataType = field.getDataType();
-        this.placeholderText = field.getPlaceholderText();
         this.fieldPosition = field.getFieldPosition();
         this.isRequired = field.getIsRequired();
         this.formatPattern = field.getFormatPattern();

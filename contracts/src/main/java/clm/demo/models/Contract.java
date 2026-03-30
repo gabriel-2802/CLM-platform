@@ -30,7 +30,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class GeneratedContract {
+public class Contract {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -56,6 +56,10 @@ public class GeneratedContract {
     /** Reference to the User (staff) who initiated the generation. */
     @Column(name = "generated_by")
     private Integer generatedBy;
+
+    /** Email address of the user who generated the contract. */
+    @Column(name = "generated_by_mail", length = 255)
+    private String generatedByMail;
 
     /** * The final filled document.
      * <b>Note:</b> Stored as BYTEA. Not lazily loaded - better handled at service layer if needed.
@@ -86,7 +90,7 @@ public class GeneratedContract {
     /** * Historical record of exactly what values were injected into the template
      * at the moment of generation. Used for auditing.
      */
-    @OneToMany(mappedBy = "generatedContract", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ContractFieldValue> fieldValues = new ArrayList<>();
 }
