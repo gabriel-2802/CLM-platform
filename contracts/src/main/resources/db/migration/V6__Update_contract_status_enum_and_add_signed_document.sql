@@ -9,12 +9,15 @@ SET search_path TO contracts;
 -- DROP OLD ENUM AND CREATE NEW ONE
 -- ============================================
 
--- Drop the old enum type (requires removing constraint first)
--- First, we need to temporarily change the column type to text
+-- First, remove the DEFAULT constraint that depends on the old enum
+ALTER TABLE contracts.generated_contract
+ALTER COLUMN contract_status DROP DEFAULT;
+
+-- Now convert the column to text so we can drop the enum
 ALTER TABLE contracts.generated_contract
 ALTER COLUMN contract_status TYPE VARCHAR(50);
 
--- Drop the old enum type
+-- Now we can safely drop the old enum type
 DROP TYPE IF EXISTS contracts.contract_status_enum;
 
 -- Create new enum type with updated values
@@ -28,6 +31,10 @@ CREATE TYPE contracts.contract_status_enum AS ENUM (
 -- Change the column back to the new enum type
 ALTER TABLE contracts.generated_contract
 ALTER COLUMN contract_status TYPE contracts.contract_status_enum USING contract_status::contracts.contract_status_enum;
+
+-- Add DEFAULT constraint back with new default value
+ALTER TABLE contracts.generated_contract
+ALTER COLUMN contract_status SET DEFAULT 'PENDING_SIGNATURE'::contracts.contract_status_enum;
 
 -- ============================================
 -- MIGRATION OF EXISTING DATA
