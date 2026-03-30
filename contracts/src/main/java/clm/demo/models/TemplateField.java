@@ -26,7 +26,7 @@ public class TemplateField {
     /** Parent template; lazy loaded */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
-    private ContractTemplate contractTemplate;
+    private Template contractTemplate;
 
     /** Display name used in the admin mapping UI (e.g., "Client Name"). */
     @Column(name = "field_label", length = 255)

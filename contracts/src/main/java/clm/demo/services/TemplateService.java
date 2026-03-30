@@ -2,14 +2,13 @@ package clm.demo.services;
 
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.UploadTemplateRequest;
-import clm.demo.dto.requests.UpdateFieldLabelRequest;
 import clm.demo.dto.responses.*;
 import clm.demo.exceptions.EmptyFileNameException;
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.UnsupportedFileException;
 import clm.demo.mappers.ContractTemplateMapper;
 import clm.demo.mappers.ParsedDocumentMapper;
-import clm.demo.models.ContractTemplate;
+import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
@@ -71,7 +70,7 @@ public class TemplateService {
         FileParserService.ParsedDocumentResponse parsedDoc = fileParserService.parseTemplate(request.getFile(), format);
 
         // create and save the ContractTemplate entity
-        ContractTemplate template = ContractTemplate.builder()
+        Template template = Template.builder()
                 .templateName(request.getTemplateName())
                 .description(request.getDescription())
                 .documentFormat(format)
@@ -83,7 +82,7 @@ public class TemplateService {
         log.info("Template saved with ID: {}", template.getId());
 
         // create TemplateField entities for each placeholder
-        final ContractTemplate finalTemplate = template;
+        final Template finalTemplate = template;
         List<TemplateField> fields = parsedDoc.getPlaceholders().stream()
                 .map(placeholder -> TemplateField.builder()
                         .contractTemplate(finalTemplate)
@@ -111,42 +110,6 @@ public class TemplateService {
         }
 
         return response;
-    }
-
-    /**
-     * Updates the label for a specific field in a template.
-     * Called by Client Management Service to set display labels.
-     * Automatically checks if all fields are now mapped and updates the template status.
-     *
-     * @param templateId the template ID
-     * @param fieldId the field ID
-     * @param request containing the new label
-     * @return TemplateFieldResponseDTO with updated field
-     * @throws ResourceNotFoundException if template or field not found
-     */
-    public TemplateFieldResponseDTO updateFieldLabel(Long templateId, Long fieldId, UpdateFieldLabelRequest request) {
-        log.info("Updating field label: template={}, field={}, label={}", templateId, fieldId, request.getFieldLabel());
-        
-        ContractTemplate template = templateRepository.findById(templateId)
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
-        
-        TemplateField field = templateFieldRepository.findById(fieldId)
-                .orElseThrow(() -> new ResourceNotFoundException("Field not found: " + fieldId));
-        
-        // Verify field belongs to the template
-        if (!field.getContractTemplate().getId().equals(templateId)) {
-            throw new RuntimeException("Field does not belong to this template");
-        }
-        
-        field.setFieldLabel(request.getFieldLabel());
-        field = templateFieldRepository.save(field);
-        
-        log.info("Field label updated: {}", fieldId);
-
-        // Check if all fields are now mapped and update the template status
-        updateTemplateFullyMappedStatus(templateId);
-
-        return new TemplateFieldResponseDTO(field);
     }
 
     /**
@@ -211,7 +174,7 @@ public class TemplateService {
     @Transactional(readOnly = true)
     public byte[] downloadTemplateAsDocx(Long templateId) throws IOException {
 
-        ContractTemplate template = templateRepository.findById(templateId)
+        Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
 
         // decompress the stored document content
@@ -242,7 +205,7 @@ public class TemplateService {
      */
     @Transactional(readOnly = true)
     public byte[] downloadTemplateAsPdf(Long templateId) throws IOException {
-        ContractTemplate template = templateRepository.findById(templateId)
+        Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
 
         // decompress the stored document content
@@ -293,7 +256,7 @@ public class TemplateService {
      */
     public List<TemplateFieldResponseDTO> updateFieldLabels(FieldMappingRequest request) {
 
-        ContractTemplate template = templateRepository.findById(request.getTemplateId())
+        Template template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
 
         // update each field with the provided label

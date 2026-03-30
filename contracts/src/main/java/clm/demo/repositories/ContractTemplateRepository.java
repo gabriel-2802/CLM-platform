@@ -1,6 +1,6 @@
 package clm.demo.repositories;
 
-import clm.demo.models.ContractTemplate;
+import clm.demo.models.Template;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
  * Handles CRUD operations and custom queries for contract templates.
  */
 @Repository
-public interface ContractTemplateRepository extends JpaRepository<ContractTemplate, Long> {
+public interface ContractTemplateRepository extends JpaRepository<Template, Long> {
 
     /**
      * Efficiently updates the isFullyMapped status without loading the full entity.
@@ -22,7 +22,7 @@ public interface ContractTemplateRepository extends JpaRepository<ContractTempla
      * @param isFullyMapped the new fully mapped status
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE ContractTemplate c SET c.isFullyMapped = :isFullyMapped WHERE c.id = :templateId")
+    @Query("UPDATE Template c SET c.isFullyMapped = :isFullyMapped WHERE c.id = :templateId")
     void updateFullyMappedStatus(@Param("templateId") Long templateId, @Param("isFullyMapped") Boolean isFullyMapped);
 
     /**
@@ -33,7 +33,7 @@ public interface ContractTemplateRepository extends JpaRepository<ContractTempla
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
-        UPDATE ContractTemplate c 
+        UPDATE Template c 
         SET c.isFullyMapped = (
             SELECT CASE 
                 WHEN COUNT(f) = 0 THEN true

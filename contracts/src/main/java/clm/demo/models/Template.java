@@ -26,7 +26,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ContractTemplate {
+public class Template {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

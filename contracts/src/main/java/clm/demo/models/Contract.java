@@ -39,7 +39,7 @@ public class Contract {
     /** Source template. Lazy loaded to keep contract lookups lightweight. */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
-    private ContractTemplate contractTemplate;
+    private Template contractTemplate;
 
     /** * Foreign reference to the main 'Client' table.
      * <b>Note:</b> No JPA @ManyToOne used because Client resides in a different schema/service.

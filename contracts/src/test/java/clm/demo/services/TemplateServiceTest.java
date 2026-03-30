@@ -8,7 +8,7 @@ import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.UnsupportedFileException;
 import clm.demo.mappers.ContractTemplateMapper;
 import clm.demo.mappers.ParsedDocumentMapper;
-import clm.demo.models.ContractTemplate;
+import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.ContractTemplateRepository;
@@ -130,7 +130,7 @@ public class TemplateServiceTest {
                 .placeholderCount(2)
                 .build();
 
-        ContractTemplate savedTemplate = ContractTemplate.builder()
+        Template savedTemplate = Template.builder()
                 .id(1L)
                 .templateName("Service Agreement 2026")
                 .description("Standard service agreement template")
@@ -146,7 +146,7 @@ public class TemplateServiceTest {
                 .thenReturn(parsedResponse);
         when(zipService.compress(originalContent))
                 .thenReturn(compressedContent);
-        when(templateRepository.save(any(ContractTemplate.class)))
+        when(templateRepository.save(any(Template.class)))
                 .thenReturn(savedTemplate);
         when(parsedDocumentMapper.toResponseDTO(parsedResponse))
                 .thenReturn(dtoResponse);
@@ -162,7 +162,7 @@ public class TemplateServiceTest {
         // verify interactions
         verify(fileParserService).parseTemplate(pdfFile, DocumentFormat.PDF);
         verify(zipService).compress(originalContent);
-        verify(templateRepository).save(any(ContractTemplate.class));
+        verify(templateRepository).save(any(Template.class));
         verify(templateFieldRepository).saveAll(anyList());
         verify(parsedDocumentMapper).toResponseDTO(parsedResponse);
 
@@ -207,7 +207,7 @@ public class TemplateServiceTest {
                 .placeholderCount(1)
                 .build();
 
-        ContractTemplate savedTemplate = ContractTemplate.builder()
+        Template savedTemplate = Template.builder()
                 .id(2L)
                 .templateName("Employment Contract")
                 .description("Standard employment contract")
@@ -224,7 +224,7 @@ public class TemplateServiceTest {
                 .thenReturn(parsedResponse);
         when(zipService.compress(originalContent))
                 .thenReturn(compressedContent);
-        when(templateRepository.save(any(ContractTemplate.class)))
+        when(templateRepository.save(any(Template.class)))
                 .thenReturn(savedTemplate);
         when(parsedDocumentMapper.toResponseDTO(parsedResponse))
                 .thenReturn(dtoResponse);
@@ -239,7 +239,7 @@ public class TemplateServiceTest {
 
         // verify
         verify(fileParserService).parseTemplate(docxFile, DocumentFormat.DOCX);
-        verify(templateRepository).save(any(ContractTemplate.class));
+        verify(templateRepository).save(any(Template.class));
         verify(templateFieldRepository).saveAll(anyList());
     }
 
@@ -354,7 +354,7 @@ public class TemplateServiceTest {
     void testGetTemplate_Success() {
         // arrange
         Long templateId = 1L;
-        ContractTemplate template = ContractTemplate.builder()
+        Template template = Template.builder()
                 .id(templateId)
                 .templateName("Service Agreement")
                 .description("Service agreement template")
@@ -476,7 +476,7 @@ public class TemplateServiceTest {
                 .placeholders(placeholders)
                 .build();
 
-        ContractTemplate savedTemplate = ContractTemplate.builder()
+        Template savedTemplate = Template.builder()
                 .id(1L)
                 .templateName("Multi-Field Template")
                 .fieldCount(5)
@@ -524,7 +524,7 @@ public class TemplateServiceTest {
                 .placeholders(List.of())
                 .build();
 
-        ContractTemplate savedTemplate = ContractTemplate.builder()
+        Template savedTemplate = Template.builder()
                 .id(1L)
                 .templateName(templateName)
                 .description(description)
@@ -546,10 +546,10 @@ public class TemplateServiceTest {
         templateService.uploadTemplate(request);
 
         // assert
-        ArgumentCaptor<ContractTemplate> templateCaptor = ArgumentCaptor.forClass(ContractTemplate.class);
+        ArgumentCaptor<Template> templateCaptor = ArgumentCaptor.forClass(Template.class);
         verify(templateRepository).save(templateCaptor.capture());
         
-        ContractTemplate capturedTemplate = templateCaptor.getValue();
+        Template capturedTemplate = templateCaptor.getValue();
         assertEquals(templateName, capturedTemplate.getTemplateName());
         assertEquals(description, capturedTemplate.getDescription());
         assertEquals(DocumentFormat.PDF, capturedTemplate.getDocumentFormat());
