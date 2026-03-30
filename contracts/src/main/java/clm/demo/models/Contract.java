@@ -1,6 +1,6 @@
 package clm.demo.models;
 
-import clm.demo.models.enums.ContractGenerationStatus;
+import clm.demo.models.enums.ContractStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -47,11 +47,11 @@ public class Contract {
     @Column(name = "client_id", nullable = false)
     private Integer clientId;
 
-    /** Current lifecycle state (e.g., GENERATED, SIGNED, EXPIRED). */
+    /** Current lifecycle state (e.g., PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED). */
     @Enumerated(EnumType.STRING)
     @Column(name = "contract_status", nullable = false, length = 50)
     @Builder.Default
-    private ContractGenerationStatus contractStatus = ContractGenerationStatus.GENERATED;
+    private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
 
     /** Reference to the User (staff) who initiated the generation. */
     @Column(name = "generated_by")
@@ -69,6 +69,14 @@ public class Contract {
     @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 
+    /** * The signed version of the document (populated when contract is signed).
+     * <b>Note:</b> Stored as BYTEA. Nullable - only set after signature/ACTIVE status.
+     */
+    @Lob
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "signed_document_content")
+    private byte[] signedDocument;
+
     /** Monetary value of the contract for reporting and filtering. */
     @Column(name = "contract_value", precision = 12, scale = 2)
     private BigDecimal contractValue;
@@ -82,6 +90,15 @@ public class Contract {
     /** Contextual notes or generation metadata. */
     @Column(name = "notes", length = 1000)
     private String notes;
+
+    /** Date when the contract was terminated (null if not terminated). */
+    @Column(name = "termination_date")
+    private LocalDate terminationDate;
+
+    /** Reasons for contract termination (empty string by default). */
+    @Column(name = "reasons_for_termination", length = 1000)
+    @Builder.Default
+    private String reasonsForTermination = "";
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

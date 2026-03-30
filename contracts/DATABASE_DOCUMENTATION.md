@@ -197,14 +197,17 @@ PostgreSQL Database: clm_platform
 | `id` | BIGSERIAL | PRIMARY KEY | Unique identifier |
 | `template_id` | BIGINT | NOT NULL, FK | References `contract_template(id)` with RESTRICT delete |
 | `client_id` | INTEGER | NOT NULL | Foreign reference to client (different schema/service) |
-| `contract_status` | contract_status_enum | NOT NULL, DEFAULT 'GENERATED' | Lifecycle: GENERATED, SIGNED, ARCHIVED, VOID |
+| `contract_status` | contract_status_enum | NOT NULL, DEFAULT 'PENDING_SIGNATURE' | Lifecycle: PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED |
 | `generated_by` | INTEGER | | User ID of the person who generated the contract |
 | `generated_by_mail` | VARCHAR(255) | | Email address of the generating user (added in V4) |
-| `document_content` | BYTEA | NOT NULL | Binary content of the filled document |
+| `document_content` | BYTEA | NOT NULL | Binary content of the filled/unsigned document |
+| `signed_document_content` | BYTEA | | Binary content of the signed document (populated after signing) |
 | `contract_value` | NUMERIC(12,2) | | Monetary value for reporting (e.g., 50000.00) |
 | `contract_start_date` | DATE | | Contract validity start date |
 | `contract_end_date` | DATE | | Contract validity end date |
 | `notes` | VARCHAR(1000) | | Additional contextual notes |
+| `termination_date` | DATE | | Date when contract was terminated (NULL if active) |
+| `reasons_for_termination` | VARCHAR(1000) | NOT NULL, DEFAULT '' | Reasons for termination (empty string if not terminated) |
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Generation timestamp |
 
 **Indexes**:
@@ -273,6 +276,8 @@ Indexes are created to optimize:
 | `generated_contract` | idx_generated_contract_template_client | `template_id, client_id` | Composite | Template+Client lookup |
 | `generated_contract` | idx_generated_contract_validity | `contract_start_date, contract_end_date` | Composite | Date range queries |
 | `generated_contract` | idx_generated_contract_created_at | `created_at DESC` | Regular | Recent contracts |
+| `generated_contract` | idx_generated_contract_termination_date | `termination_date DESC WHERE termination_date IS NOT NULL` | Partial | Terminated contracts |
+| `generated_contract` | idx_generated_contract_signed | `contract_status WHERE contract_status = 'ACTIVE'` | Partial | Active/signed contracts |
 | `contract_field_value` | PRIMARY | `id` | Unique | Primary key |
 | `contract_field_value` | idx_contract_field_value_contract | `generated_contract_id` | Regular | Find values in contract |
 | `contract_field_value` | idx_contract_field_value_field | `template_field_id` | Regular | Find usage of field |
@@ -297,6 +302,47 @@ ORDER BY idx_scan DESC;
 ```sql
 REINDEX TABLE contracts.contract_template;
 ```
+
+---
+
+## Database Migrations
+
+All schema changes are managed via Flyway version-controlled migrations in `src/main/resources/db/migration/`:
+
+| Migration | Version | Purpose | Status |
+|-----------|---------|---------|--------|
+| `V0__Reset.sql` | 0 | Initial schema reset | BASELINE |
+| `V1__Initial_schema.sql` | 1 | Create 4 core tables with indexes | ACTIVE |
+| `V2__Fix_fully_mapped_column.sql` | 2 | Rename `fully_mapped` to `is_fully_mapped` | ACTIVE |
+| `V3__Add_fully_mapped_trigger.sql` | 3 | Add trigger for auto-updating fully_mapped status | ACTIVE |
+| `V4__Add_generated_by_mail_column.sql` | 4 | Add email tracking for contract generation | ACTIVE |
+| `V5__Add_termination_fields.sql` | 5 | Add termination tracking (terminationDate, reasonsForTermination) | ACTIVE |
+| `V6__Update_contract_status_enum_and_add_signed_document.sql` | 6 | Update status enum and add signed document support | ACTIVE |
+
+### Contract Status Enum Updates
+
+**V1 (Original)**:
+- `GENERATED`: Contract generated but not signed
+- `SIGNED`: Contract signed by client
+- `ARCHIVED`: Contract completed or expired
+- `VOID`: Contract cancelled/terminated
+
+**V6 (Current)**:
+- `PENDING_SIGNATURE`: Contract generated and awaiting signature (replaces GENERATED)
+- `ACTIVE`: Contract signed and in effect (replaces SIGNED)
+- `TERMINATED`: Contract ended prematurely (replaces VOID)
+- `ARCHIVED`: Contract completed or expired (unchanged)
+
+### Recent Column Additions
+
+**V5 - Termination Tracking**:
+- `terminationDate`: DATE, nullable - records when a contract was terminated
+- `reasonsForTermination`: VARCHAR(1000), NOT NULL DEFAULT '' - documents termination reason
+
+**V6 - Signed Document Support**:
+- `signed_document_content`: BYTEA, nullable - stores the digitally signed version of the contract
+- Populated when contract status changes to ACTIVE
+- Used for audit trail and client delivery
 
 ---
 
@@ -649,7 +695,7 @@ public class Contract {
     @Enumerated(EnumType.STRING)
     @Column(name = "contract_status", nullable = false, length = 50)
     @Builder.Default
-    private ContractGenerationStatus contractStatus = ContractGenerationStatus.GENERATED;
+    private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
     
     @Column(name = "generated_by")
     private Integer generatedBy;
@@ -661,6 +707,12 @@ public class Contract {
     @JdbcTypeCode(SqlTypes.VARBINARY)
     @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
+
+    /** The signed version of the document (populated when contract is signed). */
+    @Lob
+    @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Column(name = "signed_document_content")
+    private byte[] signedDocument;
     
     @Column(name = "contract_value", precision = 12, scale = 2)
     private BigDecimal contractValue;
@@ -685,13 +737,14 @@ public class Contract {
 ```
 
 **Enums**:
-- `ContractGenerationStatus`: GENERATED, SIGNED, ARCHIVED, VOID
+- `ContractStatus`: PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED
 
 **Key Design**:
 - `clientId`: Raw Integer (no JPA relationship) - client is in different schema
 - `generatedBy`: User ID from external service
 - `generatedByMail`: Email address for notifications
-- `documentContent`: Final filled binary stored as BYTEA
+- `documentContent`: Final filled unsigned document stored as BYTEA
+- `signedDocument`: Signed version of the document (set when status = ACTIVE)
 
 **Relationships**:
 - `N:1` → `ContractTemplate` (lazy loaded)
