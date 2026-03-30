@@ -14,6 +14,8 @@ import clm.demo.models.TemplateField;
 import clm.demo.repositories.ContractFieldValueRepository;
 import clm.demo.repositories.ContractTemplateRepository;
 import clm.demo.repositories.GeneratedContractRepository;
+import clm.demo.services.file.actions.FileContentReplacementService;
+import clm.demo.services.file.actions.FileZipService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,8 @@ public class ContractService {
     private final ContractFieldValueRepository contractFieldValueRepository;
     private final ContractGenerationMapper contractGenerationMapper;
     private final GeneratedContractMapper generatedContractMapper;
+    private final FileContentReplacementService fileContentReplacementService;
+    private final FileZipService zipService;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -61,20 +66,33 @@ public class ContractService {
 
         validateMandatoryFields(template, request.getMappings());
 
+        // 1. Save contract shell first to get an ID
         Contract contract = contractGenerationMapper.toContractEntity(request, template);
-        Contract savedContract = generatedContractRepository.save(contract);
-        log.info("Contract saved with ID: {}", savedContract.getId());
+        contract = generatedContractRepository.save(contract);
+        log.info("Contract shell saved with ID: {}", contract.getId());
 
-        List<ContractFieldValue> fieldValues = buildFieldValues(savedContract, template, request.getMappings());
+        // 2. Build field values against the persisted contract
+        List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, request.getMappings());
         if (!fieldValues.isEmpty()) {
             contractFieldValueRepository.saveAll(fieldValues);
-            savedContract.setFieldValues(fieldValues);
-            log.info("Persisted {} field values for contract ID: {}", fieldValues.size(), savedContract.getId());
+            contract.setFieldValues(fieldValues);
+            log.info("Persisted {} field values for contract ID: {}", fieldValues.size(), contract.getId());
         }
 
-        return generatedContractMapper.toResponseDTO(savedContract);
+        // 3. Generate document content and update contract
+        try {
+            byte[] documentContent = fileContentReplacementService.generateDocumentContent(contract, template, fieldValues);
+            contract.setDocumentContent(zipService.compress(documentContent));
+            contract = generatedContractRepository.save(contract);
+            log.info("Contract document saved for ID: {}", contract.getId());
+        } catch (IOException e) {
+            throw new RuntimeException("Document generation failed: " + e.getMessage(), e);
+        }
+
+        return generatedContractMapper.toResponseDTO(contract);
     }
 
+    // ...existing code...
     private void validateMandatoryFields(Template template, Map<String, String> mappings) {
         List<String> missingFields = template.getTemplateFields().stream()
                 .filter(TemplateField::getIsRequired)

@@ -1,6 +1,7 @@
 package clm.demo.models;
 
 import clm.demo.models.enums.ContractStatus;
+import clm.demo.models.converters.ContractStatusConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -50,7 +51,7 @@ public class Contract {
 
     /** Current lifecycle state (e.g., PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED). */
     @Enumerated(EnumType.STRING)
-    @JdbcTypeCode(SqlTypes.NAMED_ENUM)   // ← was SqlTypes.VARCHAR
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
     @Column(name = "contract_status", nullable = false)
     @Builder.Default
     private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;

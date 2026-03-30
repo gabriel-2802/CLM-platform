@@ -5,7 +5,9 @@ import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.responses.ParsedTemplateResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
+import clm.demo.models.enums.DocumentFormat;
 import clm.demo.services.TemplateService;
+import clm.demo.services.download.DocumentDownloadService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ import java.util.List;
 public class TemplateController {
 
     private final TemplateService templateService;
+    private final DocumentDownloadService downloadService;
 
     /**
      * Uploads a contract template file, parses it for placeholders,
@@ -111,11 +114,11 @@ public class TemplateController {
      */
     @GetMapping("/download/docx/{templateId}")
     public ResponseEntity<byte[]> downloadTemplateDocx(@PathVariable @NotNull Long templateId) throws IOException {
-        byte[] documentContent = templateService.downloadTemplateAsDocx(templateId);
-        
+        byte[] documentContent = downloadService.downloadTemplate(templateId, DocumentFormat.DOCX);
+
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=template-" + templateId + ".docx")
-                .header("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                .header("Content-Type", downloadService.getContentType(DocumentFormat.DOCX))
                 .body(documentContent);
     }
 
@@ -130,11 +133,11 @@ public class TemplateController {
      */
     @GetMapping("/download/pdf/{templateId}")
     public ResponseEntity<byte[]> downloadTemplatePdf(@PathVariable @NotNull Long templateId) throws IOException {
-        byte[] documentContent = templateService.downloadTemplateAsPdf(templateId);
+        byte[] documentContent = downloadService.downloadTemplate(templateId, DocumentFormat.PDF);
         
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=template-" + templateId + ".pdf")
-                .header("Content-Type", "application/pdf")
+                .header("Content-Type", downloadService.getContentType(DocumentFormat.PDF))
                 .body(documentContent);
     }
 

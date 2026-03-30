@@ -77,6 +77,9 @@ public class FileConverterService {
             WordprocessingMLPackage wordPackage = WordprocessingMLPackage.load(new ByteArrayInputStream(docxData));
 
             ByteArrayOutputStream pdfOut = new ByteArrayOutputStream();
+
+
+            
             Docx4J.toPDF(wordPackage, pdfOut);
 
             return  pdfOut.toByteArray();

@@ -1,8 +1,11 @@
 package clm.demo.models;
 
 import clm.demo.models.enums.DataType;
+import clm.demo.models.converters.DataTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 /**
  * Represents a single placeholder (e.g., '.....') extracted from a template.
@@ -35,7 +38,8 @@ public class TemplateField {
 
     /** Expected format (STRING, DATE, etc.) used for validation and parsing logic. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "data_type", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "data_type", nullable = false)
     @Builder.Default
     private DataType dataType = DataType.STRING;
 

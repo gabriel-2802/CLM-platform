@@ -1,6 +1,7 @@
 package clm.demo.models;
 
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.models.converters.DocumentFormatConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -42,7 +43,8 @@ public class Template {
 
     /** Format type; dictates whether the system uses PDFBox or Apache POI for processing. */
     @Enumerated(EnumType.STRING)
-    @Column(name = "document_format", nullable = false, length = 10)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "document_format", nullable = false)
     private DocumentFormat documentFormat;
 
     /** * The raw source file.
