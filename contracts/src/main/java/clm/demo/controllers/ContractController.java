@@ -23,7 +23,8 @@ public class ContractController {
 
     @PostMapping("/generate")
     ResponseEntity<ContractResponseDTO> generateContracts(@Valid @RequestBody GenContractRequest request) {
-        return null;
+        ContractResponseDTO responseDTO = contractService.generateContract(request);
+        return ResponseEntity.ok(responseDTO);
     }
 
     @PutMapping(value = "upload/signed/{contractId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

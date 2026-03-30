@@ -297,10 +297,12 @@ public class TemplateService {
      * Helper method to convert string data type to enum.
      */
     private DataType convertStringToDataType(String dataTypeStr) {
+        if (dataTypeStr == null || dataTypeStr.trim().isEmpty()) {
+            return DataType.STRING;
+        }
         try {
             return DataType.valueOf(dataTypeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
-            log.warn("Invalid data type: {}, defaulting to STRING", dataTypeStr);
             return DataType.STRING;
         }
     }

@@ -1,5 +1,6 @@
 package clm.demo.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -16,8 +17,6 @@ import java.util.List;
  */
 @Data
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class FieldMappingRequest {
 
     @NotNull(message = "Template ID cannot be null")
@@ -29,8 +28,6 @@ public class FieldMappingRequest {
 
     @Data
     @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
     public static class FieldMappingDefinition {
 
         @NotNull(message = "Field ID cannot be null")
@@ -39,13 +36,10 @@ public class FieldMappingRequest {
         @NotNull(message = "Field label cannot be null")
         private String fieldLabel;
 
-        @Builder.Default
         private String dataType = "STRING";
 
-        @Builder.Default
         private boolean isRequired = true;
 
-        @Builder.Default
         private String formatPattern = "";
     }
 }
