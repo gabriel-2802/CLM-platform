@@ -21,11 +21,12 @@ public interface TemplateFieldRepository extends JpaRepository<TemplateField, Lo
     List<TemplateField> findByContractTemplateId(Long templateId);
 
     /**
-     * Checks if all fields in a template have a field label set (i.e., are fully mapped).
+     * Checks if all REQUIRED fields in a template have a field label set (i.e., are fully mapped).
+     * Optional fields (isRequired = false) are ignored in this check.
      * This is an efficient count-based query that avoids loading full entities.
      *
      * @param templateId the template ID
-     * @return true if all fields have a non-null fieldLabel, false otherwise
+     * @return true if all required fields have a non-null fieldLabel, false otherwise
      */
     @Query("""
         SELECT CASE 
@@ -35,6 +36,7 @@ public interface TemplateFieldRepository extends JpaRepository<TemplateField, Lo
         END
         FROM TemplateField f
         WHERE f.contractTemplate.id = :templateId
+        AND f.isRequired = true
     """)
     boolean areAllFieldsMapped(@Param("templateId") Long templateId);
 

@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
@@ -49,7 +50,8 @@ public class Contract {
 
     /** Current lifecycle state (e.g., PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED). */
     @Enumerated(EnumType.STRING)
-    @Column(name = "contract_status", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)   // ← was SqlTypes.VARCHAR
+    @Column(name = "contract_status", nullable = false)
     @Builder.Default
     private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
 
@@ -62,11 +64,11 @@ public class Contract {
     private String generatedByMail;
 
     /** * The final filled document.
-     * <b>Note:</b> Stored as BYTEA. Not lazily loaded - better handled at service layer if needed.
+     * <b>Note:</b> Stored as BYTEA. Nullable - set after document generation completes.
      */
     @Lob
     @JdbcTypeCode(SqlTypes.VARBINARY)
-    @Column(name = "document_content", nullable = false)
+    @Column(name = "document_content")
     private byte[] documentContent;
 
     /** * The signed version of the document (populated when contract is signed).

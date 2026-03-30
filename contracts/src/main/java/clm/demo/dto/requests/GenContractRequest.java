@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotEmpty;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.Map;
 
 @Getter
@@ -28,10 +28,10 @@ public class GenContractRequest {
     private final Long clientId;
 
     @NotNull(message = "Start date is required")
-    private final LocalDateTime startDate;
+    private final LocalDate startDate;
 
     @NotNull(message = "End date is required")
-    private final LocalDateTime endDate;
+    private final LocalDate endDate;
 
     // LABEL - VALUE MAPPINGS
     @NotEmpty(message = "At least one field mapping is required")

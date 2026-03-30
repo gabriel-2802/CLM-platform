@@ -284,9 +284,6 @@ public class TemplateService {
 
         log.info("Successfully updated {} fields for template: {}", request.getMappings().size(), request.getTemplateId());
 
-        // check if all fields are now mapped and update the template status
-        updateTemplateFullyMappedStatus(request.getTemplateId());
-
         // return the list of updated fields as response DTOs
         return updatedFields.stream()
                 .map(TemplateFieldResponseDTO::new)
@@ -304,22 +301,6 @@ public class TemplateService {
             return DataType.valueOf(dataTypeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
             return DataType.STRING;
-        }
-    }
-
-    /**
-     * Checks if all fields in a template are mapped (have labels) and updates the template's isFullyMapped status.
-     * Uses an efficient database-level query to determine if all fields have non-null labels.
-     * This is called automatically after field updates to maintain consistency.
-     *
-     * @param templateId the template ID to check and update
-     */
-    private void updateTemplateFullyMappedStatus(Long templateId) {
-        try {
-            boolean allFieldsMapped = templateFieldRepository.areAllFieldsMapped(templateId);
-            templateRepository.updateFullyMappedStatus(templateId, allFieldsMapped);
-        } catch (Exception e) {
-            log.warn("Failed to update fully mapped status for template {}: {}", templateId, e.getMessage());
         }
     }
 }

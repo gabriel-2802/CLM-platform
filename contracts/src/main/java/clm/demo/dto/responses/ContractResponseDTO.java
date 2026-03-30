@@ -1,6 +1,6 @@
 package clm.demo.dto.responses;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,43 +19,27 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ContractResponseDTO {
-
+    
     private Long id;
-
-    @JsonProperty("templateId")
     private Long templateId;
-
     private Integer clientId;
-
     private String contractStatus;
-
     private Integer generatedBy;
-
+    private String generatedByMail;
     private BigDecimal contractValue;
-
     private LocalDate contractStartDate;
-
     private LocalDate contractEndDate;
-
     private String notes;
 
+    private LocalDate terminationDate;
+    private String reasonsForTermination;
+
+
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    private List<ContractFieldValueDTO> fieldValues;
-
-    /**
-     * Nested DTO for contract field value details.
-     */
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class ContractFieldValueDTO {
-        private Long id;
-        private Long templateFieldId;
-        private String fieldValue;
-        private LocalDateTime createdAt;
-    }
+    private List<ContractFieldValueResponseDTO> fieldValues;
 }
 

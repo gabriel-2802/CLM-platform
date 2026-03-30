@@ -2,6 +2,7 @@ package clm.demo.controllers;
 
 import clm.demo.dto.responses.ErrorResponseDTO;
 import clm.demo.exceptions.EmptyFileNameException;
+import clm.demo.exceptions.MissingMandatoryFieldException;
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.UnsupportedFileException;
 import clm.demo.exceptions.DatabaseValidationException;
@@ -64,6 +65,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException e) {
         log.warn("Resource not found: {}", e.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, "Resource not found", e.getMessage());
+    }
+
+    /**
+     * Handles missing mandatory field mappings during contract generation.
+     * Provides detailed information about which fields are missing values.
+     */
+    @ExceptionHandler(MissingMandatoryFieldException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMissingMandatoryFieldException(MissingMandatoryFieldException e) {
+        log.warn("Contract generation failed due to missing mandatory fields: {}", e.getMissingFields());
+        String details = "Missing mandatory fields: " + String.join(", ", e.getMissingFields());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field mappings", details);
     }
 
     /**

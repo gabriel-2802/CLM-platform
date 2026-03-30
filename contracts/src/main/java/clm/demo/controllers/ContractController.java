@@ -39,7 +39,7 @@ public class ContractController {
 
     @GetMapping("/all")
     ResponseEntity<List<ContractResponseDTO>> getAllContracts() {
-        return null;
+        return contractService.getAll();
     }
 
     @GetMapping("download/docx/{contractId}")
