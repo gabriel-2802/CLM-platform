@@ -5,6 +5,7 @@ import clm.demo.models.Template;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.repositories.ContractTemplateRepository;
+import clm.demo.services.download.document.providers.DocumentProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

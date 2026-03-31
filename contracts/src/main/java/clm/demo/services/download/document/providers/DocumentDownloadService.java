@@ -1,7 +1,10 @@
-package clm.demo.services.download;
+package clm.demo.services.download.document.providers;
 
+import clm.demo.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
+import clm.demo.services.download.DocumentProviderRegistry;
+import clm.demo.services.download.DocumentResult;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileZipService;
 import lombok.RequiredArgsConstructor;
@@ -29,40 +32,20 @@ public class DocumentDownloadService {
     private final DocumentProviderRegistry providerRegistry;
 
     /**
-     * Downloads a template in the requested format.
-     * Templates support both DOCX and PDF formats.
-     *
-     * @param templateId   the template ID
-     * @param targetFormat the desired output format (DOCX or PDF)
-     * @return decompressed and possibly converted document bytes
-     * @throws IllegalArgumentException if the format is unsupported
-     * @throws IOException              if decompression or conversion fails
-     */
-    public byte[] downloadTemplate(Long templateId, DocumentFormat targetFormat) throws IOException {
-        return downloadDocument(templateId, targetFormat, DocumentType.TEMPLATE);
-    }
-
-    /**
-     * Downloads a contract in PDF format (the only supported format for contracts).
-     *
-     * @param contractId the contract ID
-     * @return decompressed PDF document bytes
-     * @throws IOException if decompression fails
-     */
-    public byte[] downloadContract(Long contractId) throws IOException {
-        return downloadDocument(contractId, DocumentFormat.PDF, DocumentType.UNSIGNED_CONTRACT);
-    }
-
-    /**
-     * Generic download method. Resolves the correct provider from the registry,
+     * Generic download method for all document types. Resolves the correct provider from the registry,
      * validates the requested format, then decompresses and converts as needed.
+     *
+     * <p>This is the primary method for downloading documents of any type. New document types can be
+     * supported by adding them to the {@link DocumentType} enum and registering their provider
+     * in the {@link DocumentProviderRegistry} — no changes to this method are required.</p>
      *
      * @param documentId   the document ID
      * @param targetFormat the desired output format
      * @param documentType the type of document to download
      * @return decompressed and possibly converted document bytes
-     * @throws IllegalArgumentException if the format is unsupported
-     * @throws IOException              if decompression or conversion fails
+     * @throws IllegalArgumentException if the format is unsupported for this document type
+     * @throws FileConversionException if document conversion fails
+     * @throws IOException if decompression fails
      */
     public byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentType documentType) throws IOException {
         DocumentProvider provider = providerRegistry.getProvider(documentType);

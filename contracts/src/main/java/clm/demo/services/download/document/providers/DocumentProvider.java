@@ -1,7 +1,8 @@
-package clm.demo.services.download;
+package clm.demo.services.download.document.providers;
 
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
+import clm.demo.services.download.DocumentResult;
 
 /**
  * Strategy interface for retrieving documents from different sources.

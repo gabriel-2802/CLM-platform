@@ -1,7 +1,6 @@
 package clm.demo.models;
 
 import clm.demo.models.enums.DataType;
-import clm.demo.models.converters.DataTypeConverter;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;

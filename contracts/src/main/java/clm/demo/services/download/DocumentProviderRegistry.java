@@ -1,6 +1,7 @@
 package clm.demo.services.download;
 
 import clm.demo.models.enums.DocumentType;
+import clm.demo.services.download.document.providers.DocumentProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

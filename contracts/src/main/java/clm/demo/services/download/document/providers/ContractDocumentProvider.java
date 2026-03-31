@@ -1,10 +1,11 @@
-package clm.demo.services.download;
+package clm.demo.services.download.document.providers;
 
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.models.Contract;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.repositories.GeneratedContractRepository;
+import clm.demo.services.download.DocumentResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

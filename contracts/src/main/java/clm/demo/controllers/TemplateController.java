@@ -5,9 +5,12 @@ import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.responses.ParsedTemplateResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
+import clm.demo.exceptions.FileConversionException;
+import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
-import clm.demo.services.download.DocumentDownloadService;
+import clm.demo.services.download.document.providers.DocumentDownloadService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
@@ -104,40 +107,32 @@ public class TemplateController {
     }
 
     /**
-     * Downloads a template in DOCX format.
+     * Downloads a template in the specified format (DOCX or PDF).
      * If the template is stored in another format, automatically converts it.
      *
      * @param templateId the template ID to download
-     * @return 200 OK with the DOCX file as binary attachment
-     * @throws IOException if decompression or conversion fails
-     * @throws RuntimeException if template not found
+     * @param format the desired output format (docx or pdf)
+     * @return 200 OK with the file as binary attachment
+     * @throws IllegalArgumentException       if the format is invalid
+     * @throws FileConversionException        if conversion fails
+     * @throws UnsupportedConversionException if the format combination is unsupported
+     * @throws IOException                    if decompression fails
      */
-    @GetMapping("/download/docx/{templateId}")
-    public ResponseEntity<byte[]> downloadTemplateDocx(@PathVariable @NotNull Long templateId) throws IOException {
-        byte[] documentContent = downloadService.downloadTemplate(templateId, DocumentFormat.DOCX);
-
-        return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=template-" + templateId + ".docx")
-                .header("Content-Type", downloadService.getContentType(DocumentFormat.DOCX))
-                .body(documentContent);
-    }
-
-    /**
-     * Downloads a template in PDF format.
-     * If the template is stored in another format, automatically converts it.
-     *
-     * @param templateId the template ID to download
-     * @return 200 OK with the PDF file as binary attachment
-     * @throws IOException if decompression or conversion fails
-     * @throws RuntimeException if template not found
-     */
-    @GetMapping("/download/pdf/{templateId}")
-    public ResponseEntity<byte[]> downloadTemplatePdf(@PathVariable @NotNull Long templateId) throws IOException {
-        byte[] documentContent = downloadService.downloadTemplate(templateId, DocumentFormat.PDF);
+    @GetMapping("/download/{format}/{templateId}")
+    public ResponseEntity<byte[]> downloadTemplate(@PathVariable @NotNull Long templateId, @PathVariable @NotNull String format) throws IOException {
         
+        DocumentFormat documentFormat;
+        try {
+            documentFormat = DocumentFormat.valueOf(format.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Invalid format: " + format + ". Supported formats: docx, pdf", e);
+        }
+
+        byte[] documentContent = downloadService.downloadDocument(templateId, documentFormat, DocumentType.TEMPLATE);
+
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=template-" + templateId + ".pdf")
-                .header("Content-Type", downloadService.getContentType(DocumentFormat.PDF))
+                .header("Content-Disposition", "attachment; filename=template-" + templateId + "." + format.toLowerCase())
+                .header("Content-Type", downloadService.getContentType(documentFormat))
                 .body(documentContent);
     }
 

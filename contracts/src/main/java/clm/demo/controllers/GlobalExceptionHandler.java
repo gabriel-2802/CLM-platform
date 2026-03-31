@@ -1,11 +1,13 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.responses.ErrorResponseDTO;
+import clm.demo.exceptions.DatabaseValidationException;
 import clm.demo.exceptions.EmptyFileNameException;
+import clm.demo.exceptions.FileConversionException;
 import clm.demo.exceptions.MissingMandatoryFieldException;
 import clm.demo.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.exceptions.UnsupportedFileException;
-import clm.demo.exceptions.DatabaseValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
@@ -59,6 +61,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleUnsupportedFileException(UnsupportedFileException e) {
         log.warn("Upload rejected: Unsupported file type. {}", e.getMessage());
         return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported file format", e.getMessage());
+    }
+
+    /**
+     * Handles unsupported format conversion requests (e.g., PDF to PDF).
+     */
+    @ExceptionHandler(UnsupportedConversionException.class)
+    public ResponseEntity<ErrorResponseDTO> handleUnsupportedConversionException(UnsupportedConversionException e) {
+        log.warn("Format conversion not supported: {}", e.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Unsupported format conversion", e.getMessage());
+    }
+
+    /**
+     * Handles document conversion failures during DOCX ↔ PDF conversion.
+     */
+    @ExceptionHandler(FileConversionException.class)
+    public ResponseEntity<ErrorResponseDTO> handleFileConversionException(FileConversionException e) {
+        log.error("Document conversion failed: ", e);
+        return buildResponse(HttpStatus.UNPROCESSABLE_CONTENT, "Document conversion failed", e.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
