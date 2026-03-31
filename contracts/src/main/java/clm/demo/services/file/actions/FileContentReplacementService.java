@@ -6,7 +6,8 @@ import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.PlaceholderProcessor;
-import clm.demo.utils.PlaceholderProcessor.SubstitutionResult;
+import clm.demo.utils.PlaceholderProcessor.SubstitutionResultWithSpans;
+import clm.demo.utils.PlaceholderProcessor.SubstitutionSpan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
@@ -78,10 +79,10 @@ public class FileContentReplacementService {
 
             int[] globalIndex = {0};
 
-            visitParagraphs(doc.getParagraphs(),           ordered, labelToValue, globalIndex);
-            visitTables    (doc.getTables(),               ordered, labelToValue, globalIndex);
-            visitHeaders   (doc.getHeaderList(),           ordered, labelToValue, globalIndex);
-            visitFooters   (doc.getFooterList(),           ordered, labelToValue, globalIndex);
+            visitParagraphs(doc.getParagraphs(), ordered, labelToValue, globalIndex);
+            visitTables    (doc.getTables(),     ordered, labelToValue, globalIndex);
+            visitHeaders   (doc.getHeaderList(), ordered, labelToValue, globalIndex);
+            visitFooters   (doc.getFooterList(), ordered, labelToValue, globalIndex);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.write(out);
@@ -140,11 +141,52 @@ public class FileContentReplacementService {
     }
 
     /**
-     * Fills placeholders in a single paragraph while preserving per-run formatting.
+     * Fills placeholders in a single paragraph with full per-run formatting preservation.
      *
-     * <p>Strategy: iterate runs one-by-one. If a run contains a placeholder, replace it
-     * in-place so that the run's own formatting (bold, font, size, etc.) is kept intact.
-     * Only runs that actually change are touched.</p>
+     * <h3>Why run-by-run matching fails</h3>
+     * Word splits paragraph text into many XML {@code <w:r>} runs. A dot-sequence
+     * placeholder is almost always fragmented across several consecutive runs, so no
+     * single run contains the full pattern and the regex never matches on a single run.
+     *
+     * <h3>Algorithm — merge → substitute → delta-based writeback</h3>
+     * <ol>
+     *   <li><b>Merge:</b> concatenate every run's text into one string, recording each
+     *       run's start offset in {@code runStarts[i]} and the total merged length.</li>
+     *   <li><b>Early exits:</b> skip if merged text is empty or all fields are exhausted.</li>
+     *   <li><b>Substitute:</b> {@link PlaceholderProcessor#substituteEachWithSpans}
+     *       returns the rewritten string plus one {@link SubstitutionSpan} per placeholder,
+     *       recording its {@code [originalStart, originalEnd)} and {@code replacementLen}
+     *       — all in original-string coordinates.</li>
+     *   <li><b>Early exit:</b> if nothing was filled, no DOM mutation occurs.</li>
+     *   <li><b>Delta-based writeback:</b> for each run, its original range is
+     *       {@code [runStarts[r], runStarts[r+1])}. We compute a cumulative character
+     *       delta from all spans whose {@code originalStart} falls before the run's
+     *       original end, and use that delta to map the run's original end to its
+     *       rewritten end:
+     *       <pre>
+     *         rwEnd = origEnd + cumulativeDelta(origEnd)
+     *       </pre>
+     *       The run receives {@code rewritten[rwStart .. rwEnd]}.
+     *
+     *       <p>Cross-run placeholder handling: a placeholder that starts inside run
+     *       {@code i} gets its full replacement text attributed to run {@code i} (the
+     *       run containing its original start). Runs {@code i+1..i+k} that contained
+     *       only the tail of the placeholder receive empty strings — their original
+     *       characters are fully accounted for by the delta.</p>
+     *   </li>
+     * </ol>
+     *
+     * <h3>Multiple placeholders on the same line</h3>
+     * Because the delta accumulates across all spans in original-string order, and each
+     * run's slice is computed independently from {@code runStarts[r]}, multiple
+     * replacements on the same line are handled correctly without any interaction between
+     * them.
+     *
+     * <h3>Multi-line / cross-run placeholders</h3>
+     * Word joins consecutive runs within a paragraph; the merged string has no artificial
+     * newlines between runs. If a placeholder's dots span a run boundary, the single
+     * regex match in {@code substituteEachWithSpans} captures the whole sequence, and the
+     * delta writeback correctly empties the tail runs.
      */
     private void fillParagraph(
             XWPFParagraph paragraph,
@@ -155,25 +197,93 @@ public class FileContentReplacementService {
         List<XWPFRun> runs = paragraph.getRuns();
         if (runs.isEmpty()) return;
 
-        for (XWPFRun run : runs) {
-            if (globalIndex[0] >= ordered.size()) return;
+        // ── Step 1: normalize + merge ─────────────────────────────────────────
+        // Each run's text is normalized (Unicode ellipsis → ASCII dots) BEFORE
+        // building runStarts, so all offsets live in the same coordinate space.
 
-            String text = run.getText(0);
-            if (text == null || text.isEmpty()) continue;
+        String[] normTexts = new String[runs.size()];
+        int[]    runStarts = new int[runs.size() + 1];
+        StringBuilder merged = new StringBuilder();
 
-            SubstitutionResult result = PlaceholderProcessor.substituteEach(text, i -> {
-                int absIndex = globalIndex[0] + i;
-                if (absIndex >= ordered.size()) return null;
-                String label = ordered.get(absIndex).getFieldLabel();
-                return labelToValue.get(label);   // null → keep original
-            });
-
-            if (result.filledCount() == 0) continue;
-
-            run.setText(result.text(), 0);
-            globalIndex[0] += result.filledCount();
+        for (int i = 0; i < runs.size(); i++) {
+            runStarts[i] = merged.length();
+            normTexts[i] = PlaceholderProcessor.normalize(runs.get(i).getText(0));
+            merged.append(normTexts[i]);
         }
+        runStarts[runs.size()] = merged.length();
+
+        if (merged.isEmpty()) return;
+
+        // ── Step 2: substitute ────────────────────────────────────────────────
+        SubstitutionResultWithSpans result = PlaceholderProcessor.substituteEachWithSpans(
+                merged.toString(),
+                i -> {
+                    int absIndex = globalIndex[0] + i;
+                    if (absIndex >= ordered.size()) return null;
+                    String label = ordered.get(absIndex).getFieldLabel();
+                    return labelToValue.get(label);
+                });
+
+        if (!result.anyFilled()) return;
+
+        // ── Step 3: safe slice writeback ──────────────────────────────────────
+        //
+        // We walk the rewritten string once, slicing it back into runs.
+        //
+        // Key insight: the rewritten string is a transformation of the normalized
+        // merged string. Every character in the normalized merged string maps to
+        // either itself (plain char, 1-to-1) or is part of a replaced span (the
+        // whole span maps to the replacement text). We track:
+        //
+        //   origPos  — current position in the normalized merged string
+        //   rwPos    — current position in the rewritten string
+        //   spanIdx  — next unconsumed span
+        //
+        // For each run we consume exactly (runStarts[r+1] - runStarts[r]) original
+        // characters, translating to a slice [rwStart, rwEnd) of the rewritten string.
+        // When origPos hits a span start we jump both cursors over the entire span
+        // atomically — this handles cross-run placeholders correctly: the run that
+        // contains the span start receives the full replacement, and runs that only
+        // contained the tail of the placeholder get empty strings.
+
+        String             rewritten = result.text();
+        List<SubstitutionSpan> spans = result.spans();
+
+        int origPos = 0;
+        int rwPos   = 0;
+        int spanIdx = 0;
+
+        for (int r = 0; r < runs.size(); r++) {
+            int origRunEnd = runStarts[r + 1];  // exclusive, in normalized coords
+            int rwStart    = rwPos;
+
+            while (origPos < origRunEnd) {
+                if (spanIdx < spans.size()
+                        && origPos == spans.get(spanIdx).originalStart()) {
+                    // At a span boundary: jump both cursors over the entire span.
+                    // origPos may land past origRunEnd if the placeholder crosses
+                    // a run boundary — that is intentional: subsequent runs that
+                    // only held the placeholder tail will have origPos > their
+                    // origRunEnd and their while-loop won't execute, giving them "".
+                    SubstitutionSpan sp = spans.get(spanIdx++);
+                    origPos = sp.originalEnd();
+                    rwPos  += sp.replacementLen();
+                } else {
+                    // Plain character: 1-to-1
+                    origPos++;
+                    rwPos++;
+                }
+            }
+
+            // Safety clamp: rwPos must never exceed rewritten.length().
+            // This guards against any floating-point-style accumulation error.
+            int rwEnd = Math.min(rwPos, rewritten.length());
+            runs.get(r).setText(rewritten.substring(rwStart, rwEnd), 0);
+        }
+
+        globalIndex[0] += result.filledCount();
     }
+
 
     // -------------------------------------------------------------------------
     // Helpers

@@ -40,7 +40,7 @@ public class UnsignedContractProvider implements DocumentProvider {
     @Override
     public boolean supportsFormat(DocumentFormat targetFormat) {
         // contracts are always stored as PDF and can only be downloaded as PDF
-        return targetFormat == DocumentFormat.PDF;
+        return targetFormat == DocumentFormat.PDF || targetFormat == DocumentFormat.DOCX;
     }
 
     @Override

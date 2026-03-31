@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
@@ -35,8 +36,13 @@ public class ContractController {
     }
 
     @PutMapping(value = "upload/signed/{contractId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<String> uploadSignedContract(@PathVariable Long contractId, @RequestParam("file") byte[] file) {
-        return null;
+    ResponseEntity<String> uploadSignedContract(@PathVariable Long contractId, @RequestParam("file") MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File cannot be empty");
+        }
+        
+        contractService.uploadSignedContract(contractId, file.getBytes());
+        return ResponseEntity.ok("Signed contract uploaded successfully and status updated to ACTIVE");
     }
 
     @PutMapping("terminate/{contractId}")

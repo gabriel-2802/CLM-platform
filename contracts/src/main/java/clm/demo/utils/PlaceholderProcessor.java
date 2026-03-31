@@ -27,14 +27,53 @@ public class PlaceholderProcessor {
     public record SubstitutionResult(String text, int filledCount) {}
 
     /**
-     * Normalizes line endings to {@code \n}.
-     * Must be called on raw extracted text before any other method here.
+     * Records one substitution: where the placeholder sat in the <em>original</em> string
+     * and how long the replacement string is in the <em>rewritten</em> string.
+     *
+     * @param originalStart  inclusive start offset in the original text
+     * @param originalEnd    exclusive end offset in the original text
+     * @param replacementLen length of the string written at this position (value or original dots)
+     * @param replaced       true if the placeholder was actually substituted with a value
+     */
+    public record SubstitutionSpan(int originalStart, int originalEnd, int replacementLen, boolean replaced) {}
+
+    /** Extended result carrying per-span offset data for proportional run writeback. */
+    public record SubstitutionResultWithSpans(String text, int filledCount, List<SubstitutionSpan> spans) {
+        public boolean anyFilled() { return filledCount > 0; }
+    }
+
+    /**
+     * Normalizes raw text so that placeholder matching is consistent:
+     * <ol>
+     *   <li>Line endings → {@code \n}</li>
+     *   <li>Unicode dot-like glyphs → ASCII {@code .}:
+     *     <ul>
+     *       <li>U+2026 HORIZONTAL ELLIPSIS → {@code ...} (3 dots — its visual meaning)</li>
+     *       <li>U+2025 TWO DOT LEADER      → {@code ..}  (2 dots)</li>
+     *       <li>U+FF0E FULLWIDTH FULL STOP → {@code .}   (1 dot)</li>
+     *       <li>U+22EF MIDLINE ELLIPSIS    → {@code ...} (3 dots)</li>
+     *     </ul>
+     *   </li>
+     * </ol>
+     *
+     * <p>Expanding ellipsis characters to their ASCII dot equivalents before matching
+     * means {@link clm.demo.utils.Constants#PLACEHOLDER_PATTERN} only needs to handle
+     * ASCII {@code .}, offsets remain byte-stable for writeback, and the 4-dot minimum
+     * threshold is applied uniformly regardless of how the document was authored.</p>
+     *
+     * <p>Must be called on raw extracted text before any other method here.</p>
      */
     public static String normalize(String raw) {
         if (raw == null) return "";
-        return raw.replace("\r\n", "\n").replace("\r", "\n");
+        return raw
+                .replace("\r\n", "\n")
+                .replace("\r",   "\n")
+                // Unicode dot-like glyphs → ASCII dots
+                .replace("\u2026", "...") // HORIZONTAL ELLIPSIS  → 3 dots
+                .replace("\u22EF", "...") // MIDLINE ELLIPSIS      → 3 dots
+                .replace("\u2025", "..")  // TWO DOT LEADER        → 2 dots
+                .replace("\uFF0E", ".");  // FULLWIDTH FULL STOP   → 1 dot
     }
-
 
     /**
      * Finds all placeholder occurrences in normalized text.
@@ -93,5 +132,50 @@ public class PlaceholderProcessor {
 
         matcher.appendTail(sb);
         return new SubstitutionResult(sb.toString(), replaced);
+    }
+
+    /**
+     * Same as {@link #substituteEach} but also returns per-substitution span data so
+     * callers can map character positions in the original text to positions in the
+     * rewritten text — enabling proportional writeback into individual Word runs
+     * without corrupting per-run formatting.
+     *
+     * <p>Spans use offsets in the <em>original</em> string only. The writeback loop in
+     * {@link clm.demo.services.file.actions.FileContentReplacementService} uses these
+     * to translate each run's original character range into a slice of the rewritten
+     * string via a cumulative delta, rather than a character-by-character cursor.</p>
+     *
+     * @param normalizedContent the merged paragraph text (must already be normalized)
+     * @param resolver          occurrence-index → replacement string (null = keep original dots)
+     * @return rewritten text, fill count, and one {@link SubstitutionSpan} per placeholder found
+     */
+    public static SubstitutionResultWithSpans substituteEachWithSpans(
+            String normalizedContent, IntFunction<String> resolver) {
+
+        StringBuilder sb      = new StringBuilder();
+        Matcher matcher       = PLACEHOLDER_PATTERN.matcher(normalizedContent);
+        List<SubstitutionSpan> spans = new ArrayList<>();
+        int index    = 0;
+        int replaced = 0;
+
+        while (matcher.find()) {
+            // Capture original-string offsets BEFORE appendReplacement moves the matcher.
+            int origStart = matcher.start();
+            int origEnd   = matcher.end();
+
+            String value      = resolver.apply(index++);
+            boolean didReplace = value != null;
+            String  actual    = didReplace ? value : matcher.group();
+
+            matcher.appendReplacement(sb, Matcher.quoteReplacement(actual));
+
+            // origStart / origEnd are fixed; replacementLen is the length written.
+            spans.add(new SubstitutionSpan(origStart, origEnd, actual.length(), didReplace));
+
+            if (didReplace) replaced++;
+        }
+
+        matcher.appendTail(sb);
+        return new SubstitutionResultWithSpans(sb.toString(), replaced, spans);
     }
 }
