@@ -1,5 +1,6 @@
 package clm.demo.services;
 
+import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.FileConversionException;
@@ -171,6 +172,28 @@ public class ContractService {
         throw new UnsupportedFileException("Unable to detect document format. Supported formats: PDF, DOCX");
     }
 
+    /**
+     * Terminates a contract by updating its status to TERMINATED,
+     * setting the termination date and reasons for termination.
+     *
+     * @param contractId the ID of the contract to terminate
+     * @param request    the termination request containing termination date and reasons
+     * @throws ResourceNotFoundException if contract is not found
+     */
+    public void terminateContract(Long contractId, @Valid ContractTerminationRequest request) {
+        log.info("Terminating contract ID: {} with termination date: {}", contractId, request.getTerminationDate());
+
+        // Fetch the contract
+        Contract contract = generatedContractRepository.findById(contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found with ID: " + contractId));
+
+        // update contract with termination information
+        contract.setContractStatus(ContractStatus.TERMINATED);
+        contract.setTerminationDate(request.getTerminationDate().toLocalDate());
+        contract.setReasonsForTermination(request.getReasons() != null ? request.getReasons() : "");
+
+        generatedContractMapper.toResponseDTO(contract);
+    }
 
     private void validateMandatoryFields(Template template, Map<String, String> mappings) {
         List<String> missingFields = template.getTemplateFields().stream()

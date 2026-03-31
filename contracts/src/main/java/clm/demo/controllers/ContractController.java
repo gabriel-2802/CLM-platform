@@ -47,7 +47,8 @@ public class ContractController {
 
     @PutMapping("terminate/{contractId}")
     ResponseEntity<String> terminateContract(@PathVariable Long contractId, @RequestBody @Valid ContractTerminationRequest request) {
-        return null;
+        contractService.terminateContract(contractId, request);
+        return ResponseEntity.ok("Contract terminated successfully");
     }
 
     @GetMapping("/all")
