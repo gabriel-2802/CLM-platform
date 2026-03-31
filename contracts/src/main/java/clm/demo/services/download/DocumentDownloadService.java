@@ -30,11 +30,11 @@ public class DocumentDownloadService {
      * Downloads a template in the requested format.
      * Templates support both DOCX and PDF formats.
      *
-     * @param templateId the template ID
+     * @param templateId   the template ID
      * @param targetFormat the desired output format (DOCX or PDF)
      * @return decompressed and possibly converted document bytes
-     * @throws RuntimeException if template not found or format is unsupported
-     * @throws IOException if decompression or conversion fails
+     * @throws IllegalArgumentException if the format is unsupported
+     * @throws IOException              if decompression or conversion fails
      */
     public byte[] downloadTemplate(Long templateId, DocumentFormat targetFormat) throws IOException {
         return downloadDocument(templateId, targetFormat, templateProvider);
@@ -45,7 +45,6 @@ public class DocumentDownloadService {
      *
      * @param contractId the contract ID
      * @return decompressed PDF document bytes
-     * @throws RuntimeException if contract not found
      * @throws IOException if decompression fails
      */
     public byte[] downloadContract(Long contractId) throws IOException {
@@ -54,43 +53,39 @@ public class DocumentDownloadService {
 
     /**
      * Generic download method that works with any document provider.
-     * Handles format validation, decompression, and conversion.
+     * Retrieves the document in a single provider call, then handles
+     * decompression and format conversion as needed.
      *
-     * @param documentId the document ID
+     * @param documentId   the document ID
      * @param targetFormat the desired output format
-     * @param provider the document provider to use
+     * @param provider     the document provider to use
      * @return decompressed and possibly converted document bytes
-     * @throws RuntimeException if format is unsupported
-     * @throws IOException if decompression or conversion fails
+     * @throws IllegalArgumentException if the format is unsupported
+     * @throws IOException              if decompression or conversion fails
      */
     private byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentProvider provider) throws IOException {
         DocumentType docType = provider.getDocumentType();
-        
+
         if (!provider.supportsFormat(targetFormat)) {
-            throw new IllegalArgumentException(
-            );
+            throw new IllegalArgumentException(docType + " does not support format: " + targetFormat);
         }
 
-        // retrieve compressed document
-        byte[] compressedContent = provider.getCompressedDocument(documentId);
+        // returns both compressed bytes and native format
+        DocumentResult result = provider.getDocument(documentId);
 
-        // decompress the stored document
-        byte[] decompressedContent = zipService.decompress(compressedContent);
+        byte[] decompressedContent = zipService.decompress(result.compressedContent());
 
-        // Get the native format of the document
-        DocumentFormat nativeFormat = provider.getNativeFormat(documentId);
-
-        // if already in target format, return directly
-        if (nativeFormat == targetFormat) {
+        // if already in target format, return directly — no conversion needed
+        if (result.nativeFormat() == targetFormat) {
             return decompressedContent;
         }
 
-        return converterService.convert(decompressedContent, nativeFormat, targetFormat);
+        return converterService.convert(decompressedContent, result.nativeFormat(), targetFormat);
     }
 
     /**
      * Gets the content type (MIME type) for a given document format.
-     * Useful for HTTP response headers.
+     * Useful for setting HTTP response headers.
      *
      * @param format the document format
      * @return the MIME type string
@@ -115,4 +110,3 @@ public class DocumentDownloadService {
         };
     }
 }
-

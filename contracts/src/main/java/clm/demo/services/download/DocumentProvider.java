@@ -11,21 +11,14 @@ import clm.demo.models.enums.DocumentType;
 public interface DocumentProvider {
 
     /**
-     * Retrieves the raw document content in its native format.
-     * The content is expected to be compressed (e.g., GZIP).
+     * Retrieves the document content together with its native format in a single
+     * call, avoiding multiple round-trips to the repository.
+     * The content inside {@link DocumentResult} is expected to be compressed (e.g. GZIP).
      *
      * @param documentId the ID of the document to retrieve
-     * @return compressed document bytes
+     * @return a {@link DocumentResult} containing the compressed bytes and native format
      */
-    byte[] getCompressedDocument(Long documentId);
-
-    /**
-     * Retrieves the native format of the stored document.
-     *
-     * @param documentId the ID of the document
-     * @return the DocumentFormat of the stored document
-     */
-    DocumentFormat getNativeFormat(Long documentId);
+    DocumentResult getDocument(Long documentId);
 
     /**
      * Checks if the document supports a given format for download.
@@ -37,11 +30,10 @@ public interface DocumentProvider {
     boolean supportsFormat(DocumentFormat targetFormat);
 
     /**
-     * Returns the type of document this provider handles (e.g., "Template", "Contract").
+     * Returns the type of document this provider handles (e.g., TEMPLATE, CONTRACT).
      * Used for logging and error messages.
      *
-     * @return the document type name
+     * @return the document type
      */
     DocumentType getDocumentType();
 }
-

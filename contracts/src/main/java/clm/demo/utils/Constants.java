@@ -1,10 +1,11 @@
 package clm.demo.utils;
 
+import lombok.experimental.UtilityClass;
+
 import java.util.regex.Pattern;
 
+@UtilityClass
 public final class Constants {
-
-    private Constants() {}
 
     /**
      * Matches 4+ consecutive dots, tolerating horizontal whitespace (space/tab)

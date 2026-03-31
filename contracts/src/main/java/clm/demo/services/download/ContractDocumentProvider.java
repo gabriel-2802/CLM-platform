@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Document provider for generated contracts.
- * Contracts are only stored in PDF format.
+ * Contracts are only stored in — and downloadable as — PDF format.
  */
 @Slf4j
 @Component
@@ -20,33 +20,25 @@ public class ContractDocumentProvider implements DocumentProvider {
 
     private final GeneratedContractRepository contractRepository;
 
+    /**
+     * Fetches the contract in a single repository call and returns both the
+     * compressed content and its native format (always PDF) together.
+     */
     @Override
-    public byte[] getCompressedDocument(Long documentId) {
-        log.debug("Fetching compressed contract document: {}", documentId);
-        
+    public DocumentResult getDocument(Long documentId) {
         Contract contract = contractRepository.findById(documentId)
-                .orElseThrow(() -> {
-                    log.warn("Contract not found: {}", documentId);
-                    return new ResourceNotFoundException("Contract not found: " + documentId);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + documentId));
 
         if (contract.getDocumentContent() == null) {
-            log.warn("Contract {} has no document content", documentId);
-            throw new ResourceNotFoundException("Contract document not available: " + documentId);
+            throw new ResourceNotFoundException("Contract document not yet available: " + documentId);
         }
 
-        return contract.getDocumentContent();
-    }
-
-    @Override
-    public DocumentFormat getNativeFormat(Long documentId) {
-        // contracts are always stored as PDF
-        return DocumentFormat.PDF;
+        return new DocumentResult(contract.getDocumentContent(), DocumentFormat.PDF);
     }
 
     @Override
     public boolean supportsFormat(DocumentFormat targetFormat) {
-        // contracts only support PDF format
+        // contracts are always stored as PDF and can only be downloaded as PDF
         return targetFormat == DocumentFormat.PDF;
     }
 
@@ -55,4 +47,3 @@ public class ContractDocumentProvider implements DocumentProvider {
         return DocumentType.CONTRACT;
     }
 }
-

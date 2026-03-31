@@ -20,21 +20,16 @@ public class TemplateDocumentProvider implements DocumentProvider {
 
     private final ContractTemplateRepository templateRepository;
 
+    /**
+     * Fetches the template in a single repository call and returns both the
+     * compressed content and its native format together.
+     */
     @Override
-    public byte[] getCompressedDocument(Long documentId) {
-
+    public DocumentResult getDocument(Long documentId) {
         Template template = templateRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + documentId));
 
-        return template.getDocumentContent();
-    }
-
-    @Override
-    public DocumentFormat getNativeFormat(Long documentId) {
-        Template template = templateRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + documentId));
-
-        return template.getDocumentFormat();
+        return new DocumentResult(template.getDocumentContent(), template.getDocumentFormat());
     }
 
     @Override
@@ -47,4 +42,3 @@ public class TemplateDocumentProvider implements DocumentProvider {
         return DocumentType.TEMPLATE;
     }
 }
-
