@@ -13,7 +13,10 @@ import java.io.IOException;
 
 /**
  * Service for downloading documents in various formats.
- * Handles both templates and contracts with their respective format restrictions.
+ * Delegates document retrieval to the appropriate {@link DocumentProvider}
+ * via {@link DocumentProviderRegistry} — no concrete provider types are
+ * referenced here, so adding a new document type requires no changes to
+ * this class.
  */
 @Service
 @RequiredArgsConstructor
@@ -23,8 +26,7 @@ public class DocumentDownloadService {
 
     private final FileZipService zipService;
     private final FileConverterService converterService;
-    private final TemplateDocumentProvider templateProvider;
-    private final ContractDocumentProvider contractProvider;
+    private final DocumentProviderRegistry providerRegistry;
 
     /**
      * Downloads a template in the requested format.
@@ -37,7 +39,7 @@ public class DocumentDownloadService {
      * @throws IOException              if decompression or conversion fails
      */
     public byte[] downloadTemplate(Long templateId, DocumentFormat targetFormat) throws IOException {
-        return downloadDocument(templateId, targetFormat, templateProvider);
+        return downloadDocument(templateId, targetFormat, DocumentType.TEMPLATE);
     }
 
     /**
@@ -48,29 +50,28 @@ public class DocumentDownloadService {
      * @throws IOException if decompression fails
      */
     public byte[] downloadContract(Long contractId) throws IOException {
-        return downloadDocument(contractId, DocumentFormat.PDF, contractProvider);
+        return downloadDocument(contractId, DocumentFormat.PDF, DocumentType.CONTRACT);
     }
 
     /**
-     * Generic download method that works with any document provider.
-     * Retrieves the document in a single provider call, then handles
-     * decompression and format conversion as needed.
+     * Generic download method. Resolves the correct provider from the registry,
+     * validates the requested format, then decompresses and converts as needed.
      *
      * @param documentId   the document ID
      * @param targetFormat the desired output format
-     * @param provider     the document provider to use
+     * @param documentType the type of document to download
      * @return decompressed and possibly converted document bytes
      * @throws IllegalArgumentException if the format is unsupported
      * @throws IOException              if decompression or conversion fails
      */
-    private byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentProvider provider) throws IOException {
-        DocumentType docType = provider.getDocumentType();
+    public byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentType documentType) throws IOException {
+        DocumentProvider provider = providerRegistry.getProvider(documentType);
 
         if (!provider.supportsFormat(targetFormat)) {
-            throw new IllegalArgumentException(docType + " does not support format: " + targetFormat);
+            throw new IllegalArgumentException(documentType + " does not support format: " + targetFormat);
         }
 
-        // returns both compressed bytes and native format
+        // single repository call — returns both compressed bytes and native format
         DocumentResult result = provider.getDocument(documentId);
 
         byte[] decompressedContent = zipService.decompress(result.compressedContent());
