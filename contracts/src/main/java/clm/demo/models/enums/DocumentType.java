@@ -2,5 +2,6 @@ package clm.demo.models.enums;
 
 public enum DocumentType {
     TEMPLATE,
-    CONTRACT
+    UNSIGNED_CONTRACT,
+    SIGNED_CONTRACT
 }

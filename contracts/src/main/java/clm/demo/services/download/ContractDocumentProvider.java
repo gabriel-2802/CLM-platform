@@ -44,6 +44,6 @@ public class ContractDocumentProvider implements DocumentProvider {
 
     @Override
     public DocumentType getDocumentType() {
-        return DocumentType.CONTRACT;
+        return DocumentType.UNSIGNED_CONTRACT;
     }
 }

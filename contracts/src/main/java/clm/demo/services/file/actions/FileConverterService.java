@@ -1,5 +1,7 @@
 package clm.demo.services.file.actions;
 
+import clm.demo.exceptions.FileConversionException;
+import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import lombok.extern.slf4j.Slf4j;
 
@@ -34,10 +36,10 @@ public class FileConverterService {
      * @param sourceFormat the format the bytes are currently in
      * @param targetFormat the desired output format
      * @return converted document bytes
-     * @throws IOException              if reading, writing, or conversion fails
-     * @throws IllegalArgumentException if the format combination is unsupported
+     * @throws FileConversionException          if reading, writing, or conversion fails
+     * @throws UnsupportedConversionException   if the format combination is unsupported
      */
-    public byte[] convert(byte[] data, DocumentFormat sourceFormat, DocumentFormat targetFormat) throws IOException {
+    public byte[] convert(byte[] data, DocumentFormat sourceFormat, DocumentFormat targetFormat) {
 
         if (sourceFormat == targetFormat) {
             return data;
@@ -49,20 +51,24 @@ public class FileConverterService {
                     if (targetFormat == DocumentFormat.PDF) {
                         yield convertDocxToPdf(data);
                     }
-                    throw new IllegalArgumentException("Unsupported conversion: " + sourceFormat + " to " + targetFormat);
+                    throw new UnsupportedConversionException(sourceFormat.name(), targetFormat.name());
                 }
                 case PDF -> {
                     if (targetFormat == DocumentFormat.DOCX) {
                         yield convertPdfToDocx(data);
                     }
-                    throw new IllegalArgumentException("Unsupported conversion: " + sourceFormat + " to " + targetFormat);
+                    throw new UnsupportedConversionException(sourceFormat.name(), targetFormat.name());
                 }
             };
-        } catch (IOException e) {
-            log.error("Conversion failed ({} : {}): {}", sourceFormat, targetFormat, e.getMessage(), e);
+        } catch (UnsupportedConversionException e) {
+            log.warn("Unsupported conversion requested: {} to {}", sourceFormat, targetFormat);
             throw e;
+        } catch (IOException e) {
+            log.error("Conversion failed ({} -> {}): {}", sourceFormat, targetFormat, e.getMessage(), e);
+            throw new FileConversionException("Conversion failed from " + sourceFormat + " to " + targetFormat + ": " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new IOException("Conversion failed from " + sourceFormat + " to " + targetFormat + ": " + e.getMessage(), e);
+            log.error("Unexpected error during conversion ({} -> {}): {}", sourceFormat, targetFormat, e.getMessage(), e);
+            throw new FileConversionException("Conversion failed from " + sourceFormat + " to " + targetFormat + ": " + e.getMessage(), e);
         }
     }
 
@@ -70,6 +76,7 @@ public class FileConverterService {
      * Converts DOCX bytes to PDF using the docx4j XSL-FO : Apache FOP pipeline.
      * @param docxData raw bytes of the DOCX document
      * @return PDF document bytes
+     * @throws IOException if reading or writing fails
      */
     private byte[] convertDocxToPdf(byte[] docxData) throws IOException {
         try {
@@ -78,11 +85,9 @@ public class FileConverterService {
 
             ByteArrayOutputStream pdfOut = new ByteArrayOutputStream();
 
-
-            
             Docx4J.toPDF(wordPackage, pdfOut);
 
-            return  pdfOut.toByteArray();
+            return pdfOut.toByteArray();
 
         } catch (ConversionException e) {
             throw new IOException("docx4j PDF conversion failed: " + e.getMessage(), e);

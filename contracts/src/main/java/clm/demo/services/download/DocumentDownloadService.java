@@ -50,7 +50,7 @@ public class DocumentDownloadService {
      * @throws IOException if decompression fails
      */
     public byte[] downloadContract(Long contractId) throws IOException {
-        return downloadDocument(contractId, DocumentFormat.PDF, DocumentType.CONTRACT);
+        return downloadDocument(contractId, DocumentFormat.PDF, DocumentType.UNSIGNED_CONTRACT);
     }
 
     /**
