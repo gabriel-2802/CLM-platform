@@ -5,8 +5,8 @@ import clm.demo.models.ContractFieldValue;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.utils.PlaceHolderUtils;
-import clm.demo.utils.PlaceHolderUtils;
+import clm.demo.utils.PlaceholderProcessor;
+import clm.demo.utils.PlaceholderProcessor.SubstitutionResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
@@ -19,20 +19,24 @@ import java.util.*;
  * Generates contract documents by replacing dot-sequence placeholders with field values.
  *
  * <p>Placeholders are matched positionally: the Nth dot-sequence in the document
- * corresponds to the TemplateField with {@code fieldPosition == N} (0-based, sorted).
- * The field's label is used to look up the value from the mappings map.</p>
+ * corresponds to the {@link TemplateField} with {@code fieldPosition == N} (0-based, sorted).
+ * The field's label is used to look up the value from the fieldValues list.</p>
+ *
+ * <p><strong>Note:</strong> PDF templates are round-tripped through DOCX for filling
+ * (PDF → DOCX → fill → PDF). This is inherently lossy; complex PDF layouts may degrade.</p>
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileContentReplacementService {
-    private final FileConverterService fileConverterService;
-    private final FileZipService fileZipService;
 
-    /**
-     * Generates a PDF by replacing each dot-sequence placeholder in the template
-     * with the corresponding field value from {@code fieldValues}.
-     */
+    private final FileConverterService fileConverterService;
+    private final FileZipService       fileZipService;
+
+    // -------------------------------------------------------------------------
+    // Public API
+    // -------------------------------------------------------------------------
+
     public byte[] generateDocumentContent(
             Contract contract,
             Template template,
@@ -41,16 +45,9 @@ public class FileContentReplacementService {
         log.info("Generating PDF for contract {} from {} template",
                 contract.getId(), template.getDocumentFormat());
 
-        // Build label → value lookup
         Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
-
-        // Fields ordered by position — index N maps to the Nth placeholder
-        List<TemplateField> ordered = template.getTemplateFields().stream()
-                .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
-                .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
-                .toList();
-
-        byte[] templateBytes = fileZipService.decompress(template.getDocumentContent());
+        List<TemplateField> ordered      = sortedFields(template);
+        byte[] templateBytes             = fileZipService.decompress(template.getDocumentContent());
 
         byte[] pdf = switch (template.getDocumentFormat()) {
             case DOCX -> {
@@ -69,33 +66,22 @@ public class FileContentReplacementService {
     }
 
     // -------------------------------------------------------------------------
-    // Private — DOCX filling
+    // DOCX filling
     // -------------------------------------------------------------------------
 
-    /**
-     * Fills a DOCX by replacing each dot-sequence placeholder positionally.
-     * Uses {@link PlaceHolderUtils#replaceEach} so the Nth match gets the value
-     * of the Nth ordered field (looked up by label).
-     */
     private byte[] fillDocx(
             byte[] docxBytes,
             List<TemplateField> ordered,
             Map<String, String> labelToValue) throws IOException {
 
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
+
             int[] globalIndex = {0};
 
-            fillParagraphs(doc.getParagraphs(), ordered, labelToValue, globalIndex);
-
-            doc.getTables().forEach(table ->
-                    table.getRows().forEach(row ->
-                            row.getTableCells().forEach(cell ->
-                                    fillParagraphs(cell.getParagraphs(), ordered, labelToValue, globalIndex))));
-
-            doc.getHeaderList().forEach(h ->
-                    fillParagraphs(h.getParagraphs(), ordered, labelToValue, globalIndex));
-            doc.getFooterList().forEach(f ->
-                    fillParagraphs(f.getParagraphs(), ordered, labelToValue, globalIndex));
+            visitParagraphs(doc.getParagraphs(),           ordered, labelToValue, globalIndex);
+            visitTables    (doc.getTables(),               ordered, labelToValue, globalIndex);
+            visitHeaders   (doc.getHeaderList(),           ordered, labelToValue, globalIndex);
+            visitFooters   (doc.getFooterList(),           ordered, labelToValue, globalIndex);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.write(out);
@@ -103,25 +89,62 @@ public class FileContentReplacementService {
         }
     }
 
-    private void fillParagraphs(
+    private void visitParagraphs(
             List<XWPFParagraph> paragraphs,
             List<TemplateField> ordered,
             Map<String, String> labelToValue,
             int[] globalIndex) {
 
-        for (XWPFParagraph paragraph : paragraphs) {
-            if (globalIndex[0] >= ordered.size()) break;
-            fillParagraph(paragraph, ordered, labelToValue, globalIndex);
+        for (XWPFParagraph p : paragraphs) {
+            if (globalIndex[0] >= ordered.size()) return;
+            fillParagraph(p, ordered, labelToValue, globalIndex);
+        }
+    }
+
+    private void visitTables(
+            List<XWPFTable> tables,
+            List<TemplateField> ordered,
+            Map<String, String> labelToValue,
+            int[] globalIndex) {
+
+        for (XWPFTable table : tables) {
+            if (globalIndex[0] >= ordered.size()) return;
+            for (XWPFTableRow row : table.getRows()) {
+                for (XWPFTableCell cell : row.getTableCells()) {
+                    visitParagraphs(cell.getParagraphs(), ordered, labelToValue, globalIndex);
+                }
+            }
+        }
+    }
+
+    private void visitHeaders(
+            List<XWPFHeader> headers,
+            List<TemplateField> ordered,
+            Map<String, String> labelToValue,
+            int[] globalIndex) {
+
+        for (XWPFHeader h : headers) {
+            visitParagraphs(h.getParagraphs(), ordered, labelToValue, globalIndex);
+        }
+    }
+
+    private void visitFooters(
+            List<XWPFFooter> footers,
+            List<TemplateField> ordered,
+            Map<String, String> labelToValue,
+            int[] globalIndex) {
+
+        for (XWPFFooter f : footers) {
+            visitParagraphs(f.getParagraphs(), ordered, labelToValue, globalIndex);
         }
     }
 
     /**
-     * Replaces dot-sequence placeholders in a single paragraph.
+     * Fills placeholders in a single paragraph while preserving per-run formatting.
      *
-     * <p>Concatenates all runs into one string, applies
-     * {@link PlaceHolderUtils#replaceEach} using the global index to pick the
-     * right field for each match, then writes the result back into the first run
-     * (preserving its style) and clears the rest.</p>
+     * <p>Strategy: iterate runs one-by-one. If a run contains a placeholder, replace it
+     * in-place so that the run's own formatting (bold, font, size, etc.) is kept intact.
+     * Only runs that actually change are touched.</p>
      */
     private void fillParagraph(
             XWPFParagraph paragraph,
@@ -132,37 +155,42 @@ public class FileContentReplacementService {
         List<XWPFRun> runs = paragraph.getRuns();
         if (runs.isEmpty()) return;
 
-        StringBuilder sb = new StringBuilder();
         for (XWPFRun run : runs) {
-            if (run.getText(0) != null) sb.append(run.getText(0));
+            if (globalIndex[0] >= ordered.size()) return;
+
+            String text = run.getText(0);
+            if (text == null || text.isEmpty()) continue;
+
+            SubstitutionResult result = PlaceholderProcessor.substituteEach(text, i -> {
+                int absIndex = globalIndex[0] + i;
+                if (absIndex >= ordered.size()) return null;
+                String label = ordered.get(absIndex).getFieldLabel();
+                return labelToValue.get(label);   // null → keep original
+            });
+
+            if (result.filledCount() == 0) continue;
+
+            run.setText(result.text(), 0);
+            globalIndex[0] += result.filledCount();
         }
-        String original = sb.toString();
-
-        String rewritten = PlaceHolderUtils.replaceEach(original, i -> {
-            int absIndex = globalIndex[0] + i;
-            if (absIndex >= ordered.size()) return null;
-            String label = ordered.get(absIndex).getFieldLabel();
-            return labelToValue.getOrDefault(label, null);
-        });
-
-        if (rewritten.equals(original)) return;
-
-        // Count how many placeholders were consumed in this paragraph
-        long consumed = PlaceHolderUtils.findPlaceholders(original).size();
-        globalIndex[0] += (int) consumed;
-
-        runs.get(0).setText(rewritten, 0);
-        for (int i = 1; i < runs.size(); i++) runs.get(i).setText("", 0);
     }
 
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 
-    private Map<String, String> buildLabelValueMap(List<ContractFieldValue> fieldValues) {
+    private static List<TemplateField> sortedFields(Template template) {
+        return template.getTemplateFields().stream()
+                .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
+                .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
+                .toList();
+    }
+
+    private static Map<String, String> buildLabelValueMap(List<ContractFieldValue> fieldValues) {
         Map<String, String> map = new HashMap<>(fieldValues.size() * 2);
         for (ContractFieldValue cfv : fieldValues) {
             TemplateField field = cfv.getTemplateField();
+            // Null values are excluded intentionally: a missing value leaves the placeholder intact.
             if (field != null && field.getFieldLabel() != null && cfv.getFieldValue() != null) {
                 map.put(field.getFieldLabel(), cfv.getFieldValue());
             }

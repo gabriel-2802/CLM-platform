@@ -1,8 +1,8 @@
 package clm.demo.services.file.actions;
 
+import clm.demo.dto.responses.ParsedTemplateResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.utils.PlaceHolderUtils;
-import clm.demo.utils.PlaceHolderUtils.PlaceholderInfo;
+import clm.demo.utils.PlaceholderProcessor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,8 +27,8 @@ import java.util.List;
  * clickable placeholder spans.</p>
  *
  * <p><strong>Important:</strong> {@code documentText} in the response is always the
- * <em>normalized</em> string (CRLF → LF). {@code startIndex}/{@code endIndex} on each
- * {@link PlaceholderInfo} point into that same string, so frontend offsets are
+ * <em>normalized</em> string (CRLF → LF). {@code startOffset}/{@code endOffset} on each
+ * {@link ParsedTemplateResponseDTO.PlaceholderDTO} point into that same string, so frontend offsets are
  * always consistent.</p>
  */
 @Slf4j
@@ -52,8 +52,17 @@ public class FileParserService {
         validateFile(file);
 
         String raw = extractText(file, format);
-        String normalized = PlaceHolderUtils.normalize(raw);
-        List<PlaceholderInfo> placeholders = PlaceHolderUtils.findPlaceholders(normalized);
+        String normalized = PlaceholderProcessor.normalize(raw);
+        List<ParsedTemplateResponseDTO.PlaceholderDTO> placeholders = PlaceholderProcessor.findPlaceholders(normalized)
+                .stream()
+                .map(record -> ParsedTemplateResponseDTO.PlaceholderDTO.builder()
+                        .position(record.occurrenceIndex())
+                        .placeholderText(record.prevText())
+                        .startIndex(record.startOffset())
+                        .endIndex(record.endOffset())
+                        .fieldId(-1L)
+                        .build())
+                .toList();
 
         return ParsedDocumentResponse.builder()
                 .documentText(normalized)
@@ -90,7 +99,7 @@ public class FileParserService {
      *
      * <p>Blank paragraphs are preserved as empty lines so that character offsets
      * remain accurate — skipping them would shift every subsequent
-     * {@code startIndex}/{@code endIndex}.</p>
+     * {@code startOffset}/{@code endOffset}.</p>
      */
     private String extractDocx(MultipartFile file) throws IOException {
         try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
@@ -157,10 +166,10 @@ public class FileParserService {
         /** Total number of placeholders found. */
         private int placeholderCount;
         /**
-         * Ordered placeholder occurrences. {@code startIndex}/{@code endIndex} on each
+         * Ordered placeholder occurrences. {@code startOffset}/{@code endOffset} on each
          * entry point into {@code documentText} and are used by the frontend to render
          * each dot sequence as a clickable span.
          */
-        private List<PlaceholderInfo> placeholders;
+        private List<ParsedTemplateResponseDTO.PlaceholderDTO> placeholders;
     }
 }
