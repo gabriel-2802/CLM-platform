@@ -15,6 +15,7 @@ import clm.demo.models.enums.DocumentFormat;
 
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
+import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileParserService;
 import clm.demo.services.file.actions.FileZipService;
@@ -46,6 +47,7 @@ public class TemplateService {
     private final ParsedDocumentMapper parsedDocumentMapper;
     private final FileZipService zipService;
     private final FileConverterService fileConverterService;
+    private final FileContentReplacementService fileContentReplacementService;
 
     /**
      * Generates (uploads and parses) a new contract template from an uploaded file.
@@ -66,15 +68,25 @@ public class TemplateService {
         }
 
         // parse the uploaded file
-        DocumentFormat format = detectDocumentFormat(request.getFile());
-        FileParserService.ParsedDocumentResponse parsedDoc = fileParserService.parseTemplate(request.getFile(), format);
+        DocumentFormat uploadedFormat = detectDocumentFormat(request.getFile());
+        FileParserService.ParsedDocumentResponse parsedDoc = fileParserService.parseTemplate(request.getFile(), uploadedFormat);
+
+        // templates are always stored as DOCX — convert if the upload was a PDF
+        byte[] docxBytes = request.getFile().getBytes();
+        if (uploadedFormat == DocumentFormat.PDF) {
+            log.info("Converting uploaded PDF to DOCX for storage");
+            docxBytes = fileConverterService.convert(docxBytes, DocumentFormat.PDF, DocumentFormat.DOCX);
+        }
+
+        // normalize every placeholder to exactly 4 dots before storing
+        docxBytes = fileContentReplacementService.normalizePlaceholdersInDocx(docxBytes);
 
         // create and save the ContractTemplate entity
         Template template = Template.builder()
                 .templateName(request.getTemplateName())
                 .description(request.getDescription())
-                .documentFormat(format)
-                .documentContent(zipService.compress(request.getFile().getBytes()))
+                .documentFormat(DocumentFormat.DOCX)
+                .documentContent(zipService.compress(docxBytes))
                 .fieldCount(parsedDoc.getPlaceholderCount())
                 .build();
 

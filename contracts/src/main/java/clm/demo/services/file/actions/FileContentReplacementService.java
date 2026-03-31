@@ -286,6 +286,98 @@ public class FileContentReplacementService {
 
 
     // -------------------------------------------------------------------------
+    // Template normalization — called on upload to canonicalize placeholders
+    // -------------------------------------------------------------------------
+
+    /**
+     * Rewrites every placeholder dot-sequence in the DOCX to exactly four dots ({@code ....}).
+     *
+     * <p>Storing a canonical, fixed-width placeholder means the regex in
+     * {@link clm.demo.utils.Constants#PLACEHOLDER_PATTERN} always matches runs of the
+     * same predictable length, which significantly reduces the span-delta arithmetic
+     * during contract generation and eliminates edge-cases around very long dot sequences
+     * fragmenting across many XML runs.</p>
+     *
+     * <p>Uses the same merge → substitute → delta-based writeback algorithm as
+     * {@link #fillParagraph} so cross-run dot sequences are handled correctly.</p>
+     *
+     * @param docxBytes raw DOCX bytes (not compressed)
+     * @return DOCX bytes with every placeholder replaced by {@code ....}
+     * @throws IOException if the document cannot be parsed or written
+     */
+    public byte[] normalizePlaceholdersInDocx(byte[] docxBytes) throws IOException {
+        try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
+
+            normalizeParagraphList(doc.getParagraphs());
+
+            for (XWPFTable table : doc.getTables())
+                for (XWPFTableRow row : table.getRows())
+                    for (XWPFTableCell cell : row.getTableCells())
+                        normalizeParagraphList(cell.getParagraphs());
+
+            for (XWPFHeader h : doc.getHeaderList()) normalizeParagraphList(h.getParagraphs());
+            for (XWPFFooter f : doc.getFooterList()) normalizeParagraphList(f.getParagraphs());
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            doc.write(out);
+            log.debug("Placeholder normalization complete ({} bytes)", out.size());
+            return out.toByteArray();
+        }
+    }
+
+    private void normalizeParagraphList(List<XWPFParagraph> paragraphs) {
+        for (XWPFParagraph p : paragraphs) normalizeParagraph(p);
+    }
+
+    private void normalizeParagraph(XWPFParagraph paragraph) {
+        List<XWPFRun> runs = paragraph.getRuns();
+        if (runs.isEmpty()) return;
+
+        String[] normTexts = new String[runs.size()];
+        int[]    runStarts = new int[runs.size() + 1];
+        StringBuilder merged = new StringBuilder();
+
+        for (int i = 0; i < runs.size(); i++) {
+            runStarts[i] = merged.length();
+            normTexts[i] = PlaceholderProcessor.normalize(runs.get(i).getText(0));
+            merged.append(normTexts[i]);
+        }
+        runStarts[runs.size()] = merged.length();
+
+        if (merged.isEmpty()) return;
+
+        // Replace every placeholder with exactly 4 dots.
+        SubstitutionResultWithSpans result =
+                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> "....");
+
+        if (!result.anyFilled()) return;
+
+        String rewritten = result.text();
+        List<SubstitutionSpan> spans = result.spans();
+        int origPos = 0, rwPos = 0, spanIdx = 0;
+
+        for (int r = 0; r < runs.size(); r++) {
+            int origRunEnd = runStarts[r + 1];
+            int rwStart    = rwPos;
+
+            while (origPos < origRunEnd) {
+                if (spanIdx < spans.size()
+                        && origPos == spans.get(spanIdx).originalStart()) {
+                    SubstitutionSpan sp = spans.get(spanIdx++);
+                    origPos = sp.originalEnd();
+                    rwPos  += sp.replacementLen();
+                } else {
+                    origPos++;
+                    rwPos++;
+                }
+            }
+
+            int rwEnd = Math.min(rwPos, rewritten.length());
+            runs.get(r).setText(rewritten.substring(rwStart, rwEnd), 0);
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
 

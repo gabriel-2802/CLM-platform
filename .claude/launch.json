@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "demo (Spring Boot backend)",
+      "runtimeExecutable": "mvn",
+      "runtimeArgs": ["spring-boot:run"],
+      "port": 8080
+    },
+    {
+      "name": "postgres (Docker)",
+      "runtimeExecutable": "docker-compose",
+      "runtimeArgs": ["up", "-d"],
+      "port": 5432
+    }
+  ]
+}
