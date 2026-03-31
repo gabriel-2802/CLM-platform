@@ -1,11 +1,11 @@
-package clm.demo.services.download;
+package clm.demo.services.download.document.providers;
 
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.models.Template;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
-import clm.demo.repositories.ContractTemplateRepository;
-import clm.demo.services.download.document.providers.DocumentProvider;
+import clm.demo.repositories.TemplateRepository;
+import clm.demo.services.download.DocumentResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class TemplateDocumentProvider implements DocumentProvider {
+public class TemplateProvider implements DocumentProvider {
 
-    private final ContractTemplateRepository templateRepository;
+    private final TemplateRepository templateRepository;
 
     /**
      * Fetches the template in a single repository call and returns both the

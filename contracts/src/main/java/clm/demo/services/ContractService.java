@@ -12,8 +12,8 @@ import clm.demo.models.ContractFieldValue;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.repositories.ContractFieldValueRepository;
-import clm.demo.repositories.ContractTemplateRepository;
-import clm.demo.repositories.GeneratedContractRepository;
+import clm.demo.repositories.ContractRepository;
+import clm.demo.repositories.TemplateRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileZipService;
 import jakarta.validation.Valid;
@@ -36,8 +36,8 @@ import java.util.Map;
 @Transactional
 public class ContractService {
 
-    private final ContractTemplateRepository contractTemplateRepository;
-    private final GeneratedContractRepository generatedContractRepository;
+    private final TemplateRepository contractTemplateRepository;
+    private final ContractRepository generatedContractRepository;
     private final ContractFieldValueRepository contractFieldValueRepository;
     private final ContractGenerationMapper contractGenerationMapper;
     private final GeneratedContractMapper generatedContractMapper;
@@ -92,7 +92,8 @@ public class ContractService {
         return generatedContractMapper.toResponseDTO(contract);
     }
 
-    // ...existing code...
+
+
     private void validateMandatoryFields(Template template, Map<String, String> mappings) {
         List<String> missingFields = template.getTemplateFields().stream()
                 .filter(TemplateField::getIsRequired)

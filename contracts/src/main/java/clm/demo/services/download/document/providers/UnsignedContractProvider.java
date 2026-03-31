@@ -4,7 +4,7 @@ import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.models.Contract;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
-import clm.demo.repositories.GeneratedContractRepository;
+import clm.demo.repositories.ContractRepository;
 import clm.demo.services.download.DocumentResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,9 +17,9 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-public class ContractDocumentProvider implements DocumentProvider {
+public class UnsignedContractProvider implements DocumentProvider {
 
-    private final GeneratedContractRepository contractRepository;
+    private final ContractRepository contractRepository;
 
     /**
      * Fetches the contract in a single repository call and returns both the

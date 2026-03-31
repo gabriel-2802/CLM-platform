@@ -10,7 +10,7 @@ import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
-import clm.demo.services.download.document.providers.DocumentDownloadService;
+import clm.demo.services.download.DocumentDownloadService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;

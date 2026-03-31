@@ -6,6 +6,7 @@ import clm.demo.exceptions.EmptyFileNameException;
 import clm.demo.exceptions.FileConversionException;
 import clm.demo.exceptions.MissingMandatoryFieldException;
 import clm.demo.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.SignedDocumentNotAvailableException;
 import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.exceptions.UnsupportedFileException;
 import lombok.extern.slf4j.Slf4j;
@@ -85,6 +86,16 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException e) {
         log.warn("Resource not found: {}", e.getMessage());
         return buildResponse(HttpStatus.NOT_FOUND, "Resource not found", e.getMessage());
+    }
+
+    /**
+     * Handles cases where a signed document is not yet available for download.
+     * This typically occurs when a contract has not yet been signed.
+     */
+    @ExceptionHandler(SignedDocumentNotAvailableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleSignedDocumentNotAvailableException(SignedDocumentNotAvailableException e) {
+        log.warn("Signed document unavailable: {}", e.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Signed document not available", e.getMessage());
     }
 
     /**

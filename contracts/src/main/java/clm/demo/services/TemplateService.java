@@ -13,7 +13,7 @@ import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
 
-import clm.demo.repositories.ContractTemplateRepository;
+import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileParserService;
@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class TemplateService {
 
-    private final ContractTemplateRepository templateRepository;
+    private final TemplateRepository templateRepository;
     private final TemplateFieldRepository templateFieldRepository;
     private final FileParserService fileParserService;
     private final ContractTemplateMapper contractTemplateMapper;

@@ -1,10 +1,9 @@
-package clm.demo.services.download.document.providers;
+package clm.demo.services.download;
 
 import clm.demo.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
-import clm.demo.services.download.DocumentProviderRegistry;
-import clm.demo.services.download.DocumentResult;
+import clm.demo.services.download.document.providers.DocumentProvider;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileZipService;
 import lombok.RequiredArgsConstructor;
