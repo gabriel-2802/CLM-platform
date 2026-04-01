@@ -1,6 +1,5 @@
 package clm.demo.services.file.actions;
 
-import clm.demo.dto.responses.ParsedTemplateResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.PlaceholderProcessor;
 import lombok.AllArgsConstructor;
@@ -16,20 +15,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.List;
 
 /**
- * Parses uploaded contract templates (DOCX or PDF) and extracts placeholder occurrences.
+ * Parses uploaded contract templates (DOCX or PDF) and extracts placeholder count.
  * Placeholders are sequences of 4+ consecutive dots (e.g. {@code "......"}).
  *
- * <p>Workflow: upload → validate → extract text → normalize → detect placeholders
- * → return full normalized text + positions so the frontend can render inline
- * clickable placeholder spans.</p>
+ * <p>Workflow: upload → validate → extract text → normalize → count placeholders
+ * → return normalized text and count so the service layer can create field entities.</p>
  *
  * <p><strong>Important:</strong> {@code documentText} in the response is always the
- * <em>normalized</em> string (CRLF → LF). {@code startOffset}/{@code endOffset} on each
- * {@link ParsedTemplateResponseDTO.PlaceholderDTO} point into that same string, so frontend offsets are
- * always consistent.</p>
+ * <em>normalized</em> string (CRLF → LF). Placeholder positions are derived from regex
+ * matching order, not stored explicitly.</p>
  */
 @Slf4j
 @Service
@@ -38,36 +34,25 @@ public class FileParserService {
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50 MB
 
     /**
-     * Parses the uploaded document and returns the full normalized text alongside
-     * all placeholder occurrences in document order.
+     * Parses the uploaded document and returns the full normalized text and placeholder count.
      *
      * @param file   uploaded DOCX or PDF template
      * @param format document format, selects the parser
-     * @return {@link ParsedDocumentResponse} with normalized text and placeholder list
+     * @return {@link ParsedDocument} with normalized text and placeholder count
      * @throws IOException              if the document cannot be read or parsed
      * @throws IllegalArgumentException if the file is invalid or too large
      */
-    public ParsedDocumentResponse parseTemplate(MultipartFile file, DocumentFormat format)
+    public ParsedDocument parseTemplate(MultipartFile file, DocumentFormat format)
             throws IOException {
         validateFile(file);
 
         String raw = extractText(file, format);
         String normalized = PlaceholderProcessor.normalize(raw);
-        List<ParsedTemplateResponseDTO.PlaceholderDTO> placeholders = PlaceholderProcessor.findPlaceholders(normalized)
-                .stream()
-                .map(record -> ParsedTemplateResponseDTO.PlaceholderDTO.builder()
-                        .position(record.occurrenceIndex())
-                        .placeholderText(record.prevText())
-                        .startIndex(record.startOffset())
-                        .endIndex(record.endOffset())
-                        .fieldId(-1L)
-                        .build())
-                .toList();
+        int placeholderCount = PlaceholderProcessor.findPlaceholders(normalized).size();
 
-        return ParsedDocumentResponse.builder()
+        return ParsedDocument.builder()
                 .documentText(normalized)
-                .placeholderCount(placeholders.size())
-                .placeholders(placeholders)
+                .placeholderCount(placeholderCount)
                 .build();
     }
 
@@ -85,10 +70,10 @@ public class FileParserService {
     private String extractPdf(MultipartFile file) throws IOException {
         try (PDDocument document = Loader.loadPDF(file.getBytes())) {
             String text = new PDFTextStripper().getText(document);
-            log.info("Parsed PDF '{}': {} chars", file.getOriginalFilename(), text.length());
+            log.info("parsed PDF '{}': {} chars", file.getOriginalFilename(), text.length());
             return text;
         } catch (Exception e) {
-            log.error("Failed to parse PDF '{}'", file.getOriginalFilename(), e);
+            log.error("failed to parse PDF '{}'", file.getOriginalFilename(), e);
             throw new IOException("Failed to parse PDF: " + e.getMessage(), e);
         }
     }
@@ -127,10 +112,10 @@ public class FileParserService {
                             sb.append(p.getText()).append("\n")));
 
             String content = sb.toString();
-            log.info("Parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
+            log.info("parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
             return content;
         } catch (Exception e) {
-            log.error("Failed to parse DOCX '{}'", file.getOriginalFilename(), e);
+            log.error("failed to parse DOCX '{}'", file.getOriginalFilename(), e);
             throw new IOException("Failed to parse DOCX: " + e.getMessage(), e);
         }
     }
@@ -149,7 +134,7 @@ public class FileParserService {
         if (name == null || name.isBlank())
             throw new IllegalArgumentException("File must have a valid filename");
 
-        log.debug("File validated: {} ({} bytes)", name, file.getSize());
+        log.debug("file validated: {} ({} bytes)", name, file.getSize());
     }
 
     // -------------------------------------------------------------------------
@@ -160,16 +145,10 @@ public class FileParserService {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ParsedDocumentResponse {
-        /** Full normalized (CRLF → LF) plain-text content for frontend rendering. */
+    public static class ParsedDocument {
+        /** Full normalized (CRLF → LF) plain-text content. */
         private String documentText;
         /** Total number of placeholders found. */
         private int placeholderCount;
-        /**
-         * Ordered placeholder occurrences. {@code startOffset}/{@code endOffset} on each
-         * entry point into {@code documentText} and are used by the frontend to render
-         * each dot sequence as a clickable span.
-         */
-        private List<ParsedTemplateResponseDTO.PlaceholderDTO> placeholders;
     }
 }

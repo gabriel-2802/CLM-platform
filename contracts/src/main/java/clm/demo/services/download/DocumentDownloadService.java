@@ -4,12 +4,10 @@ import clm.demo.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.download.document.providers.DocumentProvider;
-import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.utils.ZipUtils;
+import clm.demo.utils.FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 
@@ -20,75 +18,45 @@ import java.io.IOException;
  * referenced here, so adding a new document type requires no changes to
  * this class.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
-@Slf4j
 public class DocumentDownloadService {
-
-    private final FileConverterService converterService;
     private final DocumentProviderRegistry providerRegistry;
 
     /**
-     * Generic download method for all document types. Resolves the correct provider from the registry,
-     * validates the requested format, then decompresses and converts as needed.
+     * Resolves the correct provider from the registry, decompresses the stored
+     * document, and converts to the target format if necessary.
      *
-     * <p>This is the primary method for downloading documents of any type. New document types can be
-     * supported by adding them to the {@link DocumentType} enum and registering their provider
-     * in the {@link DocumentProviderRegistry} — no changes to this method are required.</p>
+     * <p>New document types are supported by registering a provider in
+     * {@link DocumentProviderRegistry} — no changes to this class are required.</p>
      *
      * @param documentId   the document ID
      * @param targetFormat the desired output format
      * @param documentType the type of document to download
-     * @return decompressed and possibly converted document bytes
+     * @return decompressed and converted document bytes
      * @throws IllegalArgumentException if the format is unsupported for this document type
-     * @throws FileConversionException if document conversion fails
-     * @throws IOException if decompression fails
+     * @throws FileConversionException  if decompression or conversion fails
      */
-    public byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentType documentType) throws IOException {
+    public byte[] downloadDocument(Long documentId, DocumentFormat targetFormat, DocumentType documentType) {
         DocumentProvider provider = providerRegistry.getProvider(documentType);
 
         if (!provider.supportsFormat(targetFormat)) {
             throw new IllegalArgumentException(documentType + " does not support format: " + targetFormat);
         }
 
-        // single repository call — returns both compressed bytes and native format
-        DocumentResult result = provider.getDocument(documentId);
+        try {
+            DocumentResult result = provider.getDocument(documentId);
+            byte[] decompressed = FileUtils.decompress(result.compressedContent());
 
-        byte[] decompressedContent = ZipUtils.decompress(result.compressedContent());
+            if (result.nativeFormat() == targetFormat) {
+                return decompressed;
+            }
 
-        // if already in target format, return directly — no conversion needed
-        if (result.nativeFormat() == targetFormat) {
-            return decompressedContent;
+            return FileUtils.convert(decompressed, result.nativeFormat(), targetFormat);
+
+        } catch (IOException e) {
+            throw new FileConversionException("Failed to download document " + documentId + ": " + e.getMessage(), e);
         }
-
-        return converterService.convert(decompressedContent, result.nativeFormat(), targetFormat);
-    }
-
-    /**
-     * Gets the content type (MIME type) for a given document format.
-     * Useful for setting HTTP response headers.
-     *
-     * @param format the document format
-     * @return the MIME type string
-     */
-    public String getContentType(DocumentFormat format) {
-        return switch (format) {
-            case PDF -> "application/pdf";
-            case DOCX -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-        };
-    }
-
-    /**
-     * Gets the file extension for a given document format.
-     *
-     * @param format the document format
-     * @return the file extension (without the dot)
-     */
-    public String getFileExtension(DocumentFormat format) {
-        return switch (format) {
-            case PDF -> "pdf";
-            case DOCX -> "docx";
-        };
     }
 }

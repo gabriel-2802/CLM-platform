@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
  * Signed contracts are only downloadable as PDF format.
  * A signed document must be available; if not, a SignedDocumentNotAvailableException is thrown.
  */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class SignedContractProvider implements DocumentProvider {

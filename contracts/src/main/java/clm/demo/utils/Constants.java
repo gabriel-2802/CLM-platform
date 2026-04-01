@@ -66,5 +66,7 @@ public final class Constants {
      */
     public static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\.{4,}(?:[ \\t]*\\.+)*");
 
+    public static final String PLACEHOLDER = "....";
+
 
 }

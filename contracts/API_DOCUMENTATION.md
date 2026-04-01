@@ -115,33 +115,18 @@ Uploads a contract template file, parses it for placeholders, and persists the t
 
 #### Response
 - **Status:** `201 Created`
-- **Body:** `ParsedTemplateResponseDTO`
+- **Body:** `TemplateUploadResponseDTO`
 
 #### Response Schema
 ```json
 {
-  "templateId": 1,
-  "templateName": "Service Agreement Template",
-  "documentText": "Service Agreement\n\nThis agreement is between [COMPANY_NAME] and [CLIENT_NAME]...",
-  "placeholderCount": 5,
-  "placeholders": [
-    {
-      "position": 1,
-      "placeholderText": ".....",
-      "startIndex": 45,
-      "endIndex": 57,
-      "fieldId": 101
-    },
-    {
-      "position": 2,
-      "placeholderText": "...",
-      "startIndex": 62,
-      "endIndex": 73,
-      "fieldId": 102
-    }
-  ]
+  "templateId": 9,
+  "templateName": "MultiLine",
+  "documentText": "Service Agreement\n\nThis agreement is between {{101}} and {{102}}..."
 }
 ```
+
+The `documentText` field contains the extracted plain text from the template with all placeholders replaced by their assigned field IDs in the format `{{fieldId}}`.
 
 #### Possible Errors
 - `400 Bad Request` - Missing required fields or empty file name

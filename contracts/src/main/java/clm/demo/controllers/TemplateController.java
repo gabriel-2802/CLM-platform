@@ -2,11 +2,13 @@ package clm.demo.controllers;
 
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.UploadTemplateRequest;
-import clm.demo.dto.responses.ParsedTemplateResponseDTO;
+import clm.demo.dto.responses.TemplateUploadResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
+import clm.demo.services.download.DocumentDownloadService;
 import clm.demo.utils.Constants;
 import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
@@ -31,6 +33,7 @@ import java.util.List;
 public class TemplateController {
 
     private final TemplateService templateService;
+    private final DocumentDownloadService downloadService;
 
     /**
      * Uploads a contract template file, parses it for placeholders,
@@ -39,8 +42,8 @@ public class TemplateController {
      * @param request containing the template file and metadata
      * @return 201 Created with parsed template details
      */
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ParsedTemplateResponseDTO> uploadTemplate(@ModelAttribute @Valid UploadTemplateRequest request) {
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TemplateUploadResponseDTO> uploadTemplate(@ModelAttribute @Valid UploadTemplateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(templateService.uploadTemplate(request));
     }
 
@@ -79,7 +82,7 @@ public class TemplateController {
      * @param request containing template ID and list of field mapping definitions
      * @return 200 OK with updated field details
      */
-    @PatchMapping("/{templateId}/labels")
+    @PutMapping("/{templateId}/labels")
     public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(@RequestBody @Valid FieldMappingRequest request) {
         return ResponseEntity.ok(templateService.updateFieldLabels(request));
     }
@@ -116,7 +119,7 @@ public class TemplateController {
             throw new IllegalArgumentException("Invalid format: " + format + ". Supported: docx, pdf", e);
         }
 
-        byte[] content = templateService.downloadTemplate(templateId, documentFormat);
+        byte[] content = downloadService.downloadDocument(templateId, documentFormat, DocumentType.TEMPLATE);
 
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=template-" + templateId + "." + format.toLowerCase())

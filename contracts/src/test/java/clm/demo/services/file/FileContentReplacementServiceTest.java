@@ -6,8 +6,7 @@ import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.services.file.actions.FileContentReplacementService;
-import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.utils.ZipUtils;
+import clm.demo.utils.FileUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * <li>Document format conversions (DOCX ↔ PDF)</li>
  * <li>File I/O and storage</li>
  * </ul>
- * <p>Uses real implementations of FileConverterService and FileZipService.
+ * <p>Uses real implementations of FileConverterService and FileUtils.
  */
 @Slf4j
 @ExtendWith(SpringExtension.class)
@@ -52,12 +51,6 @@ class FileContentReplacementServiceTest {
 
     @Autowired
     private FileContentReplacementService service;
-
-    @Autowired
-    private FileConverterService fileConverterService;
-
-    @Autowired
-    private ZipUtils fileZipService;
 
 
     @BeforeEach
@@ -84,7 +77,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("single-field", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-001");
         List<ContractFieldValue> fieldValues = createFieldValues(template, List.of("John Doe"));
@@ -104,7 +97,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("minimal-edge-case", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-002");
         List<ContractFieldValue> fieldValues = createFieldValues(template, List.of("MinimalValue"));
@@ -124,7 +117,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("many-dots-edge-case", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-003");
         List<ContractFieldValue> fieldValues = createFieldValues(template, List.of("LongValueForManyDots"));
@@ -144,7 +137,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("multiline-field", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-004");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -165,7 +158,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("trailing-dots-edge-case", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-005");
         List<ContractFieldValue> fieldValues = createFieldValues(template, List.of("TrailingValue"));
@@ -187,7 +180,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("dots-separate-lines", DocumentFormat.DOCX, 2);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-006");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -208,7 +201,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("paragraph-boundary", DocumentFormat.DOCX, 2);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-007");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -229,7 +222,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("unicode-dots", DocumentFormat.DOCX, 2);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-008");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -252,7 +245,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("multiple-fields", DocumentFormat.DOCX, 3);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-009");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -275,7 +268,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("complex-template", DocumentFormat.DOCX, 7);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-010");
         List<ContractFieldValue> fieldValues = createFieldValues(template, 
@@ -298,7 +291,7 @@ class FileContentReplacementServiceTest {
         String templateFile = TEMPLATE_PREFIX + "1-template-edge-case-many-dots.docx";
         byte[] templateBytes = loadTemplateFile(templateFile);
 
-        byte[] compressed = fileZipService.compress(templateBytes);
+        byte[] compressed = FileUtils.compress(templateBytes);
         assertNotNull(compressed);
         
         log.info("✓ Placeholder normalization test passed");
@@ -313,7 +306,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("partial-mapping", DocumentFormat.DOCX, 3);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-PARTIAL");
         
@@ -336,7 +329,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("null-values", DocumentFormat.DOCX, 2);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-NULL");
         
@@ -365,7 +358,7 @@ class FileContentReplacementServiceTest {
         byte[] templateBytes = loadTemplateFile(templateFile);
 
         Template template = createTestTemplate("file-storage-test", DocumentFormat.DOCX, 1);
-        template.setDocumentContent(fileZipService.compress(templateBytes));
+        template.setDocumentContent(FileUtils.compress(templateBytes));
         
         Contract contract = createTestContract("CONTRACT-STORAGE-001");
         List<ContractFieldValue> fieldValues = createFieldValues(template, List.of("StorageTest"));
@@ -396,7 +389,7 @@ class FileContentReplacementServiceTest {
 
             int fieldCount = i + 1;
             Template template = createTestTemplate("batch-test-" + fieldCount, DocumentFormat.DOCX, fieldCount);
-            template.setDocumentContent(fileZipService.compress(templateBytes));
+            template.setDocumentContent(FileUtils.compress(templateBytes));
             
             Contract contract = createTestContract("CONTRACT-BATCH-" + (i + 1));
             List<ContractFieldValue> fieldValues = createFieldValues(template, generateFieldValues(fieldCount));

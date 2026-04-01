@@ -17,8 +17,7 @@ import clm.demo.repositories.ContractFieldValueRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
-import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.utils.ZipUtils;
+import clm.demo.utils.FileUtils;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
@@ -57,7 +56,6 @@ public class ContractService {
     private final GeneratedContractMapper generatedContractMapper;
 
     private final FileContentReplacementService fileContentReplacementService;
-    private final FileConverterService fileConverterService;
 
     private final ContractSpecification contractSpecification;
 
@@ -95,7 +93,7 @@ public class ContractService {
         // generate document content and update contract
         try {
             byte[] documentContent = fileContentReplacementService.generateDocumentContent(contract, template, fieldValues);
-            contract.setDocumentContent(ZipUtils.compress(documentContent));
+            contract.setDocumentContent(FileUtils.compress(documentContent));
             contract = generatedContractRepository.save(contract);
         } catch (IOException e) {
             throw new ContractGenerationFailException("Failed to generate contract document: " + e.getMessage());
@@ -124,10 +122,10 @@ public class ContractService {
 
             byte[] pdfBytes = fileBytes;
             if (sourceFormat != DocumentFormat.PDF) {
-                pdfBytes = fileConverterService.convert(fileBytes, sourceFormat, DocumentFormat.PDF);
+                pdfBytes = FileUtils.convert(fileBytes, sourceFormat, DocumentFormat.PDF);
             }
 
-            contract.setSignedDocument(ZipUtils.compress(pdfBytes));
+            contract.setSignedDocument(FileUtils.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract = generatedContractRepository.save(contract);
 

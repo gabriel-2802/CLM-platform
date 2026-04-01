@@ -42,9 +42,6 @@ public class TemplateField {
     @Builder.Default
     private DataType dataType = DataType.STRING;
 
-    /** The actual placeholder text captured from document (e.g., "......"). */
-    @Column(name = "placeholder_text", length = 255)
-    private String placeholderText;
 
     /** Zero-based index of appearance in the document.*/
     @Column(name = "field_position")

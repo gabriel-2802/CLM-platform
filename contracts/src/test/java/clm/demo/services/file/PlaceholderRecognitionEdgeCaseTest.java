@@ -3,8 +3,7 @@ package clm.demo.services.file;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.utils.ZipUtils;
+import clm.demo.utils.FileUtils;
 import clm.demo.utils.PlaceholderProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,10 +41,7 @@ class PlaceholderRecognitionEdgeCaseTest {
     private static final String OUTPUT_DIR = "target/test-output/edge-cases";
 
     @Mock
-    private FileConverterService fileConverterService;
-
-    @Mock
-    private ZipUtils fileZipService;
+    private FileUtils fileZipService;
 
     private PlaceholderProcessorTestHelper placeholderHelper;
 

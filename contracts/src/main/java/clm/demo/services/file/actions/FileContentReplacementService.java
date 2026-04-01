@@ -8,7 +8,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.PlaceholderProcessor;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionResultWithSpans;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionSpan;
-import clm.demo.utils.ZipUtils;
+import clm.demo.utils.FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
@@ -29,10 +29,7 @@ import java.util.*;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class FileContentReplacementService {
-
-    private final FileConverterService fileConverterService;
 
     // -------------------------------------------------------------------------
     // Public API
@@ -48,17 +45,17 @@ public class FileContentReplacementService {
 
         Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
         List<TemplateField> ordered      = sortedFields(template);
-        byte[] templateBytes             = ZipUtils.decompress(template.getDocumentContent());
+        byte[] templateBytes             = FileUtils.decompress(template.getDocumentContent());
 
         byte[] pdf = switch (template.getDocumentFormat()) {
             case DOCX -> {
                 byte[] filled = fillDocx(templateBytes, ordered, labelToValue);
-                yield fileConverterService.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
+                yield FileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
             }
             case PDF -> {
-                byte[] asDocx = fileConverterService.convert(templateBytes, DocumentFormat.PDF, DocumentFormat.DOCX);
+                byte[] asDocx = FileUtils.convert(templateBytes, DocumentFormat.PDF, DocumentFormat.DOCX);
                 byte[] filled = fillDocx(asDocx, ordered, labelToValue);
-                yield fileConverterService.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
+                yield FileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
             }
         };
 
