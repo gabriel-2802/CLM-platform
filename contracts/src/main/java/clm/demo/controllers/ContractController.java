@@ -2,6 +2,7 @@ package clm.demo.controllers;
 
 import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
+import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.FileConversionException;
 import clm.demo.exceptions.UnsupportedConversionException;
@@ -54,6 +55,11 @@ public class ContractController {
     @GetMapping("/all")
     ResponseEntity<List<ContractResponseDTO>> getAllContracts() {
         return contractService.getAll();
+    }
+
+    @GetMapping("/search")
+    ResponseEntity<List<ContractResponseDTO>> searchContracts(@RequestBody SearchRequest request) {
+        return contractService.search(request);
     }
 
     /**

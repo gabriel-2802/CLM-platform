@@ -2,6 +2,7 @@ package clm.demo.services;
 
 import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
+import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.FileConversionException;
 import clm.demo.exceptions.MissingMandatoryFieldException;
@@ -22,6 +23,7 @@ import clm.demo.repositories.TemplateRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileZipService;
+import clm.demo.specifications.ContractSpecification;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,6 +36,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -50,6 +54,7 @@ public class ContractService {
     private final FileContentReplacementService fileContentReplacementService;
     private final FileZipService zipService;
     private final FileConverterService fileConverterService;
+    private final ContractSpecification contractSpecification;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -62,16 +67,16 @@ public class ContractService {
      */
     public ContractResponseDTO generateContract(@Valid GenContractRequest request) {
         log.info("Starting contract generation for template ID: {}, client ID: {}",
-                request.getTemplateId(), request.getClientId());
+                request.templateId(), request.clientId());
 
-        Template template = contractTemplateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found with ID: " + request.getTemplateId()));
+        Template template = contractTemplateRepository.findById(request.templateId())
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found with ID: " + request.templateId()));
 
         if (!template.getIsFullyMapped()) {
             throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
         }
 
-        validateMandatoryFields(template, request.getMappings());
+        validateMandatoryFields(template, request.mappings());
 
         // 1. Save contract shell first to get an ID
         Contract contract = contractGenerationMapper.toContractEntity(request, template);
@@ -79,7 +84,7 @@ public class ContractService {
         log.info("Contract shell saved with ID: {}", contract.getId());
 
         // 2. Build field values against the persisted contract
-        List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, request.getMappings());
+        List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, request.mappings());
         if (!fieldValues.isEmpty()) {
             contractFieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
@@ -134,6 +139,7 @@ public class ContractService {
             // Update contract with signed document and set status to ACTIVE
             contract.setSignedDocument(compressedPdf);
             contract.setContractStatus(ContractStatus.ACTIVE);
+            contract = generatedContractRepository.save(contract);
 
             log.info("Signed document uploaded and contract status updated to ACTIVE for contract ID: {}", contractId);
 
@@ -238,5 +244,69 @@ public class ContractService {
                 .isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(generatedContractRepository.findAll().stream()
                         .map(generatedContractMapper::toResponseDTO)
                         .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<ContractResponseDTO>> search(SearchRequest request) {
+        log.info("Searching contracts with criteria: {}", request);
+
+        // Start with the base specification from all non-null fields
+        var specification = contractSpecification.buildSearchSpecification(request);
+
+        // Execute the base query
+        List<Contract> results = generatedContractRepository.findAll(specification);
+        log.debug("Base search returned {} contracts", results.size());
+
+        // Apply labelValues filtering if provided (field value intersection)
+        if (request.labelValues() != null && !request.labelValues().isEmpty()) {
+            results = filterByLabelValues(results, request.labelValues());
+            log.debug("After labelValues filtering: {} contracts remain", results.size());
+        }
+
+        // Map to DTOs and return
+        List<ContractResponseDTO> responseDTOs = results.stream()
+                .map(generatedContractMapper::toResponseDTO)
+                .toList();
+
+        return responseDTOs.isEmpty() 
+                ? ResponseEntity.noContent().build() 
+                : ResponseEntity.ok(responseDTOs);
+    }
+
+    /**
+     * Filters contracts by matching field values.
+     * Implements intersection logic: a contract must have ALL specified labelValues
+     * in its field values (case-insensitive substring matching).
+     *
+     * @param contracts the initial list of contracts to filter
+     * @param labelValues the label values to search for
+     * @return filtered list of contracts that match ALL provided labelValues
+     */
+    private List<Contract> filterByLabelValues(List<Contract> contracts, List<String> labelValues) {
+        if (labelValues == null || labelValues.isEmpty()) {
+            return contracts;
+        }
+
+        return contracts.stream()
+                .filter(contract -> {
+                    // Get all field values for this contract
+                    Set<String> contractFieldValues = contract.getFieldValues().stream()
+                            .map(ContractFieldValue::getFieldValue)
+                            .map(String::toLowerCase)
+                            .collect(Collectors.toSet());
+
+                    // Check if all labelValues match (intersection logic - AND)
+                    return labelValues.stream()
+                            .allMatch(labelValue -> {
+                                if (labelValue == null || labelValue.isBlank()) {
+                                    return true; // Skip null/blank values
+                                }
+                                String searchValue = labelValue.toLowerCase();
+                                // Substring matching for each field value
+                                return contractFieldValues.stream()
+                                        .anyMatch(fieldValue -> fieldValue.contains(searchValue));
+                            });
+                })
+                .toList();
     }
 }
