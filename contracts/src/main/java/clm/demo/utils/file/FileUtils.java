@@ -1,4 +1,4 @@
-package clm.demo.utils;
+package clm.demo.utils.file;
 
 import clm.demo.exceptions.FileConversionException;
 import clm.demo.exceptions.UnsupportedConversionException;
@@ -121,7 +121,7 @@ public class FileUtils {
         } catch (ConversionException e) {
             throw new IOException("docx4j PDF conversion failed: " + e.getMessage(), e);
         } catch (Exception e) {
-            throw new IOException("unexpected docx4j error during DOCX → PDF: " + e.getMessage(), e);
+            throw new IOException("unexpected docx4j error during DOCX => PDF: " + e.getMessage(), e);
         }
     }
 
@@ -158,7 +158,7 @@ public class FileUtils {
 
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             docx.write(baos);
-            log.info("PDF → DOCX: produced {} bytes", baos.size());
+            log.info("PDF => DOCX: produced {} bytes", baos.size());
             return baos.toByteArray();
         }
     }

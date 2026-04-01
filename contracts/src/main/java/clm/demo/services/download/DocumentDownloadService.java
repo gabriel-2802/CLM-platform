@@ -4,7 +4,7 @@ import clm.demo.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.download.document.providers.DocumentProvider;
-import clm.demo.utils.FileUtils;
+import clm.demo.utils.file.FileUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

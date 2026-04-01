@@ -16,8 +16,8 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.ContractFieldValueRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.TemplateRepository;
-import clm.demo.services.file.utils.FileContentReplacement;
-import clm.demo.utils.FileUtils;
+import clm.demo.utils.docx.DocxFiller;
+import clm.demo.utils.file.FileUtils;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
@@ -90,7 +90,14 @@ public class ContractService {
 
         // generate document content and update contract
         try {
-            byte[] documentContent = FileContentReplacement.generateDocumentContent(template, fieldValues);
+            List<TemplateField> ordered = template.getTemplateFields().stream()
+                    .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
+                    .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
+                    .toList();
+            Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
+            byte[] templateBytes = FileUtils.decompress(template.getDocumentContent());
+            byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
+            byte[] documentContent = FileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
             contract.setDocumentContent(FileUtils.compress(documentContent));
             contract = generatedContractRepository.save(contract);
         } catch (IOException e) {
@@ -257,5 +264,27 @@ public class ContractService {
                     .build());
         }
         return fieldValues;
+    }
+
+    /**
+     * Builds a map from field labels to their string values.
+     *
+     * <p>entries where the field, field label, or field value is null are excluded.
+     * a missing value is intentional: the corresponding placeholder is left intact in
+     * the output document rather than being replaced with an empty string.</p>
+     *
+     * @param fieldValues list of contract field values
+     * @return map from field label to field value, never null
+     */
+    private static Map<String, String> buildLabelValueMap(List<ContractFieldValue> fieldValues) {
+        Map<String, String> map = new java.util.HashMap<>(fieldValues.size() * 2);
+        for (ContractFieldValue cfv : fieldValues) {
+            TemplateField field = cfv.getTemplateField();
+            // null values excluded intentionally: a missing value leaves the placeholder intact
+            if (field != null && field.getFieldLabel() != null && cfv.getFieldValue() != null) {
+                map.put(field.getFieldLabel(), cfv.getFieldValue());
+            }
+        }
+        return map;
     }
 }

@@ -8,15 +8,17 @@ The CLM (Contract Lifecycle Management) Platform uses a **PostgreSQL relational 
 - **Extract and map template fields** (placeholders) for data injection
 - **Generate contracts** by merging templates with client-specific data
 - **Maintain audit trails** of all injected field values
-- **Track contract lifecycle** (GENERATED → SIGNED → ARCHIVED/VOID)
+- **Track contract lifecycle** (PENDING_SIGNATURE → ACTIVE → TERMINATED/ARCHIVED)
+- **Support advanced search** with trigram indexing and database functions
 
 **Key Characteristics:**
-- **Database**: PostgreSQL
+- **Database**: PostgreSQL 12+
 - **Schema**: `contracts` (isolated namespace)
-- **Tables**: 4 core tables + audit trail
+- **Tables**: 4 core tables with comprehensive indexing
 - **Data Volume**: Supports BYTEA storage for document binary content
-- **Migration Tool**: Flyway (versioned migrations)
-- **ORM**: Hibernate JPA (Spring Data JPA)
+- **Migration Tool**: Flyway (versioned migrations, V1-V6)
+- **ORM**: Hibernate JPA (Spring Data JPA with Lombok annotations)
+- **Search**: pg_trgm extension with GIN indexes for efficient substring searches
 
 
 ### Environment Variables
@@ -149,10 +151,10 @@ PostgreSQL Database: clm_platform
 | `id` | BIGSERIAL | PRIMARY KEY | Unique identifier, auto-incremented |
 | `template_name` | VARCHAR(255) | NOT NULL, UNIQUE | Human-readable template name (e.g., "Enterprise NDA v2") |
 | `description` | VARCHAR(500) | | Administrative notes/metadata about template purpose |
-| `document_format` | document_format_enum | NOT NULL | Format type: PDF or DOCX |
+| `document_format` | document_format_enum | NOT NULL | Format type: PDF, DOCX, or ZIP |
 | `document_content` | BYTEA | NOT NULL | Raw binary content of the template file |
 | `field_count` | INTEGER | NOT NULL, DEFAULT 0 | Count of placeholders found in document |
-| `is_fully_mapped` | BOOLEAN | NOT NULL, DEFAULT false | True when ALL fields have labels assigned |
+| `is_fully_mapped` | BOOLEAN | NOT NULL, DEFAULT false | True when ALL required fields have labels assigned |
 | `created_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Template upload/creation timestamp |
 | `updated_at` | TIMESTAMP | NOT NULL, DEFAULT NOW() | Last modification timestamp |
 
@@ -172,8 +174,7 @@ PostgreSQL Database: clm_platform
 | `id` | BIGSERIAL | PRIMARY KEY | Unique identifier |
 | `template_id` | BIGINT | NOT NULL, FK | References `contract_template(id)` with CASCADE delete |
 | `field_label` | VARCHAR(255) | | User-friendly field name (e.g., "Client Name"). NULL until mapped. |
-| `data_type` | data_type_enum | NOT NULL, DEFAULT 'STRING' | Expected data type: STRING, DATE, NUMBER, BOOLEAN, CURRENCY, ENUM |
-| `placeholder_text` | VARCHAR(255) | | The actual placeholder pattern found (e.g., "......") |
+| `data_type` | data_type_enum | NOT NULL, DEFAULT 'STRING' | Expected data type: STRING, DATE, NUMBER, BOOLEAN, CURRENCY |
 | `field_position` | INTEGER | | Zero-based index of field occurrence in document |
 | `is_required` | BOOLEAN | NOT NULL, DEFAULT true | If true, generation fails without a value |
 | `format_pattern` | VARCHAR(255) | | Validation/formatting pattern (e.g., "dd/MM/yyyy", "#,##0.00") |
@@ -181,9 +182,7 @@ PostgreSQL Database: clm_platform
 
 **Indexes**:
 - `idx_template_field_template_position` on `(template_id, field_position)`
-- `idx_template_field_template_name` on `(template_id, field_label)`
 - `idx_template_field_template` on `template_id`
-- `idx_template_field_label_null` on `template_id WHERE field_label IS NULL` (optimization for trigger)
 
 ---
 
@@ -199,7 +198,7 @@ PostgreSQL Database: clm_platform
 | `client_id` | INTEGER | NOT NULL | Foreign reference to client (different schema/service) |
 | `contract_status` | contract_status_enum | NOT NULL, DEFAULT 'PENDING_SIGNATURE' | Lifecycle: PENDING_SIGNATURE, ACTIVE, TERMINATED, ARCHIVED |
 | `generated_by` | INTEGER | | User ID of the person who generated the contract |
-| `generated_by_mail` | VARCHAR(255) | | Email address of the generating user (added in V4) |
+| `generated_by_mail` | VARCHAR(255) | | Email address of the generating user |
 | `document_content` | BYTEA | NOT NULL | Binary content of the filled/unsigned document |
 | `signed_document_content` | BYTEA | | Binary content of the signed document (populated after signing) |
 | `contract_value` | NUMERIC(12,2) | | Monetary value for reporting (e.g., 50000.00) |
@@ -252,12 +251,14 @@ PostgreSQL Database: clm_platform
 Indexes are created to optimize:
 1. **Lookup by ID** (Primary Key)
 2. **Lookup by Business Key** (template_name)
-3. **Filtering** (client_id, template_id, status)
-4. **Date Range Queries** (contract_start_date, contract_end_date)
-5. **Sorting** (created_at DESC)
-6. **Conditional Queries** (field_label IS NULL)
+3. **Filtering** (client_id, template_id, status, contract_status)
+4. **Date Range Queries** (contract_start_date, contract_end_date, created_at)
+5. **Substring Search** (GIN trigram indexes for case-insensitive LIKE patterns)
+6. **Composite Queries** (template+client, status+client combinations)
 
 ### Complete Index Reference
+
+**Primary Indexes (V1)**:
 
 | Table | Index Name | Columns | Type | Purpose |
 |-------|------------|---------|------|---------|
@@ -267,8 +268,34 @@ Indexes are created to optimize:
 | `template_field` | PRIMARY | `id` | Unique | Primary key |
 | `template_field` | idx_template_field_template | `template_id` | Regular | Find fields in template |
 | `template_field` | idx_template_field_template_position | `template_id, field_position` | Composite | Lookup field by position |
-| `template_field` | idx_template_field_template_name | `template_id, field_label` | Composite | Find field by label |
-| `template_field` | idx_template_field_label_null | `template_id WHERE field_label IS NULL` | Partial | Unmapped fields |
+| `generated_contract` | PRIMARY | `id` | Unique | Primary key |
+| `generated_contract` | idx_generated_contract_template_client | `template_id, client_id` | Composite | Template+Client lookup |
+| `generated_contract` | idx_generated_contract_validity | `contract_start_date, contract_end_date` | Composite | Date range queries |
+| `generated_contract` | idx_generated_contract_created_at | `created_at DESC` | Regular | Recent contracts |
+| `contract_field_value` | PRIMARY | `id` | Unique | Primary key |
+| `contract_field_value` | idx_contract_field_value_contract | `generated_contract_id` | Regular | Find values in contract |
+| `contract_field_value` | idx_contract_field_value_field | `template_field_id` | Regular | Find usage of field |
+
+**Search Indexes (V2-V4)**:
+
+| Table | Index Name | Columns | Type | Purpose |
+|-------|------------|---------|------|---------|
+| `generated_contract` | idx_generated_contract_status | `contract_status` | Regular | Filter by status |
+| `generated_contract` | idx_generated_contract_client_id | `client_id` | Regular | Filter by client |
+| `generated_contract` | idx_generated_contract_generated_by | `generated_by` | Regular | Filter by generator |
+| `generated_contract` | idx_generated_contract_created_date_range | `created_at DESC` | Regular | Date range queries |
+| `contract_template` | idx_ct_name_lower_trgm | `lower(template_name)` | GIN trigram | Substring search in names |
+| `contract_template` | idx_ct_desc_lower_trgm | `lower(description)` | GIN trigram | Substring search in descriptions |
+| `generated_contract` | idx_gc_notes_lower_trgm | `lower(notes)` | GIN trigram | Substring search in notes |
+| `contract_field_value` | idx_cfv_field_value_lower_trgm | `lower(field_value)` | GIN trigram | Substring search in field values |
+
+**Removed Indexes (V6)**:
+- `idx_generated_contract_status_client` - Composite index not used in dynamic filtering
+- `idx_contract_template_name_status` - Composite index not used in dynamic filtering
+- `idx_contract_field_value_contract_field` - Composite index not used in dynamic filtering
+- `idx_generated_contract_search_composite` - Composite index not used in dynamic filtering
+- `idx_generated_contract_notes_btree` - Replaced by GIN trigram index
+- `idx_contract_field_value_field_value_btree` - Replaced by GIN trigram index
 | `generated_contract` | PRIMARY | `id` | Unique | Primary key |
 | `generated_contract` | idx_generated_contract_template | `template_id` | Regular | Find contracts for template |
 | `generated_contract` | idx_generated_contract_client | `client_id` | Regular | Find contracts for client |
@@ -281,7 +308,6 @@ Indexes are created to optimize:
 | `contract_field_value` | PRIMARY | `id` | Unique | Primary key |
 | `contract_field_value` | idx_contract_field_value_contract | `generated_contract_id` | Regular | Find values in contract |
 | `contract_field_value` | idx_contract_field_value_field | `template_field_id` | Regular | Find usage of field |
-| `contract_field_value` | idx_contract_field_value_contract_field | `generated_contract_id, template_field_id` | Composite | Specific field in contract |
 
 ### Index Maintenance
 
@@ -311,38 +337,12 @@ All schema changes are managed via Flyway version-controlled migrations in `src/
 
 | Migration | Version | Purpose | Status |
 |-----------|---------|---------|--------|
-| `V0__Reset.sql` | 0 | Initial schema reset | BASELINE |
-| `V1__Initial_schema.sql` | 1 | Create 4 core tables with indexes | ACTIVE |
-| `V2__Fix_fully_mapped_column.sql` | 2 | Rename `fully_mapped` to `is_fully_mapped` | ACTIVE |
-| `V3__Add_fully_mapped_trigger.sql` | 3 | Add trigger for auto-updating fully_mapped status | ACTIVE |
-| `V4__Add_generated_by_mail_column.sql` | 4 | Add email tracking for contract generation | ACTIVE |
-| `V5__Add_termination_fields.sql` | 5 | Add termination tracking (terminationDate, reasonsForTermination) | ACTIVE |
-| `V6__Update_contract_status_enum_and_add_signed_document.sql` | 6 | Update status enum and add signed document support | ACTIVE |
-
-### Contract Status Enum Updates
-
-**V1 (Original)**:
-- `GENERATED`: Contract generated but not signed
-- `SIGNED`: Contract signed by client
-- `ARCHIVED`: Contract completed or expired
-- `VOID`: Contract cancelled/terminated
-
-**V6 (Current)**:
-- `PENDING_SIGNATURE`: Contract generated and awaiting signature (replaces GENERATED)
-- `ACTIVE`: Contract signed and in effect (replaces SIGNED)
-- `TERMINATED`: Contract ended prematurely (replaces VOID)
-- `ARCHIVED`: Contract completed or expired (unchanged)
-
-### Recent Column Additions
-
-**V5 - Termination Tracking**:
-- `terminationDate`: DATE, nullable - records when a contract was terminated
-- `reasonsForTermination`: VARCHAR(1000), NOT NULL DEFAULT '' - documents termination reason
-
-**V6 - Signed Document Support**:
-- `signed_document_content`: BYTEA, nullable - stores the digitally signed version of the contract
-- Populated when contract status changes to ACTIVE
-- Used for audit trail and client delivery
+| `V1__init_schema.sql` | 1 | Create 4 core tables with indexes, enums, and auto-mapping trigger | ACTIVE |
+| `V2__optimize_search_indexes.sql` | 2 | Add single-column and composite indexes for search optimization | ACTIVE |
+| `V3__add_search_functions.sql` | 3 | Add database functions for label value intersection and advanced search | ACTIVE |
+| `V4__trigram_search_indexes.sql` | 4 | Enable pg_trgm extension and create GIN trigram indexes for substring search | ACTIVE |
+| `V5__remove_placeholder_text_column.sql` | 5 | Remove `placeholder_text` column (normalized via regex matching) | ACTIVE |
+| `V6__cleanup_unused_indexes.sql` | 6 | Remove unused composite indexes from V2 | ACTIVE |
 
 ---
 
@@ -391,7 +391,6 @@ All schema changes are managed via Flyway version-controlled migrations in `src/
 **Optional**:
 - `contract_template.description`
 - `template_field.field_label` (NULL = unmapped)
-- `template_field.placeholder_text`
 - `template_field.field_position`
 - `template_field.format_pattern`
 - `generated_contract.generated_by`
@@ -400,6 +399,7 @@ All schema changes are managed via Flyway version-controlled migrations in `src/
 - `generated_contract.contract_start_date`
 - `generated_contract.contract_end_date`
 - `generated_contract.notes`
+- `generated_contract.termination_date`
 
 ---
 
@@ -409,123 +409,267 @@ All schema changes are managed via Flyway version-controlled migrations in `src/
 
 Triggers enforce business logic and maintain data consistency at the database level, ensuring correctness even with direct SQL operations.
 
-### 1. contract_template_updated_at_trigger
-
-**Table**: `contract_template`  
-**Event**: BEFORE UPDATE  
-**Scope**: FOR EACH ROW
-
-**Function**: `update_updated_at_column()`
-
-```sql
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-```
-
-**Behavior**: Automatically sets `updated_at` to current timestamp whenever the template is modified
-
-**Example**:
-```sql
-UPDATE contracts.contract_template 
-SET description = 'Updated description' 
-WHERE id = 1;
--- Result: updated_at is automatically set to NOW()
-```
-
----
-
-### 2. template_field_update_trigger
+### 1. trg_template_field_label_mapped
 
 **Table**: `template_field`  
-**Event**: AFTER UPDATE  
-**Scope**: FOR EACH ROW  
-**Condition**: `OLD.field_label IS DISTINCT FROM NEW.field_label`
+**Event**: AFTER INSERT OR UPDATE OF field_label  
+**Scope**: FOR EACH ROW
 
-**Function**: `update_template_fully_mapped_status()`
+**Function**: `fn_check_template_fully_mapped()`
 
 ```sql
-CREATE OR REPLACE FUNCTION update_template_fully_mapped_status()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION contracts.fn_check_template_fully_mapped()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
 DECLARE
-    template_id BIGINT;
-    all_mapped BOOLEAN;
+    v_template_id       BIGINT;
+    v_unmapped_required INTEGER;
 BEGIN
-    template_id := NEW.template_id;
-    
-    all_mapped := NOT EXISTS (
-        SELECT 1 FROM contracts.template_field
-        WHERE template_id = template_id
-        AND field_label IS NULL
-    );
-    
-    UPDATE contracts.contract_template
-    SET is_fully_mapped = all_mapped,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = template_id;
-    
+    -- Only act when field_label changes to a non-null value
+    IF NEW.field_label IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    v_template_id := NEW.template_id;
+
+    -- Count required fields that still have no label
+    SELECT COUNT(*)
+    INTO   v_unmapped_required
+    FROM   contracts.template_field
+    WHERE  template_id  = v_template_id
+      AND  is_required  = TRUE
+      AND  field_label  IS NULL;
+
+    IF v_unmapped_required = 0 THEN
+        -- Every required field has a label → mark template as fully mapped
+        UPDATE contracts.contract_template
+        SET    is_fully_mapped = TRUE,
+               updated_at      = NOW()
+        WHERE  id = v_template_id
+          AND  is_fully_mapped = FALSE;
+    ELSE
+        -- At least one required field still unmapped → ensure flag is FALSE
+        UPDATE contracts.contract_template
+        SET    is_fully_mapped = FALSE,
+               updated_at      = NOW()
+        WHERE  id = v_template_id
+          AND  is_fully_mapped = TRUE;
+    END IF;
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 ```
 
-**Behavior**: When a field's label is updated, check if ALL fields in the template now have labels, and update the template's `is_fully_mapped` status
+**Behavior**: 
+- Fires when a `field_label` is set (INSERT or UPDATE with non-NULL value)
+- Counts required fields in the template that still lack a label
+- If ALL required fields now have labels → sets `is_fully_mapped = TRUE`
+- If ANY required field still lacks a label → sets `is_fully_mapped = FALSE`
+- Only updates template if the flag actually changes (avoids unnecessary writes)
 
 **Example**:
 ```sql
--- Template has 3 fields, 2 with labels, 1 without
+-- Template has 3 required fields, none mapped yet
+INSERT INTO contracts.template_field (template_id, field_position, data_type, is_required)
+VALUES (1, 0, 'STRING', true);
+-- Trigger fires: counts 3 unmapped required fields
+-- Result: is_fully_mapped stays FALSE (or is set to FALSE if new)
+
+-- Map the first field
 UPDATE contracts.template_field 
-SET field_label = 'Client Email' 
-WHERE id = 5;
--- Trigger fires: Checks that all 3 fields now have labels
--- Result: contract_template.is_fully_mapped = true
+SET field_label = 'Client Name' 
+WHERE id = 1;
+-- Trigger fires: counts 2 unmapped required fields remaining
+-- Result: is_fully_mapped = FALSE
+
+-- Map remaining two fields
+UPDATE contracts.template_field SET field_label = 'Address' WHERE id = 2;
+UPDATE contracts.template_field SET field_label = 'Email' WHERE id = 3;
+-- Trigger fires on second update: counts 0 unmapped required fields
+-- Result: is_fully_mapped = TRUE (template is now ready for generation)
 ```
+
+**Optimization**:
+- Only activates when `field_label` is changed (not for other column updates)
+- Uses `v_unmapped_required = 0` check to avoid expensive full query scans
+- Created as AFTER trigger to use NEW values (already persisted)
 
 ---
 
-### 3. template_field_insert_trigger
+## Database Functions (Search & Analytics)
 
-**Table**: `template_field`  
-**Event**: AFTER INSERT  
-**Scope**: FOR EACH ROW
+Database functions created in V3 to optimize search operations:
 
-**Function**: `update_template_fully_mapped_status()` (same as above)
+### 1. fn_find_contracts_by_label_values
 
-**Behavior**: When a new field is inserted (though typically without a label initially), update the template's `is_fully_mapped` status for consistency
+**Purpose**: Find contracts matching ALL label values (intersection-based search)
+
+**Signature**:
+```sql
+fn_find_contracts_by_label_values(
+    p_label_values TEXT[],
+    p_case_insensitive BOOLEAN DEFAULT TRUE
+) RETURNS TABLE (contract_id BIGINT)
+```
+
+**Use Case**: Search for contracts where field values contain all specified search terms
+- Supports case-insensitive substring matching
+- Returns only contracts where ALL search terms are found in some field value
 
 **Example**:
 ```sql
-INSERT INTO contracts.template_field (template_id, placeholder_text, field_position, data_type)
-VALUES (1, '......', 3, 'STRING');
--- Trigger fires: Rechecks template's fully_mapped status
--- Result: is_fully_mapped updated (likely to false since new field has no label)
+SELECT * FROM contracts.fn_find_contracts_by_label_values(
+    ARRAY['John', 'USD'],  -- Find contracts with both "John" and "USD"
+    TRUE
+);
 ```
 
 ---
 
-### Trigger Optimization
+### 2. fn_get_contract_search_summary
 
-**Index for Trigger Performance**:
+**Purpose**: Retrieve contract details with all field values aggregated
+
+**Signature**:
 ```sql
-CREATE INDEX idx_template_field_label_null
-ON contracts.template_field(template_id)
-WHERE field_label IS NULL;
+fn_get_contract_search_summary(p_contract_id BIGINT)
+RETURNS TABLE (
+    contract_id BIGINT,
+    template_name VARCHAR,
+    client_id INTEGER,
+    contract_status VARCHAR,
+    field_count BIGINT,
+    field_values_csv TEXT,
+    created_at TIMESTAMP
+)
 ```
 
-This partial index helps the `NOT EXISTS` query in the trigger function execute efficiently by only indexing null labels.
+**Use Case**: Get a complete summary of a contract including all injected field values
+
+**Example**:
+```sql
+SELECT * FROM contracts.fn_get_contract_search_summary(123);
+-- Returns: contract details with all field values as comma-separated string
+```
 
 ---
 
-## JPA Entity Models
+### 3. fn_search_contracts_advanced
 
-### 1. ContractTemplate Entity
+**Purpose**: Advanced search with multiple optional filters
+
+**Signature**:
+```sql
+fn_search_contracts_advanced(
+    p_client_id INTEGER DEFAULT NULL,
+    p_contract_status VARCHAR DEFAULT NULL,
+    p_generated_by INTEGER DEFAULT NULL,
+    p_created_after DATE DEFAULT NULL,
+    p_created_before DATE DEFAULT NULL,
+    p_notes_search VARCHAR DEFAULT NULL
+) RETURNS TABLE (contract_id BIGINT, score FLOAT)
+```
+
+**Use Case**: Complex contract search with dynamic optional filters
+
+**Example**:
+```sql
+SELECT * FROM contracts.fn_search_contracts_advanced(
+    p_client_id => 42,
+    p_contract_status => 'ACTIVE',
+    p_created_after => '2024-01-01'
+);
+-- Returns: contracts for client 42, active status, created after Jan 1 2024
+```
+
+---
+
+---
+
+## Enum Types
+
+### 1. ContractStatus
+
+**Database Type**: `contracts.contract_status_enum`  
+**Java Enum**: `clm.demo.models.enums.ContractStatus`  
+**Table**: `generated_contract.contract_status`
+
+| Value | Description | Lifecycle Stage |
+|-------|-------------|-----------------|
+| `PENDING_SIGNATURE` | Contract generated but not yet signed | Initial state |
+| `ACTIVE` | Contract signed and currently in effect | Active/operational |
+| `TERMINATED` | Contract ended prematurely (before natural end date) | End state |
+| `ARCHIVED` | Contract completed or expired naturally | End state |
+
+**State Transitions**:
+```
+PENDING_SIGNATURE → ACTIVE (when signed)
+         ↓
+      ACTIVE → TERMINATED (if terminated early)
+         ↓
+      ACTIVE → ARCHIVED (if contract completes naturally)
+      TERMINATED → ARCHIVED (can archive terminated contracts)
+```
+
+---
+
+### 2. DocumentFormat
+
+**Database Type**: `contracts.document_format_enum`  
+**Java Enum**: `clm.demo.models.enums.DocumentFormat`  
+**Table**: `contract_template.document_format`
+
+| Value | Description | Processing Strategy |
+|-------|-------------|-------------------|
+| `PDF` | Adobe PDF document format | Using PDFBox library |
+| `DOCX` | Microsoft Word document format | Using Apache POI library |
+
+**Processing Notes**:
+- Format determines which parsing/generation library is used
+- ZIP archives containing multiple formats are also supported (extracted to PDF/DOCX internally)
+- Document binary is stored in `document_content` BYTEA column
+
+---
+
+### 3. DataType
+
+**Database Type**: `contracts.data_type_enum`  
+**Java Enum**: `clm.demo.models.enums.DataType`  
+**Table**: `template_field.data_type`
+
+| Value | Description | Default Format Pattern | Example |
+|-------|-------------|----------------------|---------|
+| `STRING` | Text/string values | (none) | "John Doe" |
+| `DATE` | Calendar dates | `dd/MM/yyyy` | "01/15/2024" |
+| `NUMBER` | Numeric values | `#,##0.00` | "1,234.56" |
+| `BOOLEAN` | True/False values | (none) | "true", "Yes" |
+| `CURRENCY` | Monetary values | `$#,##0.00` | "$1,234.56" |
+
+**Format Pattern Syntax**:
+- **Dates**: Java `DateTimeFormatter` syntax (e.g., `dd/MM/yyyy`, `yyyy-MM-dd`)
+- **Numbers**: Java `DecimalFormat` syntax (e.g., `#,##0.00`, `0.00%`)
+
+**Example Field Configuration**:
+```sql
+-- Amount field with currency format
+INSERT INTO contracts.template_field 
+(template_id, field_label, data_type, format_pattern, is_required)
+VALUES (1, 'Contract Amount', 'CURRENCY', '$#,##0.00', true);
+
+-- Contract end date with custom format
+INSERT INTO contracts.template_field 
+(template_id, field_label, data_type, format_pattern, is_required)
+VALUES (1, 'End Date', 'DATE', 'dd MMMM yyyy', true);
+```
+
+---
+
+### 1. Template Entity
 
 **Package**: `clm.demo.models`  
-**File**: `ContractTemplate.java`  
+**File**: `Template.java`  
 **ORM Table**: `contracts.contract_template`
 
 ```java
@@ -535,7 +679,7 @@ This partial index helps the `NOT EXISTS` query in the trigger function execute 
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ContractTemplate {
+public class Template {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -548,7 +692,8 @@ public class ContractTemplate {
     private String description;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "document_format", nullable = false, length = 10)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "document_format", nullable = false)
     private DocumentFormat documentFormat;
     
     @Lob
@@ -575,10 +720,6 @@ public class ContractTemplate {
     @OneToMany(mappedBy = "contractTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<TemplateField> templateFields = new ArrayList<>();
-    
-    @OneToMany(mappedBy = "contractTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<Contract> contracts = new ArrayList<>();
 }
 ```
 
@@ -587,6 +728,7 @@ public class ContractTemplate {
 - `@Table(name = "contract_template", schema = "contracts")`: Specifies table and schema
 - `@Data`: Lombok generates getters/setters/equals/hashCode
 - `@Builder`: Provides builder pattern construction
+- `@JdbcTypeCode(SqlTypes.NAMED_ENUM)`: Maps enum to PostgreSQL ENUM type
 - `@Lob + @JdbcTypeCode(VARBINARY)`: Maps byte[] to BYTEA
 - `@CreationTimestamp`: Auto-set on insert (Hibernate)
 - `@UpdateTimestamp`: Auto-set on update (Hibernate)
@@ -597,7 +739,6 @@ public class ContractTemplate {
 
 **Relationships**:
 - `1:N` → `TemplateField` (one template has many fields)
-- `1:N` → `Contract` (one template generates many contracts)
 
 ---
 
@@ -624,19 +765,17 @@ public class TemplateField {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
-    private ContractTemplate contractTemplate;
+    private Template contractTemplate;
     
     @Column(name = "field_label", length = 255)
     @Builder.Default
     private String fieldLabel = null;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "data_type", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "data_type", nullable = false)
     @Builder.Default
     private DataType dataType = DataType.STRING;
-    
-    @Column(name = "placeholder_text", length = 255)
-    private String placeholderText;
     
     @Column(name = "field_position")
     private Integer fieldPosition;
@@ -651,14 +790,15 @@ public class TemplateField {
 ```
 
 **Enums**:
-- `DataType`: STRING, DATE, NUMBER, BOOLEAN, CURRENCY, ENUM
+- `DataType`: STRING, DATE, NUMBER, BOOLEAN, CURRENCY
 
 **Relationships**:
-- `N:1` → `ContractTemplate` (lazy loaded)
+- `N:1` → `Template` (lazy loaded)
 
 **Key Fields**:
-- `fieldLabel`: NULL initially, set during mapping phase. When all fields have labels, template becomes "fully mapped"
+- `fieldLabel`: NULL initially, set during mapping phase. When all required fields have labels, template becomes "fully mapped"
 - `formatPattern`: For dates use "dd/MM/yyyy", for numbers use "#,##0.00"
+- `field_position`: Zero-based index tracking the order of appearance in the document
 
 ---
 
@@ -687,13 +827,14 @@ public class Contract {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "template_id", nullable = false)
-    private ContractTemplate contractTemplate;
+    private Template contractTemplate;
     
     @Column(name = "client_id", nullable = false)
     private Integer clientId;
     
     @Enumerated(EnumType.STRING)
-    @Column(name = "contract_status", nullable = false, length = 50)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(name = "contract_status", nullable = false)
     @Builder.Default
     private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
     
@@ -708,7 +849,6 @@ public class Contract {
     @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 
-    /** The signed version of the document (populated when contract is signed). */
     @Lob
     @JdbcTypeCode(SqlTypes.VARBINARY)
     @Column(name = "signed_document_content")
@@ -726,11 +866,19 @@ public class Contract {
     @Column(name = "notes", length = 1000)
     private String notes;
     
+    @Column(name = "termination_date")
+    private LocalDate terminationDate;
+    
+    @Column(name = "reasons_for_termination", length = 1000)
+    @Builder.Default
+    private String reasonsForTermination = "";
+    
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
     
     @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     @Builder.Default
     private List<ContractFieldValue> fieldValues = new ArrayList<>();
 }
@@ -745,10 +893,12 @@ public class Contract {
 - `generatedByMail`: Email address for notifications
 - `documentContent`: Final filled unsigned document stored as BYTEA
 - `signedDocument`: Signed version of the document (set when status = ACTIVE)
+- `terminationDate`: Date when contract was terminated (NULL if active)
+- `reasonsForTermination`: Reason for early termination (empty string if not terminated)
 
 **Relationships**:
-- `N:1` → `ContractTemplate` (lazy loaded)
-- `1:N` → `ContractFieldValue` (audit trail)
+- `N:1` → `Template` (lazy loaded)
+- `1:N` → `ContractFieldValue` (audit trail with batch loading for performance)
 
 ---
 

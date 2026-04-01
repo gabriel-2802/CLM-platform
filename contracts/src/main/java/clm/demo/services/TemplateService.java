@@ -13,10 +13,10 @@ import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
-import clm.demo.services.file.utils.FileContentReplacement;
-import clm.demo.utils.FileParser;
-import clm.demo.utils.FileUtils;
-import clm.demo.utils.PlaceholderProcessor;
+import clm.demo.utils.docx.DocxNormalizer;
+import clm.demo.utils.file.FileParser;
+import clm.demo.utils.file.FileUtils;
+import clm.demo.utils.file.PlaceholderProcessor;
 import clm.demo.utils.Utils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -82,7 +82,7 @@ public class TemplateService {
                     : fileBytes;
 
             // normalize every placeholder to exactly 4 dots before storing
-            docxBytes = FileContentReplacement.normalizePlaceholdersInDocx(docxBytes);
+            docxBytes = DocxNormalizer.normalizePlaceholdersInDocx(docxBytes);
 
             Template template = templateRepository.save(
                     Template.builder()
