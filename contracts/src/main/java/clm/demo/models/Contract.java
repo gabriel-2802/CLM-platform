@@ -3,6 +3,7 @@ package clm.demo.models;
 import clm.demo.models.enums.ContractStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -105,10 +106,16 @@ public class Contract {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    /** * Historical record of exactly what values were injected into the template
+    /**
+     * Historical record of exactly what values were injected into the template
      * at the moment of generation. Used for auditing.
+     *
+     * <p>@BatchSize instructs Hibernate to load field values for up to 50
+     * contracts in a single IN-clause query instead of one query per contract,
+     * eliminating the N+1 problem when mapping result pages to DTOs.</p>
      */
     @OneToMany(mappedBy = "contract", cascade = CascadeType.ALL, orphanRemoval = true)
+    @BatchSize(size = 50)
     @Builder.Default
     private List<ContractFieldValue> fieldValues = new ArrayList<>();
 }

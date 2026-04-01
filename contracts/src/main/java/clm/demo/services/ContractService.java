@@ -27,6 +27,9 @@ import clm.demo.specifications.ContractSpecification;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +39,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -45,6 +46,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional
 public class ContractService {
+
+    private static final int DEFAULT_PAGE      = 0;
+    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final TemplateRepository contractTemplateRepository;
     private final ContractRepository generatedContractRepository;
@@ -117,27 +121,20 @@ public class ContractService {
     public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes) {
         log.info("Processing signed document upload for contract ID: {}", contractId);
 
-        // Fetch the contract
         Contract contract = generatedContractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found with ID: " + contractId));
 
         try {
-            // Detect the file format based on file content (PDF or DOCX)
             DocumentFormat sourceFormat = detectDocumentFormat(fileBytes);
             log.debug("Detected file format: {}", sourceFormat);
 
-            // Convert to PDF if not already in PDF format
             byte[] pdfBytes = fileBytes;
             if (sourceFormat != DocumentFormat.PDF) {
                 log.info("Converting document from {} to PDF", sourceFormat);
                 pdfBytes = fileConverterService.convert(fileBytes, sourceFormat, DocumentFormat.PDF);
             }
 
-            // Compress the PDF document
-            byte[] compressedPdf = zipService.compress(pdfBytes);
-
-            // Update contract with signed document and set status to ACTIVE
-            contract.setSignedDocument(compressedPdf);
+            contract.setSignedDocument(zipService.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract = generatedContractRepository.save(contract);
 
@@ -152,33 +149,6 @@ public class ContractService {
     }
 
     /**
-     * Detects the document format (PDF or DOCX) from the file bytes.
-     *
-     * @param fileBytes the raw file bytes
-     * @return DocumentFormat.PDF or DocumentFormat.DOCX
-     * @throws UnsupportedFileException if the format cannot be detected
-     */
-    private DocumentFormat detectDocumentFormat(byte[] fileBytes) {
-        if (fileBytes == null || fileBytes.length < 4) {
-            throw new UnsupportedFileException("Invalid file: insufficient data to determine format");
-        }
-
-        // Check for PDF signature (PDF files start with "%PDF")
-        if (fileBytes[0] == 0x25 && fileBytes[1] == 0x50 && 
-            fileBytes[2] == 0x44 && fileBytes[3] == 0x46) {
-            return DocumentFormat.PDF;
-        }
-
-        // Check for DOCX signature (ZIP format starting with PK)
-        // DOCX files are ZIP archives that start with "PK"
-        if (fileBytes[0] == 0x50 && fileBytes[1] == 0x4B) {
-            return DocumentFormat.DOCX;
-        }
-
-        throw new UnsupportedFileException("Unable to detect document format. Supported formats: PDF, DOCX");
-    }
-
-    /**
      * Terminates a contract by updating its status to TERMINATED,
      * setting the termination date and reasons for termination.
      *
@@ -189,16 +159,81 @@ public class ContractService {
     public void terminateContract(Long contractId, @Valid ContractTerminationRequest request) {
         log.info("Terminating contract ID: {} with termination date: {}", contractId, request.getTerminationDate());
 
-        // Fetch the contract
         Contract contract = generatedContractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found with ID: " + contractId));
 
-        // update contract with termination information
         contract.setContractStatus(ContractStatus.TERMINATED);
         contract.setTerminationDate(request.getTerminationDate().toLocalDate());
         contract.setReasonsForTermination(request.getReasons() != null ? request.getReasons() : "");
 
         generatedContractMapper.toResponseDTO(contract);
+    }
+
+    public ResponseEntity<List<ContractResponseDTO>> getAll() {
+        List<ContractResponseDTO> list = generatedContractRepository.findAll().stream()
+                .map(generatedContractMapper::toResponseDTO)
+                .toList();
+        return list.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(list);
+    }
+
+    /**
+     * Searches contracts using server-side filtering, sorting, and pagination.
+     *
+     * <p>All predicates (notes, status, clientId, generatedBy, templateName,
+     * templateDescription, date range, labelValues) are translated to SQL by
+     * {@link ContractSpecification} and executed entirely on PostgreSQL.
+     * No rows are loaded into the JVM before the final page is assembled.</p>
+     *
+     * <p>Pagination is applied via {@code LIMIT} / {@code OFFSET} in the
+     * generated SQL.  Results are ordered by {@code created_at DESC} so the
+     * most recent contracts appear first.</p>
+     *
+     * @param request filter and pagination parameters
+     * @return 200 OK with the result page, or 204 No Content when empty
+     */
+    @Transactional(readOnly = true)
+    public ResponseEntity<List<ContractResponseDTO>> search(SearchRequest request) {
+        log.info("Searching contracts with criteria: {}", request);
+
+        int pageIndex = request.page() != null ? request.page() : DEFAULT_PAGE;
+        int pageSize  = request.size() != null ? request.size() : DEFAULT_PAGE_SIZE;
+
+        PageRequest pageable = PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
+
+        Page<Contract> page = generatedContractRepository.findAll(
+                contractSpecification.buildSearchSpecification(request),
+                pageable
+        );
+
+        log.debug("Search returned {}/{} contracts (page {}/{})",
+                page.getNumberOfElements(), page.getTotalElements(),
+                page.getNumber(), page.getTotalPages());
+
+        List<ContractResponseDTO> responseDTOs = page.getContent().stream()
+                .map(generatedContractMapper::toResponseDTO)
+                .toList();
+
+        return responseDTOs.isEmpty()
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(responseDTOs);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    private DocumentFormat detectDocumentFormat(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length < 4) {
+            throw new UnsupportedFileException("Invalid file: insufficient data to determine format");
+        }
+        if (fileBytes[0] == 0x25 && fileBytes[1] == 0x50 &&
+            fileBytes[2] == 0x44 && fileBytes[3] == 0x46) {
+            return DocumentFormat.PDF;
+        }
+        if (fileBytes[0] == 0x50 && fileBytes[1] == 0x4B) {
+            return DocumentFormat.DOCX;
+        }
+        throw new UnsupportedFileException("Unable to detect document format. Supported formats: PDF, DOCX");
     }
 
     private void validateMandatoryFields(Template template, Map<String, String> mappings) {
@@ -218,16 +253,11 @@ public class ContractService {
     }
 
     private List<ContractFieldValue> buildFieldValues(Contract contract, Template template, Map<String, String> mappings) {
-
         List<ContractFieldValue> fieldValues = new ArrayList<>();
-
         for (TemplateField field : template.getTemplateFields()) {
             if (field.getFieldLabel() == null) continue;
-
             String value = mappings.get(field.getFieldLabel());
-
             if (value == null || value.isBlank()) continue;
-
             fieldValues.add(ContractFieldValue.builder()
                     .contract(contract)
                     .templateField(field)
@@ -235,78 +265,5 @@ public class ContractService {
                     .build());
         }
         return fieldValues;
-    }
-
-    public ResponseEntity<List<ContractResponseDTO>> getAll() {
-        return generatedContractRepository.findAll().stream()
-                .map(generatedContractMapper::toResponseDTO)
-                .toList()
-                .isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(generatedContractRepository.findAll().stream()
-                        .map(generatedContractMapper::toResponseDTO)
-                        .toList());
-    }
-
-    @Transactional(readOnly = true)
-    public ResponseEntity<List<ContractResponseDTO>> search(SearchRequest request) {
-        log.info("Searching contracts with criteria: {}", request);
-
-        // Start with the base specification from all non-null fields
-        var specification = contractSpecification.buildSearchSpecification(request);
-
-        // Execute the base query
-        List<Contract> results = generatedContractRepository.findAll(specification);
-        log.debug("Base search returned {} contracts", results.size());
-
-        // Apply labelValues filtering if provided (field value intersection)
-        if (request.labelValues() != null && !request.labelValues().isEmpty()) {
-            results = filterByLabelValues(results, request.labelValues());
-            log.debug("After labelValues filtering: {} contracts remain", results.size());
-        }
-
-        // Map to DTOs and return
-        List<ContractResponseDTO> responseDTOs = results.stream()
-                .map(generatedContractMapper::toResponseDTO)
-                .toList();
-
-        return responseDTOs.isEmpty() 
-                ? ResponseEntity.noContent().build() 
-                : ResponseEntity.ok(responseDTOs);
-    }
-
-    /**
-     * Filters contracts by matching field values.
-     * Implements intersection logic: a contract must have ALL specified labelValues
-     * in its field values (case-insensitive substring matching).
-     *
-     * @param contracts the initial list of contracts to filter
-     * @param labelValues the label values to search for
-     * @return filtered list of contracts that match ALL provided labelValues
-     */
-    private List<Contract> filterByLabelValues(List<Contract> contracts, List<String> labelValues) {
-        if (labelValues == null || labelValues.isEmpty()) {
-            return contracts;
-        }
-
-        return contracts.stream()
-                .filter(contract -> {
-                    // Get all field values for this contract
-                    Set<String> contractFieldValues = contract.getFieldValues().stream()
-                            .map(ContractFieldValue::getFieldValue)
-                            .map(String::toLowerCase)
-                            .collect(Collectors.toSet());
-
-                    // Check if all labelValues match (intersection logic - AND)
-                    return labelValues.stream()
-                            .allMatch(labelValue -> {
-                                if (labelValue == null || labelValue.isBlank()) {
-                                    return true; // Skip null/blank values
-                                }
-                                String searchValue = labelValue.toLowerCase();
-                                // Substring matching for each field value
-                                return contractFieldValues.stream()
-                                        .anyMatch(fieldValue -> fieldValue.contains(searchValue));
-                            });
-                })
-                .toList();
     }
 }
