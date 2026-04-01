@@ -5,6 +5,7 @@ import clm.demo.models.ContractFieldValue;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.utils.DocxTraversal;
 import clm.demo.utils.PlaceholderProcessor;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionResultWithSpans;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionSpan;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Generates contract documents by replacing dot-sequence placeholders with field values.
@@ -73,67 +75,12 @@ public class FileContentReplacementService {
             Map<String, String> labelToValue) throws IOException {
 
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
-
-            int[] globalIndex = {0};
-
-            visitParagraphs(doc.getParagraphs(), ordered, labelToValue, globalIndex);
-            visitTables    (doc.getTables(),     ordered, labelToValue, globalIndex);
-            visitHeaders   (doc.getHeaderList(), ordered, labelToValue, globalIndex);
-            visitFooters   (doc.getFooterList(), ordered, labelToValue, globalIndex);
+            AtomicInteger globalIndex = new AtomicInteger(0);
+            DocxTraversal.forEachParagraph(doc, p -> fillParagraph(p, ordered, labelToValue, globalIndex));
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.write(out);
             return out.toByteArray();
-        }
-    }
-
-    private void visitParagraphs(
-            List<XWPFParagraph> paragraphs,
-            List<TemplateField> ordered,
-            Map<String, String> labelToValue,
-            int[] globalIndex) {
-
-        for (XWPFParagraph p : paragraphs) {
-            if (globalIndex[0] >= ordered.size()) return;
-            fillParagraph(p, ordered, labelToValue, globalIndex);
-        }
-    }
-
-    private void visitTables(
-            List<XWPFTable> tables,
-            List<TemplateField> ordered,
-            Map<String, String> labelToValue,
-            int[] globalIndex) {
-
-        for (XWPFTable table : tables) {
-            if (globalIndex[0] >= ordered.size()) return;
-            for (XWPFTableRow row : table.getRows()) {
-                for (XWPFTableCell cell : row.getTableCells()) {
-                    visitParagraphs(cell.getParagraphs(), ordered, labelToValue, globalIndex);
-                }
-            }
-        }
-    }
-
-    private void visitHeaders(
-            List<XWPFHeader> headers,
-            List<TemplateField> ordered,
-            Map<String, String> labelToValue,
-            int[] globalIndex) {
-
-        for (XWPFHeader h : headers) {
-            visitParagraphs(h.getParagraphs(), ordered, labelToValue, globalIndex);
-        }
-    }
-
-    private void visitFooters(
-            List<XWPFFooter> footers,
-            List<TemplateField> ordered,
-            Map<String, String> labelToValue,
-            int[] globalIndex) {
-
-        for (XWPFFooter f : footers) {
-            visitParagraphs(f.getParagraphs(), ordered, labelToValue, globalIndex);
         }
     }
 
@@ -147,49 +94,27 @@ public class FileContentReplacementService {
      *
      * <h3>Algorithm — merge → substitute → delta-based writeback</h3>
      * <ol>
-     *   <li><b>Merge:</b> concatenate every run's text into one string, recording each
-     *       run's start offset in {@code runStarts[i]} and the total merged length.</li>
-     *   <li><b>Early exits:</b> skip if merged text is empty or all fields are exhausted.</li>
+     *   <li><b>Merge:</b> concatenate every run's normalized text into one string, recording
+     *       each run's start offset in {@code runStarts[i]}.</li>
+     *   <li><b>Early exits:</b> skip if all fields are exhausted or merged text is empty.</li>
      *   <li><b>Substitute:</b> {@link PlaceholderProcessor#substituteEachWithSpans}
      *       returns the rewritten string plus one {@link SubstitutionSpan} per placeholder,
      *       recording its {@code [originalStart, originalEnd)} and {@code replacementLen}
      *       — all in original-string coordinates.</li>
      *   <li><b>Early exit:</b> if nothing was filled, no DOM mutation occurs.</li>
-     *   <li><b>Delta-based writeback:</b> for each run, its original range is
-     *       {@code [runStarts[r], runStarts[r+1])}. We compute a cumulative character
-     *       delta from all spans whose {@code originalStart} falls before the run's
-     *       original end, and use that delta to map the run's original end to its
-     *       rewritten end:
-     *       <pre>
-     *         rwEnd = origEnd + cumulativeDelta(origEnd)
-     *       </pre>
-     *       The run receives {@code rewritten[rwStart .. rwEnd]}.
-     *
-     *       <p>Cross-run placeholder handling: a placeholder that starts inside run
-     *       {@code i} gets its full replacement text attributed to run {@code i} (the
-     *       run containing its original start). Runs {@code i+1..i+k} that contained
-     *       only the tail of the placeholder receive empty strings — their original
-     *       characters are fully accounted for by the delta.</p>
-     *   </li>
+     *   <li><b>Delta-based writeback:</b> delegated to {@link #writebackSpans}.
+     *       Cross-run placeholders are handled correctly: the run containing the
+     *       placeholder's start receives the full replacement; runs that held only
+     *       the tail receive empty strings.</li>
      * </ol>
-     *
-     * <h3>Multiple placeholders on the same line</h3>
-     * Because the delta accumulates across all spans in original-string order, and each
-     * run's slice is computed independently from {@code runStarts[r]}, multiple
-     * replacements on the same line are handled correctly without any interaction between
-     * them.
-     *
-     * <h3>Multi-line / cross-run placeholders</h3>
-     * Word joins consecutive runs within a paragraph; the merged string has no artificial
-     * newlines between runs. If a placeholder's dots span a run boundary, the single
-     * regex match in {@code substituteEachWithSpans} captures the whole sequence, and the
-     * delta writeback correctly empties the tail runs.
      */
     private void fillParagraph(
             XWPFParagraph paragraph,
             List<TemplateField> ordered,
             Map<String, String> labelToValue,
-            int[] globalIndex) {
+            AtomicInteger globalIndex) {
+
+        if (globalIndex.get() >= ordered.size()) return;
 
         List<XWPFRun> runs = paragraph.getRuns();
         if (runs.isEmpty()) return;
@@ -197,25 +122,23 @@ public class FileContentReplacementService {
         // ── Step 1: normalize + merge ─────────────────────────────────────────
         // Each run's text is normalized (Unicode ellipsis → ASCII dots) BEFORE
         // building runStarts, so all offsets live in the same coordinate space.
-
-        String[] normTexts = new String[runs.size()];
-        int[]    runStarts = new int[runs.size() + 1];
-        StringBuilder merged = new StringBuilder();
+        int[]         runStarts = new int[runs.size() + 1];
+        StringBuilder merged    = new StringBuilder();
 
         for (int i = 0; i < runs.size(); i++) {
             runStarts[i] = merged.length();
-            normTexts[i] = PlaceholderProcessor.normalize(runs.get(i).getText(0));
-            merged.append(normTexts[i]);
+            merged.append(PlaceholderProcessor.normalize(runs.get(i).getText(0)));
         }
         runStarts[runs.size()] = merged.length();
 
         if (merged.isEmpty()) return;
 
         // ── Step 2: substitute ────────────────────────────────────────────────
+        int base = globalIndex.get();
         SubstitutionResultWithSpans result = PlaceholderProcessor.substituteEachWithSpans(
                 merged.toString(),
                 i -> {
-                    int absIndex = globalIndex[0] + i;
+                    int absIndex = base + i;
                     if (absIndex >= ordered.size()) return null;
                     String label = ordered.get(absIndex).getFieldLabel();
                     return labelToValue.get(label);
@@ -223,62 +146,10 @@ public class FileContentReplacementService {
 
         if (!result.anyFilled()) return;
 
-        // ── Step 3: safe slice writeback ──────────────────────────────────────
-        //
-        // We walk the rewritten string once, slicing it back into runs.
-        //
-        // Key insight: the rewritten string is a transformation of the normalized
-        // merged string. Every character in the normalized merged string maps to
-        // either itself (plain char, 1-to-1) or is part of a replaced span (the
-        // whole span maps to the replacement text). We track:
-        //
-        //   origPos  — current position in the normalized merged string
-        //   rwPos    — current position in the rewritten string
-        //   spanIdx  — next unconsumed span
-        //
-        // For each run we consume exactly (runStarts[r+1] - runStarts[r]) original
-        // characters, translating to a slice [rwStart, rwEnd) of the rewritten string.
-        // When origPos hits a span start we jump both cursors over the entire span
-        // atomically — this handles cross-run placeholders correctly: the run that
-        // contains the span start receives the full replacement, and runs that only
-        // contained the tail of the placeholder get empty strings.
+        // ── Step 3: delta-based writeback ─────────────────────────────────────
+        writebackSpans(runs, runStarts, result.text(), result.spans());
 
-        String             rewritten = result.text();
-        List<SubstitutionSpan> spans = result.spans();
-
-        int origPos = 0;
-        int rwPos   = 0;
-        int spanIdx = 0;
-
-        for (int r = 0; r < runs.size(); r++) {
-            int origRunEnd = runStarts[r + 1];  // exclusive, in normalized coords
-            int rwStart    = rwPos;
-
-            while (origPos < origRunEnd) {
-                if (spanIdx < spans.size()
-                        && origPos == spans.get(spanIdx).originalStart()) {
-                    // At a span boundary: jump both cursors over the entire span.
-                    // origPos may land past origRunEnd if the placeholder crosses
-                    // a run boundary — that is intentional: subsequent runs that
-                    // only held the placeholder tail will have origPos > their
-                    // origRunEnd and their while-loop won't execute, giving them "".
-                    SubstitutionSpan sp = spans.get(spanIdx++);
-                    origPos = sp.originalEnd();
-                    rwPos  += sp.replacementLen();
-                } else {
-                    // Plain character: 1-to-1
-                    origPos++;
-                    rwPos++;
-                }
-            }
-
-            // Safety clamp: rwPos must never exceed rewritten.length().
-            // This guards against any floating-point-style accumulation error.
-            int rwEnd = Math.min(rwPos, rewritten.length());
-            runs.get(r).setText(rewritten.substring(rwStart, rwEnd), 0);
-        }
-
-        globalIndex[0] += result.filledCount();
+        globalIndex.addAndGet(result.filledCount());
     }
 
 
@@ -304,16 +175,7 @@ public class FileContentReplacementService {
      */
     public byte[] normalizePlaceholdersInDocx(byte[] docxBytes) throws IOException {
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
-
-            normalizeParagraphList(doc.getParagraphs());
-
-            for (XWPFTable table : doc.getTables())
-                for (XWPFTableRow row : table.getRows())
-                    for (XWPFTableCell cell : row.getTableCells())
-                        normalizeParagraphList(cell.getParagraphs());
-
-            for (XWPFHeader h : doc.getHeaderList()) normalizeParagraphList(h.getParagraphs());
-            for (XWPFFooter f : doc.getFooterList()) normalizeParagraphList(f.getParagraphs());
+            DocxTraversal.forEachParagraph(doc, this::normalizeParagraph);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.write(out);
@@ -322,36 +184,54 @@ public class FileContentReplacementService {
         }
     }
 
-    private void normalizeParagraphList(List<XWPFParagraph> paragraphs) {
-        for (XWPFParagraph p : paragraphs) normalizeParagraph(p);
-    }
-
     private void normalizeParagraph(XWPFParagraph paragraph) {
         List<XWPFRun> runs = paragraph.getRuns();
         if (runs.isEmpty()) return;
 
-        String[] normTexts = new String[runs.size()];
-        int[]    runStarts = new int[runs.size() + 1];
-        StringBuilder merged = new StringBuilder();
+        int[]         runStarts = new int[runs.size() + 1];
+        StringBuilder merged    = new StringBuilder();
 
         for (int i = 0; i < runs.size(); i++) {
             runStarts[i] = merged.length();
-            normTexts[i] = PlaceholderProcessor.normalize(runs.get(i).getText(0));
-            merged.append(normTexts[i]);
+            merged.append(PlaceholderProcessor.normalize(runs.get(i).getText(0)));
         }
         runStarts[runs.size()] = merged.length();
 
         if (merged.isEmpty()) return;
 
-        // Replace every placeholder with exactly 4 dots.
         SubstitutionResultWithSpans result =
                 PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> "....");
 
         if (!result.anyFilled()) return;
 
-        String rewritten = result.text();
-        List<SubstitutionSpan> spans = result.spans();
-        int origPos = 0, rwPos = 0, spanIdx = 0;
+        writebackSpans(runs, runStarts, result.text(), result.spans());
+    }
+
+    // -------------------------------------------------------------------------
+    // Shared writeback
+    // -------------------------------------------------------------------------
+
+    /**
+     * Slices {@code rewritten} back into {@code runs} using the original run boundaries
+     * ({@code runStarts}) and the substitution span offsets.
+     *
+     * <p>We walk the rewritten string once per run. For each run we consume exactly
+     * {@code runStarts[r+1] - runStarts[r]} original characters, translating that range
+     * to a slice {@code [rwStart, rwEnd)} of the rewritten string. When {@code origPos}
+     * hits a span start, both cursors jump over the entire span atomically — this handles
+     * cross-run placeholders: the run containing the span start gets the full replacement,
+     * and runs that held only the tail get empty strings.</p>
+     *
+     * <p>Shared by {@link #fillParagraph} and {@link #normalizeParagraph} so any fix
+     * applies to both code paths automatically.</p>
+     */
+    private static void writebackSpans(
+            List<XWPFRun> runs, int[] runStarts,
+            String rewritten, List<SubstitutionSpan> spans) {
+
+        int origPos = 0;
+        int rwPos   = 0;
+        int spanIdx = 0;
 
         for (int r = 0; r < runs.size(); r++) {
             int origRunEnd = runStarts[r + 1];
@@ -360,15 +240,18 @@ public class FileContentReplacementService {
             while (origPos < origRunEnd) {
                 if (spanIdx < spans.size()
                         && origPos == spans.get(spanIdx).originalStart()) {
+                    // At a span boundary: jump both cursors over the entire span atomically.
                     SubstitutionSpan sp = spans.get(spanIdx++);
                     origPos = sp.originalEnd();
                     rwPos  += sp.replacementLen();
                 } else {
+                    // Plain character: 1-to-1
                     origPos++;
                     rwPos++;
                 }
             }
 
+            // Safety clamp: rwPos must never exceed rewritten.length().
             int rwEnd = Math.min(rwPos, rewritten.length());
             runs.get(r).setText(rewritten.substring(rwStart, rwEnd), 0);
         }
@@ -378,8 +261,16 @@ public class FileContentReplacementService {
     // Helpers
     // -------------------------------------------------------------------------
 
-    private static List<TemplateField> sortedFields(Template template) {
-        return template.getTemplateFields().stream()
+    private List<TemplateField> sortedFields(Template template) {
+        List<TemplateField> all = template.getTemplateFields();
+        long dropped = all.stream()
+                .filter(f -> f.getFieldPosition() == null || f.getFieldLabel() == null)
+                .count();
+        if (dropped > 0) {
+            log.warn("Template {}: {} field(s) with null position or label dropped from substitution" +
+                     " — placeholder positions may misalign", template.getId(), dropped);
+        }
+        return all.stream()
                 .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
                 .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
                 .toList();

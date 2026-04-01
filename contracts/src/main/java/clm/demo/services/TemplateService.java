@@ -15,8 +15,8 @@ import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileParserService;
-import clm.demo.utils.Constants;
 import clm.demo.utils.FileUtils;
+import clm.demo.utils.PlaceholderProcessor;
 import clm.demo.utils.Utils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -132,15 +131,10 @@ public class TemplateService {
      * @return document text with placeholders replaced by {{fieldId}}
      */
     private String replaceWithFieldIds(String normalizedText, List<TemplateField> savedFields) {
-        Matcher matcher = Constants.PLACEHOLDER_PATTERN.matcher(normalizedText);
-        int[] index = {0};
-
-        return matcher.replaceAll(match -> {
-            if (index[0] >= savedFields.size()) {
-                return match.group(); // fallback if somehow more matches than fields
-            }
-            return "{{" + savedFields.get(index[0]++).getId() + "}}";
-        });
+        return PlaceholderProcessor.substituteEach(
+                normalizedText,
+                i -> i < savedFields.size() ? "{{" + savedFields.get(i).getId() + "}}" : null
+        ).text();
     }
 
     /**

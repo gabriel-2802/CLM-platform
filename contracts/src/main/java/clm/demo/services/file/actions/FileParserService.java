@@ -1,6 +1,7 @@
 package clm.demo.services.file.actions;
 
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.utils.DocxTraversal;
 import clm.demo.utils.PlaceholderProcessor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -89,27 +90,8 @@ public class FileParserService {
     private String extractDocx(MultipartFile file) throws IOException {
         try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
             StringBuilder sb = new StringBuilder();
-
-            // Body paragraphs — preserve blank lines to keep char offsets accurate
-            document.getParagraphs()
-                    .forEach(p -> sb.append(p.getText()).append("\n"));
-
-            // Table cells
-            document.getTables().forEach(table ->
-                    table.getRows().forEach(row ->
-                            row.getTableCells().forEach(cell ->
-                                    cell.getParagraphs().forEach(p ->
-                                            sb.append(p.getText()).append("\n")))));
-
-            // Headers
-            document.getHeaderList().forEach(header ->
-                    header.getParagraphs().forEach(p ->
-                            sb.append(p.getText()).append("\n")));
-
-            // Footers
-            document.getFooterList().forEach(footer ->
-                    footer.getParagraphs().forEach(p ->
-                            sb.append(p.getText()).append("\n")));
+            // Preserve blank lines as empty entries to keep placeholder offsets accurate.
+            DocxTraversal.forEachParagraph(document, p -> sb.append(p.getText()).append("\n"));
 
             String content = sb.toString();
             log.info("parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
