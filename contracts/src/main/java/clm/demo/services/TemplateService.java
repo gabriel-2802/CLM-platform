@@ -13,8 +13,8 @@ import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
-import clm.demo.services.file.actions.FileContentReplacementService;
-import clm.demo.services.file.actions.FileParserService;
+import clm.demo.services.file.utils.FileContentReplacement;
+import clm.demo.utils.FileParser;
 import clm.demo.utils.FileUtils;
 import clm.demo.utils.PlaceholderProcessor;
 import clm.demo.utils.Utils;
@@ -46,9 +46,6 @@ public class TemplateService {
 
     private final ContractTemplateMapper contractTemplateMapper;
 
-    private final FileParserService fileParserService;
-    private final FileContentReplacementService fileContentReplacementService;
-
     /**
      * Uploads and parses a new contract template from an uploaded file.
      * Extracts placeholders and creates TemplateField entities.
@@ -77,7 +74,7 @@ public class TemplateService {
             byte[] fileBytes = request.getFile().getBytes();
 
             DocumentFormat uploadedFormat = Utils.detectDocumentFormat(fileBytes);
-            FileParserService.ParsedDocument parsedDoc = fileParserService.parseTemplate(request.getFile(), uploadedFormat);
+            FileParser.ParsedDocument parsedDoc = FileParser.parseTemplate(request.getFile(), uploadedFormat);
 
             // convert to DOCX if uploaded as PDF
             byte[] docxBytes = uploadedFormat == DocumentFormat.PDF
@@ -85,7 +82,7 @@ public class TemplateService {
                     : fileBytes;
 
             // normalize every placeholder to exactly 4 dots before storing
-            docxBytes = fileContentReplacementService.normalizePlaceholdersInDocx(docxBytes);
+            docxBytes = FileContentReplacement.normalizePlaceholdersInDocx(docxBytes);
 
             Template template = templateRepository.save(
                     Template.builder()
@@ -93,13 +90,13 @@ public class TemplateService {
                             .description(request.getDescription())
                             .documentFormat(DocumentFormat.DOCX)
                             .documentContent(FileUtils.compress(docxBytes))
-                            .fieldCount(parsedDoc.getPlaceholderCount())
+                            .fieldCount(parsedDoc.placeholderCount())
                             .build()
             );
 
             // create TemplateField entities for each placeholder
             List<TemplateField> savedFields = templateFieldRepository.saveAll(
-                    IntStream.range(0, parsedDoc.getPlaceholderCount())
+                    IntStream.range(0, parsedDoc.placeholderCount())
                             .mapToObj(position -> TemplateField.builder()
                                     .contractTemplate(template)
                                     .fieldPosition(position)
@@ -108,7 +105,7 @@ public class TemplateService {
             );
 
             // simple positional replace
-            String documentText = replaceWithFieldIds(parsedDoc.getDocumentText(), savedFields);
+            String documentText = replaceWithFieldIds(parsedDoc.documentText(), savedFields);
 
             return TemplateUploadResponseDTO.builder()
                     .templateId(template.getId())

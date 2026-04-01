@@ -16,7 +16,7 @@ import java.util.function.Consumer;
  * <p>Canonical order: body → table cells → headers → footers.</p>
  */
 @UtilityClass
-public class DocxTraversal {
+public class DocxUtils {
 
     /**
      * Visits every paragraph in {@code doc} in canonical order and passes it to {@code consumer}.

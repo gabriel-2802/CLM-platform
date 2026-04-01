@@ -16,7 +16,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.ContractFieldValueRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.TemplateRepository;
-import clm.demo.services.file.actions.FileContentReplacementService;
+import clm.demo.services.file.utils.FileContentReplacement;
 import clm.demo.utils.FileUtils;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.utils.Utils;
@@ -55,8 +55,6 @@ public class ContractService {
     private final ContractGenerationMapper contractGenerationMapper;
     private final GeneratedContractMapper generatedContractMapper;
 
-    private final FileContentReplacementService fileContentReplacementService;
-
     private final ContractSpecification contractSpecification;
 
     /**
@@ -92,7 +90,7 @@ public class ContractService {
 
         // generate document content and update contract
         try {
-            byte[] documentContent = fileContentReplacementService.generateDocumentContent(contract, template, fieldValues);
+            byte[] documentContent = FileContentReplacement.generateDocumentContent(template, fieldValues);
             contract.setDocumentContent(FileUtils.compress(documentContent));
             contract = generatedContractRepository.save(contract);
         } catch (IOException e) {

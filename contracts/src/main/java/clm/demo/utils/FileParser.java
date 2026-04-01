@@ -1,18 +1,12 @@
-package clm.demo.services.file.actions;
+package clm.demo.utils;
 
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.utils.DocxTraversal;
-import clm.demo.utils.PlaceholderProcessor;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -20,17 +14,10 @@ import java.io.IOException;
 /**
  * Parses uploaded contract templates (DOCX or PDF) and extracts placeholder count.
  * Placeholders are sequences of 4+ consecutive dots (e.g. {@code "......"}).
- *
- * <p>Workflow: upload → validate → extract text → normalize → count placeholders
- * → return normalized text and count so the service layer can create field entities.</p>
- *
- * <p><strong>Important:</strong> {@code documentText} in the response is always the
- * <em>normalized</em> string (CRLF → LF). Placeholder positions are derived from regex
- * matching order, not stored explicitly.</p>
  */
 @Slf4j
-@Service
-public class FileParserService {
+@UtilityClass
+public class FileParser {
 
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50 MB
 
@@ -43,7 +30,7 @@ public class FileParserService {
      * @throws IOException              if the document cannot be read or parsed
      * @throws IllegalArgumentException if the file is invalid or too large
      */
-    public ParsedDocument parseTemplate(MultipartFile file, DocumentFormat format)
+    public static ParsedDocument parseTemplate(MultipartFile file, DocumentFormat format)
             throws IOException {
         validateFile(file);
 
@@ -51,17 +38,10 @@ public class FileParserService {
         String normalized = PlaceholderProcessor.normalize(raw);
         int placeholderCount = PlaceholderProcessor.findPlaceholders(normalized).size();
 
-        return ParsedDocument.builder()
-                .documentText(normalized)
-                .placeholderCount(placeholderCount)
-                .build();
+        return new ParsedDocument(normalized, placeholderCount);
     }
-
-    // -------------------------------------------------------------------------
-    // Text extraction
-    // -------------------------------------------------------------------------
-
-    private String extractText(MultipartFile file, DocumentFormat format) throws IOException {
+    
+    private static String extractText(MultipartFile file, DocumentFormat format) throws IOException {
         return switch (format) {
             case PDF  -> extractPdf(file);
             case DOCX -> extractDocx(file);
@@ -91,7 +71,7 @@ public class FileParserService {
         try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
             StringBuilder sb = new StringBuilder();
             // Preserve blank lines as empty entries to keep placeholder offsets accurate.
-            DocxTraversal.forEachParagraph(document, p -> sb.append(p.getText()).append("\n"));
+            DocxUtils.forEachParagraph(document, p -> sb.append(p.getText()).append("\n"));
 
             String content = sb.toString();
             log.info("parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
@@ -101,11 +81,7 @@ public class FileParserService {
             throw new IOException("Failed to parse DOCX: " + e.getMessage(), e);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Validation
-    // -------------------------------------------------------------------------
-
+    
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty())
             throw new IllegalArgumentException("File cannot be null or empty");
@@ -119,18 +95,7 @@ public class FileParserService {
         log.debug("file validated: {} ({} bytes)", name, file.getSize());
     }
 
-    // -------------------------------------------------------------------------
-    // Response model
-    // -------------------------------------------------------------------------
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ParsedDocument {
-        /** Full normalized (CRLF → LF) plain-text content. */
-        private String documentText;
-        /** Total number of placeholders found. */
-        private int placeholderCount;
-    }
+    public record  ParsedDocument(
+            String documentText,
+            int placeholderCount) {}
 }

@@ -1,478 +1,208 @@
 # Contract Template Management API Documentation
-
+This document mirrors the current Spring Boot controllers (`TemplateController`, `ContractController`) and the DTOs under `clm.demo.dto`. All endpoints emit JSON bodies directly (no wrapper object); errors are normalized through `GlobalExceptionHandler`.
 ## Response Format
-
 ### Success Response (2xx)
 ```json
 {
-  "data": {
-    // Response payload varies by endpoint
-  },
-  "timestamp": "2026-03-30T10:30:00",
-  "status": 200
-}
-```
-
-### Error Response (4xx, 5xx)
-```json
-{
-  "status": 400,
-  "message": "Template upload failed",
-  "details": "File name cannot be empty",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
----
-
-## Error Handling
-
-The API uses standardized HTTP status codes and provides detailed error messages via the `ErrorResponseDTO`:
-
-| Error Type | HTTP Status | Trigger Condition |
-|-----------|-------------|-------------------|
-| **Bad Request** | 400 | Invalid request parameters, validation failures, data constraint violations |
-| **Not Found** | 404 | Template or resource does not exist |
-| **Unsupported Media Type** | 415 | File format is not DOCX or PDF |
-| **Unprocessable Content** | 422 | Document binary processing or parsing fails |
-| **Internal Server Error** | 500 | Unexpected server errors, uncaught exceptions |
-
-### Common Error Responses
-
-#### 1. Empty File Name Error
-**Payload Example:**
-```json
-{
-  "status": 400,
-  "message": "Template upload failed",
-  "details": "File name cannot be empty",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
-#### 2. Unsupported File Type Error
-**Payload Example:**
-```json
-{
-  "status": 415,
-  "message": "Unsupported file format",
-  "details": "Unsupported file type. Only .docx and .pdf files are allowed.",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
-#### 3. Resource Not Found Error
-**Payload Example:**
-```json
-{
-  "status": 404,
-  "message": "Resource not found",
-  "details": "Template with ID 999 not found",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
-#### 4. Data Validation Error
-**Payload Example:**
-```json
-{
-  "status": 400,
-  "message": "Data validation error",
-  "details": "Data violates validation constraints.",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
-#### 5. Document Processing Error
-**Payload Example:**
-```json
-{
-  "status": 422,
-  "message": "Document processing failed",
-  "details": "Error reading DOCX file: ZIP entry not found",
-  "timestamp": "2026-03-30T10:30:00"
-}
-```
-
----
-
-## Endpoints
-
-### 1. Upload Template
-**POST** `/api/templates/upload`
-
-Uploads a contract template file, parses it for placeholders, and persists the template with its extracted fields.
-
-#### Request
-- **Content-Type:** `multipart/form-data`
-- **Parameters:**
-
-  | Parameter | Type | Required | Description |
-  |-----------|------|----------|-------------|
-  | file | File | Yes | Contract template file (DOCX or PDF) |
-  | templateName | String | Yes | Name for the template (non-blank) |
-  | description | String | No | Optional description of the template |
-
-#### Response
-- **Status:** `201 Created`
-- **Body:** `TemplateUploadResponseDTO`
-
-#### Response Schema
-```json
-{
-  "templateId": 9,
-  "templateName": "MultiLine",
-  "documentText": "Service Agreement\n\nThis agreement is between {{101}} and {{102}}..."
-}
-```
-
-The `documentText` field contains the extracted plain text from the template with all placeholders replaced by their assigned field IDs in the format `{{fieldId}}`.
-
-#### Possible Errors
-- `400 Bad Request` - Missing required fields or empty file name
-- `415 Unsupported Media Type` - File is not DOCX or PDF
-- `422 Unprocessable Content` - File is corrupted or cannot be parsed
-- `500 Internal Server Error` - Unexpected server error
-
----
-### 1.2 Update Field Labels
-**PUT** `/api/templates/{templateId}/labels`
-
-Updates multiple field mappings for a template. LABELS WILL BE USED FOR CONTRACT GENERATION
-
-#### Request
-- **Content-Type:** `application/json`
-- **Body:** `FieldMappingRequest`
-
-- By default all are STRINGS and no format pattern, but for numbers and dates (ie specific labels you can send specific data types and format patterns to ensure correct formatting during contract generation)
-- By default all fields are required, but you can set isRequired to false for optional fields (ie Client Name may be optional for some templates, but Effective Date is always required)
-
-#### Request Payload Example
-```json
-{
-  "templateId": 1,
-  "mappings": [
-    {
-      "fieldId": 101,
-      "fieldLabel": "Company_Name",
-      "dataType": "STRING",
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "fieldId": 102,
-      "fieldLabel": "Client Name",
-      "dataType": "STRING",
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "fieldId": 103,
-      "fieldLabel": "Service Term",
-      "dataType": "STRING",
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "fieldId": 104,
-      "fieldLabel": "Effective Date",
-      "dataType": "DATE",
-      "isRequired": true,
-      "formatPattern": "yyyy-MM-dd"
-    },
-    {
-      "fieldId": 105,
-      "fieldLabel": "Total Price",
-      "dataType": "DECIMAL",
-      "isRequired": false,
-      "formatPattern": "###,##0.00"
-    }
-  ]
-}
-```
-
-#### Response (you can ignore this or show it on the screen, it's UI decision)
-- **Status:** `200 OK`
-- **Body:** `List<TemplateFieldResponseDTO>`
-
-#### Response Payload Example
-```json
-[
-  {
-    "id": 101,
-    "fieldLabel": "Company Name",
-    "dataType": "STRING",
-    "placeholderText": "COMPANY_NAME",
-    "fieldPosition": 1,
-    "isRequired": true,
-    "formatPattern": ""
-  },
-  {
-    "id": 102,
-    "fieldLabel": "Client Name",
-    "dataType": "STRING",
-    "placeholderText": "CLIENT_NAME",
-    "fieldPosition": 2,
-    "isRequired": true,
-    "formatPattern": ""
-  },
-  {
-    "id": 103,
-    "fieldLabel": "Service Term",
-    "dataType": "STRING",
-    "placeholderText": "SERVICE_TERM",
-    "fieldPosition": 3,
-    "isRequired": true,
-    "formatPattern": ""
-  },
-  {
-    "id": 104,
-    "fieldLabel": "Effective Date",
-    "dataType": "DATE",
-    "placeholderText": "EFFECTIVE_DATE",
-    "fieldPosition": 4,
-    "isRequired": true,
-    "formatPattern": "yyyy-MM-dd"
-  },
-  {
-    "id": 105,
-    "fieldLabel": "Total Price",
-    "dataType": "DECIMAL",
-    "placeholderText": "TOTAL_PRICE",
-    "fieldPosition": 5,
-    "isRequired": true,
-    "formatPattern": "###,##0.00"
-  }
-]
-```
-
-#### Validation Rules
-- `templateId` - Must not be null
-- `mappings` - Must not be empty, must contain at least one field mapping
-- `fieldId` - Must not be null (within each mapping)
-- `fieldLabel` - Must not be null (within each mapping)
-- `dataType` - Default value: "STRING" (valid types: STRING, INTEGER, DECIMAL, DATE, BOOLEAN)
-- `isRequired` - Default value: true
-- `formatPattern` - Default value: "" (empty string)
-
-#### Possible Errors
-- `400 Bad Request` - Invalid request data, empty mappings list, or missing required fields
-- `404 Not Found` - Template or field with specified ID does not exist
-- `422 Unprocessable Content` - Data type mismatch or constraint violation
-- `500 Internal Server Error` - Database access failure
-
----
-
-### 2. Get All Templates
-**GET** `/api/templates/all`
-
-Retrieves all available templates with their metadata and field counts.
-
-#### Request
--  NO BODY
-
-#### Response
-- **Status:** `200 OK`
-- **Body:** `List<TemplateResponseDTO>`
-
-#### INFO
-- fullYMapped is true if all fields that ARE REQUIRED have been mapped to database columns, false if any field is still unmapped (therefore it cannot be used to generate contract if false)
-#### Response Schema
-```json
-[
-  {
-    "templateId": 1,
-    "templateName": "Service Agreement Template",
-    "description": "Standard service agreement",
-    "fieldCount": 5,
-    "fullyMapped": true,
-    "createdAt": "2026-03-25T14:30:00",
-    "updatedAt": "2026-03-28T10:15:00",
-    "fields": [
-      {
-        "id": 101,
-        "fieldLabel": "Company_Name",
-        "dataType": "STRING",
-        "fieldPosition": 1,
-        "isRequired": true,
-        "formatPattern": ""
-      },
-      {
-        "id": 102,
-        "fieldLabel": "Client Name",
-        "placeholderText": "CLIENT_NAME",
-        "dataType": "STRING",
-        "fieldPosition": 2,
-        "isRequired": true,
-        "formatPattern": ""
-      },
-      {
-        "id": 104,
-        "fieldLabel": "Effective Date",
-        "placeholderText": "EFFECTIVE_DATE",
-        "dataType": "DATE",
-        "fieldPosition": 4,
-        "isRequired": true,
-        "formatPattern": "yyyy-MM-dd"
-      }
-    ]
-  },
-  {
-    "templateId": 2,
-    "templateName": "NDA Template",
-    "description": "Non-Disclosure Agreement",
-    "fieldCount": 3,
-    "fullyMapped": false,
-    "createdAt": "2026-03-20T09:00:00",
-    "updatedAt": "2026-03-20T09:00:00",
-    "fields": [...]
-  }
-]
-```
-
-#### Possible Errors
-- `500 Internal Server Error` - Database access failure
-
----
-
-### 3. Get Template by ID
-**GET** `/api/templates/{templateId}`
-
-Retrieves a specific template by ID with all its parsed fields and current mappings.
-
-#### Request
-- NO BODY
-
-#### Response
-- **Status:** `200 OK`
-- **Body:** `TemplateResponseDTO`
-
-#### Response Payload Example
-```json
-{
-  "templateId": 1,
-  "templateName": "Service Agreement Template",
-  "description": "Standard service agreement for all clients",
-  "fieldCount": 5,
+  "templateId": 42,
+  "templateName": "Enterprise NDA",
+  "fieldCount": 8,
   "fullyMapped": true,
-  "createdAt": "2026-03-25T14:30:00",
-  "updatedAt": "2026-03-28T10:15:00",
   "fields": [
     {
       "id": 101,
-      "fieldLabel": "Company Name",
-      "placeholderText": "....",
-      "dataType": "STRING",
-      "fieldPosition": 1,
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "id": 102,
       "fieldLabel": "Client Name",
-      "placeholderText": "CLIENT_NAME",
       "dataType": "STRING",
-      "fieldPosition": 2,
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "id": 103,
-      "fieldLabel": "Service Term",
-      "placeholderText": "SERVICE_TERM",
-      "dataType": "STRING",
-      "fieldPosition": 3,
-      "isRequired": true,
-      "formatPattern": ""
-    },
-    {
-      "id": 104,
-      "fieldLabel": "Effective Date",
-      "placeholderText": "EFFECTIVE_DATE",
-      "dataType": "DATE",
-      "fieldPosition": 4,
-      "isRequired": true,
-      "formatPattern": "yyyy-MM-dd"
-    },
-    {
-      "id": 105,
-      "fieldLabel": "Total Price",
-      "placeholderText": "TOTAL_PRICE",
-      "dataType": "DECIMAL",
-      "fieldPosition": 5,
-      "isRequired": true,
-      "formatPattern": "###,##0.00"
+      "isRequired": true
     }
   ]
 }
 ```
-
-#### Possible Errors
-- `404 Not Found` - Template with specified ID does not exist
-- `500 Internal Server Error` - Database access failure
-
-
-### 5. Delete Template
-**DELETE** `/api/templates/{templateId}`
-
-Deletes a template and cascades to all its fields, mappings, and generated contracts.
-
-#### Request
-- NO BODY
-
-#### Response
-- **Status:** `204 No Content`
-- **Body:** Empty
-
-#### Possible Errors
-- `404 Not Found` - Template with specified ID does not exist
-- `500 Internal Server Error` - Database access failure during cascade delete
-
+### Error Response (4xx/5xx)
+Every error uses `ErrorResponseDTO`.
+```json
+{
+  "status": 400,
+  "message": "Template upload failed",
+  "details": "File cannot be empty",
+  "timestamp": "2026-03-30T10:30:00"
+}
+```
+## Error Handling
+`GlobalExceptionHandler` centralizes API failures. Common mappings:
+| Exception | HTTP Status | Message | Typical Cause |
+|-----------|-------------|---------|----------------|
+| `IllegalArgumentException`, `EmptyFileNameException` | 400 | Invalid request / Template upload failed | Missing multipart parts, negative page, empty files |
+| `TemplateFieldOwnershipException`, `MissingMandatoryFieldException` | 400 | Field does not belong to template / Missing required field mappings | Inconsistent template/field IDs or absent values |
+| `ResourceNotFoundException` | 404 | Resource not found | Template/contract/field absent |
+| `UnsupportedFileException` | 415 | Unsupported file format | Upload other than DOCX/PDF |
+| `FileConversionException`, `TemplateUploadException` | 422 | Document conversion failed / Template upload failed | Apache POI/PDFBox failures, corrupt binaries |
+| `InvalidContractStateException`, `SignedDocumentNotAvailableException` | 409 | Invalid contract state / Signed document not available | Uploading signed doc to inactive contract, downloading before signature |
+| `ContractGenerationFailException`, generic `Exception` | 500 | Contract generation failed / Internal server error | Unexpected runtime issues |
+## DTO Reference
+### Request DTOs
+#### UploadTemplateRequest (`multipart/form-data`)
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `file` | File | Yes | DOCX or PDF; PDFs are converted to DOCX internally |
+| `templateName` | String | Yes | Must be unique; duplicates raise `DuplicateTemplateNameException` |
+| `description` | String | No | Optional admin note |
+#### FieldMappingRequest (`application/json`)
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `templateId` | Long | Yes | Must match template being updated |
+| `mappings` | Array<FieldMappingDefinition> | Yes | At least one entry |
+`FieldMappingDefinition`
+| Field | Type | Required | Defaults |
+|-------|------|----------|----------|
+| `fieldId` | Long | Yes | Existing `TemplateField.id` |
+| `fieldLabel` | String | Yes | Unique per template |
+| `dataType` | Enum | No | Defaults to `STRING`; valid: `STRING`, `DATE`, `NUMBER`, `BOOLEAN`, `CURRENCY` |
+| `isRequired` | Boolean | No | Defaults to `true` |
+| `formatPattern` | String | No | Date patterns follow `DateTimeFormatter`, numbers use `DecimalFormat` |
+#### GenContractRequest (`application/json`)
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `templateId` | Long | Yes | Must reference a fully mapped template |
+| `userId` | Long | Yes | Staff member generating the contract |
+| `userMail` | String (email) | Yes | Valid email format enforced |
+| `clientId` | Long | Yes | External system client identifier |
+| `startDate` | ISO date | Yes | Contract validity start |
+| `endDate` | ISO date | Yes | Contract validity end |
+| `mappings` | Map<String,String> | Yes | Key = `fieldLabel`, value = field content |
+| `value` | Number | No | Monetary value |
+| `notes` | String | No | Optional context |
+#### ContractTerminationRequest (`application/json`)
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `terminationDate` | ISO timestamp | Yes | Converted to `LocalDate` internally |
+| `reasons` | String | No | Optional explanation |
+#### SearchRequest (body of `GET /api/contracts/search`)
+| Field | Type | Required |
+|-------|------|----------|
+| `notes` | String | No |
+| `contractStatus` | Enum (`PENDING_SIGNATURE`, `ACTIVE`, `TERMINATED`, `ARCHIVED`) | No |
+| `clientId` | Integer | No |
+| `generatedBy` | Integer | No |
+| `labelValues` | Array<String> | No (AND filter using trigram search) |
+| `templateName` | String | No |
+| `templateDescription` | String | No |
+| `createdAfter` | ISO date | No |
+| `createdBefore` | ISO date | No |
+| `page` | Integer | No (default 0) |
+| `size` | Integer | No (default 20) |
+### Response DTOs
+#### TemplateUploadResponseDTO
+| Field | Description |
+|-------|-------------|
+| `templateId` | Persisted template ID |
+| `templateName` | Value echoed from request |
+| `documentText` | Normalized DOCX text with placeholders replaced by `{{fieldId}}` tokens |
+#### TemplateResponseDTO
+| Field | Description |
+|-------|-------------|
+| `templateId`, `templateName`, `description` | Template metadata |
+| `fieldCount` | Count of placeholders parsed |
+| `fullyMapped` | `true` when all required fields have labels |
+| `createdAt`, `updatedAt` | ISO timestamps |
+| `fields[]` | Array of `TemplateFieldDTO` objects |
+`TemplateFieldDTO`
+| Field | Notes |
+|-------|------|
+| `id` | TemplateField ID |
+| `fieldLabel` | Display label; can be null until mapped |
+| `dataType` | String form of enum |
+| `fieldPosition` | Positional order from top of document |
+| `isRequired` | Boolean |
+| `formatPattern` | Optional formatter |
+#### TemplateFieldResponseDTO
+Returned by the labels endpoint; mirrors `TemplateFieldDTO` but always populated (derived from entity constructor).
+#### ContractResponseDTO
+| Field | Description |
+|-------|-------------|
+| `id` | Generated contract ID |
+| `templateId`, `clientId` | Foreign keys |
+| `contractStatus` | Current status |
+| `generatedBy`, `generatedByMail` | Audit of creator |
+| `contractValue` | Monetary value (nullable) |
+| `contractStartDate`, `contractEndDate` | Validity window |
+| `notes` | Optional notes |
+| `terminationDate`, `reasonsForTermination` | Populated when terminated |
+| `createdAt`, `updatedAt` | Audit timestamps |
+| `fieldValues[]` | Array of `ContractFieldValueResponseDTO` |
+`ContractFieldValueResponseDTO` fields: `id`, `templateFieldId`, `fieldLabel`, `fieldValue`.
 ---
-
-### 6. Download Template as DOCX
-**GET** `/api/templates/download/docx/{templateId}`
-
-Downloads a template in DOCX format. If the template is stored in another format, automatically converts it.
-
-#### Request
-- NO BODY
-
-#### Response
-- **Status:** `200 OK`
-- **Content-Type:** `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
-- **Body:** Binary DOCX file
-- **Headers:**
-  - `Content-Disposition: attachment; filename=template-{templateName}.docx`
-
-#### Possible Errors
-- `404 Not Found` - Template with specified ID does not exist
-- `422 Unprocessable Content` - File decompression or conversion fails
-- `500 Internal Server Error` - Unexpected error during file processing
-
+## Template Endpoints (`/api/templates`)
+### Upload Template — `POST /api/templates/upload`
+- **Consumes**: `multipart/form-data`
+- **Produces**: `application/json`
+- **Body**: `UploadTemplateRequest`
+- **Behavior**: Detects format (DOCX/PDF), normalizes placeholders to four dots, compresses DOCX bytes, persists `Template` and placeholder `TemplateField` rows, and returns `TemplateUploadResponseDTO`.
+- **Response**: `201 Created`
+- **Sample**:
+```json
+{
+  "templateId": 7,
+  "templateName": "Service Agreement",
+  "documentText": "This Agreement between {{101}} and {{102}}..."
+}
+```
+- **Errors**: 400 (empty file/duplicate name), 415 (unsupported format), 422 (parse failure), 500 (unexpected).
+### List Templates — `GET /api/templates`
+- **Query Params**: `page` (default 0), `size` (default 20).
+- **Response**: `200 OK` with `List<TemplateResponseDTO>`; `204 No Content` when page empty.
+- **Notes**: `TemplateService` executes a paged query ordered by `createdAt DESC`.
+### Get Template — `GET /api/templates/{templateId}`
+- **Response**: `200 OK` `TemplateResponseDTO`.
+- **Errors**: 404 when template is absent.
+### Update Field Labels — `PUT /api/templates/{templateId}/labels`
+- **Consumes**: `application/json`
+- **Body**: `FieldMappingRequest` (the `templateId` in the body must equal the path parameter).
+- **Response**: `200 OK` `List<TemplateFieldResponseDTO>`.
+- **Validation**: rejects updates when a provided `fieldId` does not belong to the template (`TemplateFieldOwnershipException`).
+### Delete Template — `DELETE /api/templates/{templateId}`
+- **Response**: `204 No Content`.
+- **Behavior**: Cascade deletes associated `TemplateField` rows and generated contracts.
+### Download Template — `GET /api/templates/download/{templateId}/{format}`
+- **Path Parameters**: `format` ∈ {`docx`, `pdf`}.
+- **Response**: `200 OK` binary with `Content-Disposition: attachment; filename=template-{templateId}.{format}`.
+- **Details**: Delegates to `DocumentDownloadService` with `DocumentType.TEMPLATE`. Rejects unsupported formats via `IllegalArgumentException`.
 ---
-
-### 7. Download Template as PDF
-**GET** `/api/templates/download/pdf/{templateId}`
-
-Downloads a template in PDF format. If the template is stored in another format, automatically converts it.
-
-#### Request
-- **Path Parameters:**
-  | Parameter | Type | Required | Description |
-  |-----------|------|----------|-------------|
-  | templateId | Long | Yes | The unique identifier of the template |
-
-#### Response
-- **Status:** `200 OK`
-- **Content-Type:** `application/pdf`
-- **Body:** Binary PDF file
-- **Headers:**
-  - `Content-Disposition: attachment; filename=template-{templateName}.pdf`
-
-#### Possible Errors
-- `404 Not Found` - Template with specified ID does not exist
-- `422 Unprocessable Content` - File decompression or conversion fails
-- `500 Internal Server Error` - Unexpected error during file processing
-
+## Contract Endpoints (`/api/contracts`)
+### Generate Contract — `POST /api/contracts/generate`
+- **Consumes**: `application/json`
+- **Body**: `GenContractRequest`
+- **Behavior**: Validates template is fully mapped, enforces required fields, persists `Contract` + `ContractFieldValue` entities, generates DOCX/PDF via `FileContentReplacementService`, and compresses binary content before saving.
+- **Response**: `200 OK` `ContractResponseDTO` (including generated field values when present).
+- **Errors**: 404 (template missing), 400 (`MissingMandatoryFieldException`), 422 (`ContractGenerationFailException`), 500 fallback.
+### Upload Signed Contract — `POST /api/contracts/{contractId}/upload-signed`
+- **Consumes**: `multipart/form-data`
+- **Body**: `file` (DOCX/PDF)
+- **Behavior**: Converts uploads to PDF when necessary, stores compressed signed binary, updates status to `ACTIVE`.
+- **Response**: `200 OK` `ContractResponseDTO`.
+- **Errors**: 400 (empty file), 404 (contract missing), 422 (conversion failure).
+### Terminate Contract — `PUT /api/contracts/terminate/{contractId}`
+- **Consumes**: `application/json`
+- **Body**: `ContractTerminationRequest`
+- **Behavior**: Only `ACTIVE` contracts can transition to `TERMINATED`; sets termination metadata.
+- **Response**: `204 No Content`.
+- **Errors**: 404 (missing contract), 409 (`InvalidContractStateException`).
+### List Contracts — `GET /api/contracts`
+- **Query Params**: `page`, `size` with same defaults as template listing.
+- **Response**: `200 OK` `List<ContractResponseDTO>` or `204 No Content`.
+### Search Contracts — `GET /api/contracts/search`
+- **Consumes**: `application/json` body despite GET (kept for backward compatibility).
+- **Body**: `SearchRequest`.
+- **Behavior**: Delegates to `ContractSpecification` + custom SQL functions/indexes (see DB documentation) for server-side filtering, ordering by `created_at DESC`.
+- **Response**: `200 OK` `List<ContractResponseDTO>` or `204 No Content`.
+- **Errors**: 400 for invalid filters, 500 for DB issues.
+### Download Contract — `GET /api/contracts/download/{contractId}/{type}/{format}`
+- **Path Parameters**: `type` ∈ {`unsigned`, `signed`} (mapped to `DocumentType.UNSIGNED_CONTRACT` / `SIGNED_CONTRACT`); `format` ∈ {`docx`, `pdf`}.
+- **Response**: `200 OK` binary attachment named `contract-{contractId}.{format}`.
+- **Errors**: 400 (invalid type/format), 404 (contract missing or signed artifact unavailable), 422 (conversion failure).
 ---
+## Usage Tips
+- Always map every required field via `/api/templates/{templateId}/labels` before generating a contract; otherwise `MissingMandatoryFieldException` is raised.
+- For consistent pagination, reuse the `page`/`size` defaults from `clm.demo.utils.Constants` (currently 0 / 20).
+- `FieldMappingRequest.dataType` must align with downstream formatting rules; e.g., use `DATE` plus `formatPattern: "yyyy-MM-dd"` to ensure deterministic rendering.
+- GET `/api/contracts/search` accepts a body because consumers relied on GET semantics while experimenting with filters. Future versions may introduce a POST alias.
