@@ -185,3 +185,6 @@ docker-reset:
 	else \
 		echo "$(YELLOW)Cancelled$(NC)"; \
 	fi
+
+db:
+	docker exec -it clm_postgres psql -U clm_user -d clm_platform
