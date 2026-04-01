@@ -3,125 +3,117 @@ package clm.demo.services;
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.*;
-import clm.demo.exceptions.EmptyFileNameException;
 import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.UnsupportedFileException;
+import clm.demo.exceptions.TemplateDownloadException;
+import clm.demo.exceptions.TemplateFieldOwnershipException;
+import clm.demo.exceptions.TemplateUploadException;
 import clm.demo.mappers.ContractTemplateMapper;
 import clm.demo.mappers.ParsedDocumentMapper;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
-import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
-
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileConverterService;
 import clm.demo.services.file.actions.FileParserService;
-import clm.demo.services.file.actions.FileZipService;
+import clm.demo.utils.ZipUtils;
+import clm.demo.utils.Utils;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.security.InvalidParameterException;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Service for managing contract templates.
  * Handles template upload, parsing, field extraction, and mapping operations.
  */
-@Slf4j
+
 @Service
 @RequiredArgsConstructor
-@Transactional
 public class TemplateService {
 
     private final TemplateRepository templateRepository;
     private final TemplateFieldRepository templateFieldRepository;
-    private final FileParserService fileParserService;
+
     private final ContractTemplateMapper contractTemplateMapper;
     private final ParsedDocumentMapper parsedDocumentMapper;
-    private final FileZipService zipService;
+
+    private final FileParserService fileParserService;
     private final FileConverterService fileConverterService;
     private final FileContentReplacementService fileContentReplacementService;
 
     /**
-     * Generates (uploads and parses) a new contract template from an uploaded file.
+     * Uploads and parses a new contract template from an uploaded file.
      * Extracts placeholders and creates TemplateField entities.
      *
      * @param request containing file, template name, and description
      * @return ParsedTemplateResponseDTO with parsed content and template info
-     * @throws IOException if file parsing fails
      * @throws IllegalArgumentException if file is empty
      */
-    public ParsedTemplateResponseDTO uploadTemplate(UploadTemplateRequest request) throws IOException {
-        log.info("Generating template: {}", request.getTemplateName());
+    @Transactional
+    public ParsedTemplateResponseDTO uploadTemplate(UploadTemplateRequest request) {
 
-        // validation
         if (request.getFile().isEmpty()) {
-            log.warn("Empty file provided for template generation");
             throw new IllegalArgumentException("File cannot be empty");
         }
 
-        // parse the uploaded file
-        DocumentFormat uploadedFormat = detectDocumentFormat(request.getFile());
-        FileParserService.ParsedDocumentResponse parsedDoc = fileParserService.parseTemplate(request.getFile(), uploadedFormat);
+        try {
+            DocumentFormat uploadedFormat = Utils.detectDocumentFormat(request.getFile().getBytes());
+            FileParserService.ParsedDocumentResponse parsedDoc = fileParserService.parseTemplate(request.getFile(), uploadedFormat);
 
-        // templates are always stored as DOCX — convert if the upload was a PDF
-        byte[] docxBytes = request.getFile().getBytes();
-        if (uploadedFormat == DocumentFormat.PDF) {
-            log.info("Converting uploaded PDF to DOCX for storage");
-            docxBytes = fileConverterService.convert(docxBytes, DocumentFormat.PDF, DocumentFormat.DOCX);
+            // templates are always stored as DOCX,  convert if the upload was a PDF
+            byte[] docxBytes = request.getFile().getBytes();
+            if (uploadedFormat == DocumentFormat.PDF) {
+                docxBytes = fileConverterService.convert(docxBytes, DocumentFormat.PDF, DocumentFormat.DOCX);
+            }
+
+            // normalize every placeholder to exactly 4 dots before storing
+            docxBytes = fileContentReplacementService.normalizePlaceholdersInDocx(docxBytes);
+
+            Template template = templateRepository.save(
+                    Template.builder()
+                            .templateName(request.getTemplateName())
+                            .description(request.getDescription())
+                            .documentFormat(DocumentFormat.DOCX)
+                            .documentContent(ZipUtils.compress(docxBytes))
+                            .fieldCount(parsedDoc.getPlaceholderCount())
+                            .build()
+            );
+
+            // create TemplateField entities for each placeholder
+            List<TemplateField> fields = parsedDoc.getPlaceholders().stream()
+                    .map(placeholder -> TemplateField.builder()
+                            .contractTemplate(template)
+                            .fieldPosition(placeholder.getPosition())
+                            .placeholderText(placeholder.getPlaceholderText())
+                            .build())
+                    .toList();
+
+            List<TemplateField> savedFields = templateFieldRepository.saveAll(fields);
+
+            // set field IDs on placeholders for client-side reference
+            for (int i = 0; i < parsedDoc.getPlaceholders().size(); i++) {
+                parsedDoc.getPlaceholders().get(i).setFieldId(savedFields.get(i).getId());
+            }
+
+            ParsedTemplateResponseDTO response = parsedDocumentMapper.toResponseDTO(parsedDoc);
+            response.setTemplateId(template.getId());
+            response.setTemplateName(template.getTemplateName());
+
+            return response;
+
+        } catch (IOException e) {
+            throw new TemplateUploadException("Failed to process uploaded template: " + e.getMessage());
         }
-
-        // normalize every placeholder to exactly 4 dots before storing
-        docxBytes = fileContentReplacementService.normalizePlaceholdersInDocx(docxBytes);
-
-        // create and save the ContractTemplate entity
-        Template template = Template.builder()
-                .templateName(request.getTemplateName())
-                .description(request.getDescription())
-                .documentFormat(DocumentFormat.DOCX)
-                .documentContent(zipService.compress(docxBytes))
-                .fieldCount(parsedDoc.getPlaceholderCount())
-                .build();
-
-        template = templateRepository.save(template);
-        log.info("Template saved with ID: {}", template.getId());
-
-        // create TemplateField entities for each placeholder
-        final Template finalTemplate = template;
-        List<TemplateField> fields = parsedDoc.getPlaceholders().stream()
-                .map(placeholder -> TemplateField.builder()
-                        .contractTemplate(finalTemplate)
-                        .fieldPosition(placeholder.getPosition())
-                        .placeholderText(placeholder.getPlaceholderText())
-                        .build())
-                .collect(Collectors.toList());
-
-        var savedFields = templateFieldRepository.saveAll(fields);
-
-        // set field IDs on placeholders for client-side reference
-        for (int i = 0; i < parsedDoc.getPlaceholders().size(); i++) {
-            Long fieldId = savedFields.get(i).getId();
-            parsedDoc.getPlaceholders().get(i).setFieldId(fieldId);
-        }
-
-        // map parsed document to response DTO using mapper
-        ParsedTemplateResponseDTO response = parsedDocumentMapper.toResponseDTO(parsedDoc);
-        response.setTemplateId(template.getId());
-        response.setTemplateName(template.getTemplateName());
-        
-        // Log response placeholders
-        for (int i = 0; i < response.getPlaceholders().size(); i++) {
-            log.debug("Response placeholder {} fieldId: {}", i, response.getPlaceholders().get(i).getFieldId());
-        }
-
-        return response;
     }
 
     /**
@@ -129,190 +121,118 @@ public class TemplateService {
      *
      * @param templateId the template ID
      * @return TemplateResponseDTO containing template details
-     * @throws RuntimeException if template not found
+     * @throws ResourceNotFoundException if template not found
      */
     @Transactional(readOnly = true)
     public TemplateResponseDTO getTemplate(Long templateId) {
-        log.info("Fetching template: {}", templateId);
         return templateRepository.findById(templateId)
                 .map(contractTemplateMapper::toResponseDTO)
-                .orElseThrow(() -> {
-                    log.warn("Template not found: {}", templateId);
-                    return new ResourceNotFoundException("Template not found: " + templateId);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
     }
 
     /**
-     * Retrieves all available templates with their metadata.
-     * Returns a list of all templates sorted by creation date (newest first).
+     * Retrieves all templates with pagination, sorted by creation date descending.
      *
-     * @return List of TemplateResponseDTO containing all templates
+     * @param page zero-based page index
+     * @param size number of records per page
+     * @return page of TemplateResponseDTOs
      */
     @Transactional(readOnly = true)
-    public List<TemplateResponseDTO> getAllTemplates() {
-        log.info("Fetching all templates");
-        return templateRepository.findAll()
-                .stream()
-                .map(contractTemplateMapper::toResponseDTO)
-                .collect(Collectors.toList());
+    public Page<TemplateResponseDTO> getAllTemplates(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return templateRepository.findAll(pageable)
+                .map(contractTemplateMapper::toResponseDTO);
     }
 
     /**
      * Deletes a template by ID along with all associated fields and mappings.
      *
      * @param templateId the template ID
-     * @throws RuntimeException if template not found
+     * @throws ResourceNotFoundException if template not found
      */
+    @Transactional
     public void deleteTemplate(Long templateId) {
-
         if (!templateRepository.existsById(templateId)) {
-            log.warn("Template not found for deletion: {}", templateId);
             throw new ResourceNotFoundException("Template not found: " + templateId);
         }
-
         templateRepository.deleteById(templateId);
     }
 
     /**
-     * Downloads a template in DOCX format.
-     * If the template is stored in another format, automatically converts it.
-     * The document is decompressed from GZIP before being returned.
+     * Downloads a template in the requested format.
+     * Decompresses stored content and converts if necessary.
      *
-     * @param templateId the template ID to download
-     * @return decompressed document bytes in DOCX format
+     * @param templateId     the template ID to download
+     * @param targetFormat   the desired output format
+     * @return document bytes in the requested format
      * @throws ResourceNotFoundException if template not found
-     * @throws IOException if decompression or conversion fails
      */
     @Transactional(readOnly = true)
-    public byte[] downloadTemplateAsDocx(Long templateId) throws IOException {
-
+    public byte[] downloadTemplate(Long templateId, DocumentFormat targetFormat) {
         Template template = templateRepository.findById(templateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
 
-        // decompress the stored document content
-        byte[] decompressedContent = zipService.decompress(template.getDocumentContent());
+        try {
+            byte[] decompressedContent = ZipUtils.decompress(template.getDocumentContent());
 
-        // if already in DOCX format, return directly
-        if (template.getDocumentFormat() == DocumentFormat.DOCX) {
-            return decompressedContent;
-        }
+            if (template.getDocumentFormat() == targetFormat) {
+                return decompressedContent;
+            }
 
-        // convert from other format to DOCX
-        return fileConverterService.convert(
-                decompressedContent,
-                template.getDocumentFormat(),
-                DocumentFormat.DOCX
-        );
-    }
+            return fileConverterService.convert(decompressedContent, template.getDocumentFormat(), targetFormat);
 
-    /**
-     * Downloads a template in PDF format.
-     * If the template is stored in another format, automatically converts it.
-     * The document is decompressed from GZIP before being returned.
-     *
-     * @param templateId the template ID to download
-     * @return decompressed document bytes in PDF format
-     * @throws ResourceNotFoundException if template not found
-     * @throws IOException if decompression or conversion fails
-     */
-    @Transactional(readOnly = true)
-    public byte[] downloadTemplateAsPdf(Long templateId) throws IOException {
-        Template template = templateRepository.findById(templateId)
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
-
-        // decompress the stored document content
-        byte[] decompressedContent = zipService.decompress(template.getDocumentContent());
-
-        // if already in PDF format, return directly
-        if (template.getDocumentFormat() == DocumentFormat.PDF) {
-            log.debug("Template already in PDF format, returning directly");
-            return decompressedContent;
-        }
-
-        // convert from other format to PDF
-        log.info("Converting template from {} to PDF", template.getDocumentFormat());
-
-        return fileConverterService.convert(
-                decompressedContent,
-                template.getDocumentFormat(),
-                DocumentFormat.PDF
-        );
-    }
-
-    /**
-     * Helper method to detect document format from file extension.
-     */
-    private DocumentFormat detectDocumentFormat(MultipartFile file) {
-        String filename = file.getOriginalFilename();
-        if (filename == null || filename.isBlank()) {
-            throw new EmptyFileNameException("File must have a valid filename");
-        }
-
-        if (filename.toLowerCase().endsWith(".pdf")) {
-            return DocumentFormat.PDF;
-        } else if (filename.toLowerCase().endsWith(".docx")) {
-            return DocumentFormat.DOCX;
-        } else {
-            throw new UnsupportedFileException();
+        } catch (IOException e) {
+            throw new TemplateDownloadException("Failed to download template " + templateId + ": " + e.getMessage());
         }
     }
-    
-    
+
     /**
      * Batch updates field mappings for a template.
      * Allows setting labels, data types, required status, and format patterns for multiple fields at once.
      *
      * @param request containing templateId and list of field mapping definitions
-     * @return List of TemplateFieldResponseDTO with all updated fields
-     * @throws ResourceNotFoundException if template or any field not found
+     * @return list of TemplateFieldResponseDTO with all updated fields
+     * @throws ResourceNotFoundException       if template or any field not found
+     * @throws TemplateFieldOwnershipException if a field does not belong to the template
      */
+    @Transactional
     public List<TemplateFieldResponseDTO> updateFieldLabels(FieldMappingRequest request) {
-
-        Template template = templateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
-
-        // update each field with the provided label
-        List<TemplateField> updatedFields = new java.util.ArrayList<>();
-        for (FieldMappingRequest.FieldMappingDefinition mapping : request.getMappings()) {
-            TemplateField field = templateFieldRepository.findById(mapping.getFieldId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Field not found: " + mapping.getFieldId()));
-
-            // verify field belongs to the template
-            if (!field.getContractTemplate().getId().equals(request.getTemplateId())) {
-                log.warn("Field {} does not belong to template {}", mapping.getFieldId(), request.getTemplateId());
-                throw new InvalidParameterException("Field does not belong to this template");
-            }
-
-            // update field properties
-            field.setFieldLabel(mapping.getFieldLabel());
-            field.setDataType(convertStringToDataType(mapping.getDataType()));
-            field.setIsRequired(mapping.isRequired());
-            field.setFormatPattern(mapping.getFormatPattern());
-
-            TemplateField savedField = templateFieldRepository.save(field);
-            updatedFields.add(savedField);
-            log.debug("Field updated: {} with label: {}", mapping.getFieldId(), mapping.getFieldLabel());
+        if (!templateRepository.existsById(request.getTemplateId())) {
+            throw new ResourceNotFoundException("Template not found: " + request.getTemplateId());
         }
 
-        log.info("Successfully updated {} fields for template: {}", request.getMappings().size(), request.getTemplateId());
+        // fetch all fields in one query instead of N individual lookups
+        Set<Long> fieldIds = request.getMappings().stream()
+                .map(FieldMappingRequest.FieldMappingDefinition::getFieldId)
+                .collect(Collectors.toSet());
 
-        // return the list of updated fields as response DTOs
-        return updatedFields.stream()
+        Map<Long, TemplateField> fieldMap = templateFieldRepository.findAllById(fieldIds)
+                .stream()
+                .collect(Collectors.toMap(TemplateField::getId, f -> f));
+
+        List<TemplateField> updatedFields = request.getMappings().stream()
+                .map(mapping -> {
+                    TemplateField field = fieldMap.get(mapping.getFieldId());
+                    if (field == null) {
+                        throw new ResourceNotFoundException("Field not found: " + mapping.getFieldId());
+                    }
+                    if (!field.getContractTemplate().getId().equals(request.getTemplateId())) {
+                        throw new TemplateFieldOwnershipException(
+                                "Field " + mapping.getFieldId() + " does not belong to template " + request.getTemplateId()
+                        );
+                    }
+                    field.setFieldLabel(mapping.getFieldLabel());
+                    field.setDataType(Utils.convertStringToDataType(mapping.getDataType()));
+                    field.setIsRequired(mapping.isRequired());
+                    field.setFormatPattern(mapping.getFormatPattern());
+                    return field;
+                })
+                .toList();
+
+        List<TemplateField> savedFields = templateFieldRepository.saveAll(updatedFields);
+
+        return savedFields.stream()
                 .map(TemplateFieldResponseDTO::new)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Helper method to convert string data type to enum.
-     */
-    private DataType convertStringToDataType(String dataTypeStr) {
-        if (dataTypeStr == null || dataTypeStr.trim().isEmpty()) {
-            return DataType.STRING;
-        }
-        try {
-            return DataType.valueOf(dataTypeStr.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            return DataType.STRING;
-        }
+                .toList();
     }
 }

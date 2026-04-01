@@ -4,8 +4,14 @@ import lombok.experimental.UtilityClass;
 
 import java.util.regex.Pattern;
 
+/**
+ * Utility class for constants
+ */
 @UtilityClass
 public final class Constants {
+
+    public static final int DEFAULT_PAGE      = 0;
+    public static final int DEFAULT_PAGE_SIZE = 20;
 
     /**
      * Matches 4+ consecutive "dot-like" characters, tolerating horizontal whitespace
@@ -58,6 +64,7 @@ public final class Constants {
      * <p>{@code [ \t]} intentionally excludes {@code \n} so placeholders on separate
      * lines are never merged into one match.
      */
-    public static final Pattern PLACEHOLDER_PATTERN =
-            Pattern.compile("\\.{4,}(?:[ \\t]*\\.+)*");
+    public static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\.{4,}(?:[ \\t]*\\.+)*");
+
+
 }

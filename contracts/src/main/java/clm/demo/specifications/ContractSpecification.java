@@ -17,21 +17,6 @@ import java.util.List;
 /**
  * JPA Specification for building dynamic, server-side search queries.
  *
- * <p><b>Design goals:</b>
- * <ul>
- *   <li>Zero in-memory filtering: every predicate is translated to SQL and
- *       executed entirely on the PostgreSQL server.</li>
- *   <li>Text predicates use {@code LOWER(col) LIKE '%term%'}, which matches
- *       the functional GIN trigram indexes created in V4 migration
- *       ({@code lower(col) gin_trgm_ops}). PostgreSQL performs an Index Scan
- *       instead of a Sequential Scan on those columns.</li>
- *   <li>labelValues intersection is expressed as a correlated EXISTS subquery
- *       per term (AND semantics), keeping filtering inside a single SQL
- *       statement with no data leaking to the application layer.</li>
- *   <li>contractTemplate is JOIN-fetched (many-to-one) to eliminate the
- *       per-contract lazy-load N+1 that would occur when mapping DTOs.</li>
- * </ul>
- * </p>
  */
 @Component
 public class ContractSpecification {
@@ -47,7 +32,7 @@ public class ContractSpecification {
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
 
-            /*
+            /**
              * Eager-fetch contractTemplate for the data query only.
              * Hibernate also executes a COUNT query when Pageable is used; adding
              * a fetch to that query causes an exception, so we guard with the
@@ -60,7 +45,7 @@ public class ContractSpecification {
                 query.distinct(true);
             }
 
-            // 1. notes — functional GIN trigram index: idx_gc_notes_lower_trgm
+            // 1. notes : functional GIN trigram index: idx_gc_notes_lower_trgm
             if (request.notes() != null && !request.notes().isBlank()) {
                 predicates.add(cb.like(
                         cb.lower(root.get("notes")),
@@ -68,22 +53,22 @@ public class ContractSpecification {
                 ));
             }
 
-            // 2. contractStatus — B-tree equality: idx_generated_contract_status
+            // 2. contractStatus : B-tree equality: idx_generated_contract_status
             if (request.contractStatus() != null) {
                 predicates.add(cb.equal(root.get("contractStatus"), request.contractStatus()));
             }
 
-            // 3. clientId — B-tree equality: idx_generated_contract_client_id
+            // 3. clientId : B-tree equality: idx_generated_contract_client_id
             if (request.clientId() != null) {
                 predicates.add(cb.equal(root.get("clientId"), request.clientId()));
             }
 
-            // 4. generatedBy — B-tree equality: idx_generated_contract_generated_by
+            // 4. generatedBy : B-tree equality: idx_generated_contract_generated_by
             if (request.generatedBy() != null) {
                 predicates.add(cb.equal(root.get("generatedBy"), request.generatedBy()));
             }
 
-            // 5. templateName — GIN trigram index: idx_ct_name_lower_trgm (on joined table)
+            // 5. templateName : GIN trigram index: idx_ct_name_lower_trgm (on joined table)
             if (request.templateName() != null && !request.templateName().isBlank()) {
                 predicates.add(cb.like(
                         cb.lower(root.get("contractTemplate").get("templateName")),
@@ -91,7 +76,7 @@ public class ContractSpecification {
                 ));
             }
 
-            // 6. templateDescription — GIN trigram index: idx_ct_desc_lower_trgm (on joined table)
+            // 6. templateDescription : GIN trigram index: idx_ct_desc_lower_trgm (on joined table)
             if (request.templateDescription() != null && !request.templateDescription().isBlank()) {
                 predicates.add(cb.like(
                         cb.lower(root.get("contractTemplate").get("description")),
@@ -99,7 +84,7 @@ public class ContractSpecification {
                 ));
             }
 
-            // 7. createdAfter — B-tree range: idx_generated_contract_created_date_range
+            // 7. createdAfter : B-tree range: idx_generated_contract_created_date_range
             if (request.createdAfter() != null) {
                 predicates.add(cb.greaterThanOrEqualTo(
                         root.get("createdAt"),
@@ -107,7 +92,7 @@ public class ContractSpecification {
                 ));
             }
 
-            // 8. createdBefore — B-tree range: idx_generated_contract_created_date_range
+            // 8. createdBefore : B-tree range: idx_generated_contract_created_date_range
             if (request.createdBefore() != null) {
                 predicates.add(cb.lessThanOrEqualTo(
                         root.get("createdAt"),
@@ -115,10 +100,10 @@ public class ContractSpecification {
                 ));
             }
 
-            /*
-             * 9. labelValues — server-side AND intersection via correlated EXISTS.
+            /**
+             * 9. labelValues : server-side AND intersection via correlated EXISTS.
              *
-             * For each search term, we add:
+             * for each search term, we add:
              *   AND EXISTS (
              *       SELECT 1 FROM contract_field_value cfv
              *       WHERE cfv.generated_contract_id = gc.id
@@ -133,7 +118,7 @@ public class ContractSpecification {
              *     using the composite predicate indexes from V2.
              *   - Inner (per term): Index Scan on idx_cfv_field_value_lower_trgm
              *     (GIN trigram, V4) intersected with the FK index on
-             *     generated_contract_id — typically a very small probe.
+             *     generated_contract_id : typically a very small probe.
              *   Result: no rows cross the network boundary until after all
              *   filtering is complete.
              */

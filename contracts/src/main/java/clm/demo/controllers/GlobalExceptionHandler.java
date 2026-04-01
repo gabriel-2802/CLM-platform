@@ -1,14 +1,7 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.responses.ErrorResponseDTO;
-import clm.demo.exceptions.DatabaseValidationException;
-import clm.demo.exceptions.EmptyFileNameException;
-import clm.demo.exceptions.FileConversionException;
-import clm.demo.exceptions.MissingMandatoryFieldException;
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.SignedDocumentNotAvailableException;
-import clm.demo.exceptions.UnsupportedConversionException;
-import clm.demo.exceptions.UnsupportedFileException;
+import clm.demo.exceptions.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
@@ -17,50 +10,49 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
 
 /**
  * Intercepts exceptions across all controllers to provide consistent JSON error responses.
- * This prevents the leaking of internal stack traces to the client.
+ * Prevents leaking of internal stack traces to the client.
  */
-@RestControllerAdvice
 @Slf4j
+@RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * Handles cases where a requested resource does not exist.
+     */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException e) {
+        log.warn("resource not found: {}", e.getMessage());
+        return buildResponse(HttpStatus.NOT_FOUND, "Resource not found", e.getMessage());
+    }
 
     /**
      * Handles validation errors in requests (e.g., empty files, invalid data).
      */
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponseDTO> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.warn("Invalid argument provided: {}", e.getMessage());
+        log.warn("invalid argument provided: {}", e.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, "Invalid request", e.getMessage());
     }
 
     /**
-     * Handles binary/file-system level failures during compression or parsing.
-     */
-    @ExceptionHandler(IOException.class)
-    public ResponseEntity<ErrorResponseDTO> handleIOException(IOException e) {
-        log.error("Document binary processing failed: ", e);
-        return buildResponse(HttpStatus.UNPROCESSABLE_CONTENT, "Document processing failed", e.getMessage());
-    }
-
-    /**
-     * Handles cases where a file is uploaded without a name or is completely empty.
+     * Handles cases where a file is uploaded without a name or with a blank name.
      */
     @ExceptionHandler(EmptyFileNameException.class)
     public ResponseEntity<ErrorResponseDTO> handleEmptyFileNameException(EmptyFileNameException e) {
-        log.warn("Upload rejected: Empty file name provided.");
+        log.warn("upload rejected — empty file name: {}", e.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, "Template upload failed", e.getMessage());
     }
 
     /**
-     * Handles cases where the user uploads a format other than PDF or DOCX.
+     * Handles cases where the uploaded file format is not PDF or DOCX.
      */
     @ExceptionHandler(UnsupportedFileException.class)
     public ResponseEntity<ErrorResponseDTO> handleUnsupportedFileException(UnsupportedFileException e) {
-        log.warn("Upload rejected: Unsupported file type. {}", e.getMessage());
+        log.warn("upload rejected — unsupported file type: {}", e.getMessage());
         return buildResponse(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported file format", e.getMessage());
     }
 
@@ -69,7 +61,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(UnsupportedConversionException.class)
     public ResponseEntity<ErrorResponseDTO> handleUnsupportedConversionException(UnsupportedConversionException e) {
-        log.warn("Format conversion not supported: {}", e.getMessage());
+        log.warn("format conversion not supported: {}", e.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, "Unsupported format conversion", e.getMessage());
     }
 
@@ -78,35 +70,75 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(FileConversionException.class)
     public ResponseEntity<ErrorResponseDTO> handleFileConversionException(FileConversionException e) {
-        log.error("Document conversion failed: ", e);
-        return buildResponse(HttpStatus.UNPROCESSABLE_CONTENT, "Document conversion failed", e.getMessage());
-    }
-
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ErrorResponseDTO> handleResourceNotFoundException(ResourceNotFoundException e) {
-        log.warn("Resource not found: {}", e.getMessage());
-        return buildResponse(HttpStatus.NOT_FOUND, "Resource not found", e.getMessage());
+        log.error("document conversion failed: ", e);
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Document conversion failed", e.getMessage());
     }
 
     /**
-     * Handles cases where a signed document is not yet available for download.
-     * This typically occurs when a contract has not yet been signed.
+     * Handles failures during template file upload and processing.
+     */
+    @ExceptionHandler(TemplateUploadException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTemplateUploadException(TemplateUploadException e) {
+        log.error("template upload failed: ", e);
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Template upload failed", e.getMessage());
+    }
+
+    /**
+     * Handles failures during template download or decompression.
+     */
+    @ExceptionHandler(TemplateDownloadException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTemplateDownloadException(TemplateDownloadException e) {
+        log.error("template download failed: ", e);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Template download failed", e.getMessage());
+    }
+
+    /**
+     * Handles attempts to perform state transitions on a contract that is not
+     * in the required state (e.g., terminating a non-ACTIVE contract).
+     */
+    @ExceptionHandler(InvalidContractStateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidContractStateException(InvalidContractStateException e) {
+        log.warn("invalid contract state transition: {}", e.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, "Invalid contract state", e.getMessage());
+    }
+
+    /**
+     * Handles cases where a signed document is not yet available for download,
+     * typically because the contract has not been signed yet.
      */
     @ExceptionHandler(SignedDocumentNotAvailableException.class)
     public ResponseEntity<ErrorResponseDTO> handleSignedDocumentNotAvailableException(SignedDocumentNotAvailableException e) {
-        log.warn("Signed document unavailable: {}", e.getMessage());
-        return buildResponse(HttpStatus.BAD_REQUEST, "Signed document not available", e.getMessage());
+        log.warn("signed document unavailable: {}", e.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, "Signed document not available", e.getMessage());
+    }
+
+    /**
+     * Handles cases where a template field is submitted as part of a mapping
+     * request but does not belong to the specified template.
+     */
+    @ExceptionHandler(TemplateFieldOwnershipException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTemplateFieldOwnershipException(TemplateFieldOwnershipException e) {
+        log.warn("field ownership violation: {}", e.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Field does not belong to template", e.getMessage());
     }
 
     /**
      * Handles missing mandatory field mappings during contract generation.
-     * Provides detailed information about which fields are missing values.
      */
     @ExceptionHandler(MissingMandatoryFieldException.class)
     public ResponseEntity<ErrorResponseDTO> handleMissingMandatoryFieldException(MissingMandatoryFieldException e) {
-        log.warn("Contract generation failed due to missing mandatory fields: {}", e.getMissingFields());
-        String details = "Missing mandatory fields: " + String.join(", ", e.getMissingFields());
-        return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field mappings", details);
+        log.warn("contract generation failed — missing mandatory fields: {}", e.getMissingFields());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field mappings",
+                "Missing mandatory fields: " + String.join(", ", e.getMissingFields()));
+    }
+
+    /**
+     * Handles failures during contract document generation.
+     */
+    @ExceptionHandler(ContractGenerationFailException.class)
+    public ResponseEntity<ErrorResponseDTO> handleContractGenerationFailException(ContractGenerationFailException e) {
+        log.error("contract generation failed: ", e);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Contract generation failed", e.getMessage());
     }
 
     /**
@@ -114,58 +146,57 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DatabaseValidationException.class)
     public ResponseEntity<ErrorResponseDTO> handleDatabaseValidationException(DatabaseValidationException e) {
-        log.warn("Database validation failed: {} - {}", e.getConstraintName(), e.getMessage());
-        String details = e.getDetails() != null ? e.getDetails() : e.getMessage();
-        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation failed", details);
+        log.warn("database validation failed: {} — {}", e.getConstraintName(), e.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation failed",
+                e.getDetails() != null ? e.getDetails() : e.getMessage());
     }
 
     /**
-     * Handles data access exceptions from the database layer (constraint violations, type mismatches, etc.).
+     * Handles data access exceptions caused by constraint violations or type mismatches.
+     * Translates known DB constraint patterns into user-friendly messages.
      */
     @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
     public ResponseEntity<ErrorResponseDTO> handleInvalidDataAccessException(InvalidDataAccessResourceUsageException e) {
-        log.error("Data access error occurred: ", e);
-        
-        String message = e.getMessage();
-        String details = "A data validation error occurred. Please check your input data.";
-
-        if (message != null) {
-            if (message.contains("CHECK constraint")) {
-                details = "Data violates validation constraints.";
-            } else if (message.contains("UNIQUE constraint")) {
-                details = "A record with this value already exists.";
-            } else if (message.contains("FOREIGN KEY constraint")) {
-                details = "Referenced record does not exist.";
-            } else if (message.contains("NOT NULL constraint")) {
-                details = "Required fields are missing.";
-            } else if (message.contains("type") && message.contains("bytea")) {
-                details = "Invalid file data format. Please ensure the file is properly formatted.";
-            }
-        }
-        
-        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation error", details);
+        log.error("data access error: ", e);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Data validation error", resolveDataAccessMessage(e.getMessage()));
     }
 
     /**
-     * Handles generic data access exceptions.
+     * Handles generic data access exceptions not covered by more specific handlers.
      */
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ErrorResponseDTO> handleDataAccessException(DataAccessException e) {
-        log.error("Database access error: ", e);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Database error", "A database error occurred. Please contact support.");
+        log.error("database access error: ", e);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Database error",
+                "A database error occurred. Please contact support.");
     }
 
     /**
-     * Catch-all for any unexpected runtime exceptions to avoid 500 white-label pages.
+     * Catch-all for any unexpected exceptions to prevent 500 white-label error pages.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponseDTO> handleGeneralException(Exception e) {
-        log.error("An unexpected internal error occurred: ", e);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error", "An unexpected error occurred. Please contact support.");
+        log.error("unexpected internal error: ", e);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal server error",
+                "An unexpected error occurred. Please contact support.");
     }
 
     /**
-     *  construct the ErrorResponseDTO.
+     * Translates known DB constraint violation patterns into user-friendly messages.
+     * Avoids exposing raw SQL or internal DB details to the client.
+     */
+    private String resolveDataAccessMessage(String message) {
+        if (message == null) return "A data validation error occurred. Please check your input data.";
+        if (message.contains("CHECK constraint"))        return "Data violates validation constraints.";
+        if (message.contains("UNIQUE constraint"))       return "A record with this value already exists.";
+        if (message.contains("FOREIGN KEY constraint"))  return "Referenced record does not exist.";
+        if (message.contains("NOT NULL constraint"))     return "Required fields are missing.";
+        if (message.contains("type") && message.contains("bytea")) return "Invalid file data format.";
+        return "A data validation error occurred. Please check your input data.";
+    }
+
+    /**
+     * Constructs a consistent ErrorResponseDTO with status, message, details, and timestamp.
      */
     private ResponseEntity<ErrorResponseDTO> buildResponse(HttpStatus status, String message, String details) {
         return ResponseEntity

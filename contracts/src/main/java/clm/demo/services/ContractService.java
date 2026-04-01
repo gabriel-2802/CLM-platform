@@ -4,11 +4,7 @@ import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
-import clm.demo.exceptions.FileConversionException;
-import clm.demo.exceptions.MissingMandatoryFieldException;
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.TemplateIncompleteException;
-import clm.demo.exceptions.UnsupportedFileException;
+import clm.demo.exceptions.*;
 import clm.demo.mappers.ContractGenerationMapper;
 import clm.demo.mappers.GeneratedContractMapper;
 import clm.demo.models.Contract;
@@ -22,15 +18,15 @@ import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.services.file.actions.FileContentReplacementService;
 import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.services.file.actions.FileZipService;
+import clm.demo.utils.ZipUtils;
 import clm.demo.specifications.ContractSpecification;
+import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -40,24 +36,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static clm.demo.utils.Constants.DEFAULT_PAGE;
+import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
+
+
+/**
+ * Service class for Generated Contracts
+ */
 @Slf4j
 @Service
 @Validated
 @RequiredArgsConstructor
-@Transactional
 public class ContractService {
-
-    private static final int DEFAULT_PAGE      = 0;
-    private static final int DEFAULT_PAGE_SIZE = 20;
 
     private final TemplateRepository contractTemplateRepository;
     private final ContractRepository generatedContractRepository;
     private final ContractFieldValueRepository contractFieldValueRepository;
+
     private final ContractGenerationMapper contractGenerationMapper;
     private final GeneratedContractMapper generatedContractMapper;
+
     private final FileContentReplacementService fileContentReplacementService;
-    private final FileZipService zipService;
     private final FileConverterService fileConverterService;
+
     private final ContractSpecification contractSpecification;
 
     /**
@@ -69,10 +70,8 @@ public class ContractService {
      * @throws TemplateIncompleteException    if template is not fully mapped
      * @throws MissingMandatoryFieldException if required fields are missing values
      */
+    @Transactional
     public ContractResponseDTO generateContract(@Valid GenContractRequest request) {
-        log.info("Starting contract generation for template ID: {}, client ID: {}",
-                request.templateId(), request.clientId());
-
         Template template = contractTemplateRepository.findById(request.templateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found with ID: " + request.templateId()));
 
@@ -82,27 +81,24 @@ public class ContractService {
 
         validateMandatoryFields(template, request.mappings());
 
-        // 1. Save contract shell first to get an ID
+        // save early to obtain a DB-assigned ID required by ContractFieldValue FK.
         Contract contract = contractGenerationMapper.toContractEntity(request, template);
         contract = generatedContractRepository.save(contract);
-        log.info("Contract shell saved with ID: {}", contract.getId());
 
-        // 2. Build field values against the persisted contract
+        // build field values against the persisted contract
         List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, request.mappings());
         if (!fieldValues.isEmpty()) {
             contractFieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
-            log.info("Persisted {} field values for contract ID: {}", fieldValues.size(), contract.getId());
         }
 
-        // 3. Generate document content and update contract
+        // generate document content and update contract
         try {
             byte[] documentContent = fileContentReplacementService.generateDocumentContent(contract, template, fieldValues);
-            contract.setDocumentContent(zipService.compress(documentContent));
+            contract.setDocumentContent(ZipUtils.compress(documentContent));
             contract = generatedContractRepository.save(contract);
-            log.info("Contract document saved for ID: {}", contract.getId());
         } catch (IOException e) {
-            throw new RuntimeException("Document generation failed: " + e.getMessage(), e);
+            throw new ContractGenerationFailException("Failed to generate contract document: " + e.getMessage());
         }
 
         return generatedContractMapper.toResponseDTO(contract);
@@ -118,30 +114,24 @@ public class ContractService {
      * @throws ResourceNotFoundException if contract is not found
      * @throws FileConversionException   if document processing fails
      */
+    @Transactional
     public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes) {
-        log.info("Processing signed document upload for contract ID: {}", contractId);
-
         Contract contract = generatedContractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found with ID: " + contractId));
 
         try {
-            DocumentFormat sourceFormat = detectDocumentFormat(fileBytes);
-            log.debug("Detected file format: {}", sourceFormat);
+            DocumentFormat sourceFormat = Utils.detectDocumentFormat(fileBytes);
 
             byte[] pdfBytes = fileBytes;
             if (sourceFormat != DocumentFormat.PDF) {
-                log.info("Converting document from {} to PDF", sourceFormat);
                 pdfBytes = fileConverterService.convert(fileBytes, sourceFormat, DocumentFormat.PDF);
             }
 
-            contract.setSignedDocument(zipService.compress(pdfBytes));
+            contract.setSignedDocument(ZipUtils.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract = generatedContractRepository.save(contract);
 
-            log.info("Signed document uploaded and contract status updated to ACTIVE for contract ID: {}", contractId);
-
         } catch (IOException e) {
-            log.error("Document processing failed for contract ID {}: {}", contractId, e.getMessage(), e);
             throw new FileConversionException("Failed to process signed document: " + e.getMessage(), e);
         }
 
@@ -154,30 +144,44 @@ public class ContractService {
      *
      * @param contractId the ID of the contract to terminate
      * @param request    the termination request containing termination date and reasons
-     * @throws ResourceNotFoundException if contract is not found
+     * @throws ResourceNotFoundException    if contract is not found
+     * @throws InvalidContractStateException if contract is not in a terminable state
      */
+    @Transactional
     public void terminateContract(Long contractId, @Valid ContractTerminationRequest request) {
-        log.info("Terminating contract ID: {} with termination date: {}", contractId, request.getTerminationDate());
-
         Contract contract = generatedContractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found with ID: " + contractId));
 
+        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
+            throw new InvalidContractStateException(
+                    "Cannot terminate contract in status: " + contract.getContractStatus() +
+                            ". Only ACTIVE contracts can be terminated."
+            );
+        }
+
         contract.setContractStatus(ContractStatus.TERMINATED);
         contract.setTerminationDate(request.getTerminationDate().toLocalDate());
-        contract.setReasonsForTermination(request.getReasons() != null ? request.getReasons() : "");
+        contract.setReasonsForTermination(request.getReasons());
 
-        generatedContractMapper.toResponseDTO(contract);
-    }
-
-    public ResponseEntity<List<ContractResponseDTO>> getAll() {
-        List<ContractResponseDTO> list = generatedContractRepository.findAll().stream()
-                .map(generatedContractMapper::toResponseDTO)
-                .toList();
-        return list.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(list);
+        generatedContractRepository.save(contract);
     }
 
     /**
-     * Searches contracts using server-side filtering, sorting, and pagination.
+     * Returns all contracts with pagination.
+     *
+     * @param page zero-based page index (default 0)
+     * @param size number of records per page (default 20)
+     * @return a page of ContractResponseDTOs
+     */
+    @Transactional(readOnly = true)
+    public Page<ContractResponseDTO> getAll(int page, int size) {
+        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return generatedContractRepository.findAll(pageable)
+                .map(generatedContractMapper::toResponseDTO);
+    }
+
+    /**
+     * Returns a paginated, filtered list of contracts.
      *
      * <p>All predicates (notes, status, clientId, generatedBy, templateName,
      * templateDescription, date range, labelValues) are translated to SQL by
@@ -185,14 +189,14 @@ public class ContractService {
      * No rows are loaded into the JVM before the final page is assembled.</p>
      *
      * <p>Pagination is applied via {@code LIMIT} / {@code OFFSET} in the
-     * generated SQL.  Results are ordered by {@code created_at DESC} so the
+     * generated SQL. Results are ordered by {@code created_at DESC} so the
      * most recent contracts appear first.</p>
      *
      * @param request filter and pagination parameters
-     * @return 200 OK with the result page, or 204 No Content when empty
+     * @return a page of matching ContractResponseDTOs; empty page if none found
      */
     @Transactional(readOnly = true)
-    public ResponseEntity<List<ContractResponseDTO>> search(SearchRequest request) {
+    public Page<ContractResponseDTO> search(SearchRequest request) {
         log.info("Searching contracts with criteria: {}", request);
 
         int pageIndex = request.page() != null ? request.page() : DEFAULT_PAGE;
@@ -209,33 +213,16 @@ public class ContractService {
                 page.getNumberOfElements(), page.getTotalElements(),
                 page.getNumber(), page.getTotalPages());
 
-        List<ContractResponseDTO> responseDTOs = page.getContent().stream()
-                .map(generatedContractMapper::toResponseDTO)
-                .toList();
-
-        return responseDTOs.isEmpty()
-                ? ResponseEntity.noContent().build()
-                : ResponseEntity.ok(responseDTOs);
+        return page.map(generatedContractMapper::toResponseDTO);
     }
 
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private DocumentFormat detectDocumentFormat(byte[] fileBytes) {
-        if (fileBytes == null || fileBytes.length < 4) {
-            throw new UnsupportedFileException("Invalid file: insufficient data to determine format");
-        }
-        if (fileBytes[0] == 0x25 && fileBytes[1] == 0x50 &&
-            fileBytes[2] == 0x44 && fileBytes[3] == 0x46) {
-            return DocumentFormat.PDF;
-        }
-        if (fileBytes[0] == 0x50 && fileBytes[1] == 0x4B) {
-            return DocumentFormat.DOCX;
-        }
-        throw new UnsupportedFileException("Unable to detect document format. Supported formats: PDF, DOCX");
-    }
-
+    /**
+     * Validates that all required template fields have non-empty values in the provided mappings.
+     *
+     * @param template the template containing field definitions with required flags
+     * @param mappings map of field labels to field values
+     * @throws MissingMandatoryFieldException if any required field is missing or has a blank value
+     */
     private void validateMandatoryFields(Template template, Map<String, String> mappings) {
         List<String> missingFields = template.getTemplateFields().stream()
                 .filter(TemplateField::getIsRequired)
@@ -252,6 +239,15 @@ public class ContractService {
         }
     }
 
+    /**
+     * Builds a list of ContractFieldValue entities from template fields and provided mappings.
+     *
+     *
+     * @param contract the contract entity to associate field values with
+     * @param template the template containing field definitions
+     * @param mappings map of field labels to field values
+     * @return a list of ContractFieldValue entities; empty list if no fields have values
+     */
     private List<ContractFieldValue> buildFieldValues(Contract contract, Template template, Map<String, String> mappings) {
         List<ContractFieldValue> fieldValues = new ArrayList<>();
         for (TemplateField field : template.getTemplateFields()) {

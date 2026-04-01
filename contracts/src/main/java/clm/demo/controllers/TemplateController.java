@@ -1,26 +1,23 @@
 package clm.demo.controllers;
 
-import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.requests.FieldMappingRequest;
+import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.ParsedTemplateResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
-import clm.demo.exceptions.FileConversionException;
-import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
-import clm.demo.services.download.DocumentDownloadService;
+import clm.demo.utils.Constants;
+import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
-import java.io.IOException;
 import java.util.List;
 
 /**
@@ -31,11 +28,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/templates")
 @RequiredArgsConstructor
-@Validated
 public class TemplateController {
 
     private final TemplateService templateService;
-    private final DocumentDownloadService downloadService;
 
     /**
      * Uploads a contract template file, parses it for placeholders,
@@ -43,62 +38,57 @@ public class TemplateController {
      *
      * @param request containing the template file and metadata
      * @return 201 Created with parsed template details
-     * @throws IOException if file parsing fails
-     * @throws IllegalArgumentException if file is invalid
      */
-    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ParsedTemplateResponseDTO> uploadTemplate(@ModelAttribute @Valid UploadTemplateRequest request) throws IOException {
-        ParsedTemplateResponseDTO response = templateService.uploadTemplate(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ParsedTemplateResponseDTO> uploadTemplate(@ModelAttribute @Valid UploadTemplateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(templateService.uploadTemplate(request));
     }
 
     /**
-     * Retrieves all available templates with their metadata and field counts.
-     * This endpoint must come before /{templateId} to properly route "/all" requests.
+     * Retrieves all templates with pagination, sorted by creation date descending.
      *
-     * @return 200 OK with list of all templates
+     * @param page zero-based page index (default 0)
+     * @param size number of records per page (default 20)
+     * @return 200 OK with page of templates, or 204 No Content if none found
      */
-    @GetMapping("/all")
-    public ResponseEntity<List<TemplateResponseDTO>> getAllTemplates() {
-        var templates = templateService.getAllTemplates();
-        return ResponseEntity.ok(templates);
+    @GetMapping
+    public ResponseEntity<List<TemplateResponseDTO>> getAllTemplates(
+            @RequestParam(defaultValue = "" + Constants.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = "" + Constants.DEFAULT_PAGE_SIZE) int size) {
+        Page<TemplateResponseDTO> result = templateService.getAllTemplates(page, size);
+        return result.isEmpty()
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(result.getContent());
     }
 
     /**
      * Retrieves a template by ID with all its parsed fields and current mappings.
      *
      * @param templateId the template ID
-     * @return 200 OK with template metadata, fields, and mappings
-     * @throws RuntimeException if template not found
+     * @return 200 OK with template metadata and fields
      */
     @GetMapping("/{templateId}")
     public ResponseEntity<TemplateResponseDTO> getTemplate(@PathVariable @NotNull Long templateId) {
-        TemplateResponseDTO response = templateService.getTemplate(templateId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(templateService.getTemplate(templateId));
     }
 
-
     /**
-     * Updates multiple field mappings for a template in a single batch operation.
-     * Maps multiple template fields to their corresponding database columns.
-     * Called after user selects database columns for all template placeholders.
+     * Batch updates field mappings for a template.
+     * Maps multiple template placeholders to labels, data types, and validation rules.
      *
-     * @param request containing template ID and a list of field mapping definitions
-     * @return 200 OK with batch mapping results and status for each field
+     * @param request containing template ID and list of field mapping definitions
+     * @return 200 OK with updated field details
      */
-    @PutMapping("/{templateId}/labels")
+    @PatchMapping("/{templateId}/labels")
     public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(@RequestBody @Valid FieldMappingRequest request) {
-       var response = templateService.updateFieldLabels(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(templateService.updateFieldLabels(request));
     }
 
     /**
-     * Deletes a template and cascades to all its fields, mappings, and generated contracts.
-     * Prefer archiving via status update over deletion in production.
+     * Deletes a template and cascades to all its fields and mappings.
      *
      * @param templateId the template to delete
      * @return 204 No Content on success
-     * @throws RuntimeException if template not found
      */
     @DeleteMapping("/{templateId}")
     public ResponseEntity<Void> deleteTemplate(@PathVariable @NotNull Long templateId) {
@@ -108,33 +98,29 @@ public class TemplateController {
 
     /**
      * Downloads a template in the specified format (DOCX or PDF).
-     * If the template is stored in another format, automatically converts it.
+     * Converts automatically if the stored format differs from the requested one.
      *
      * @param templateId the template ID to download
-     * @param format the desired output format (docx or pdf)
-     * @return 200 OK with the file as binary attachment
-     * @throws IllegalArgumentException       if the format is invalid
-     * @throws FileConversionException        if conversion fails
-     * @throws UnsupportedConversionException if the format combination is unsupported
-     * @throws IOException                    if decompression fails
+     * @param format     the desired output format (docx or pdf)
+     * @return 200 OK with the file as a binary attachment
      */
-    @GetMapping("/download/{format}/{templateId}")
-    public ResponseEntity<byte[]> downloadTemplate(@PathVariable @NotNull Long templateId, @PathVariable @NotNull String format) throws IOException {
-        
+    @GetMapping("/download/{templateId}/{format}")
+    public ResponseEntity<byte[]> downloadTemplate(
+            @PathVariable @NotNull Long templateId,
+            @PathVariable @NotNull String format) {
+
         DocumentFormat documentFormat;
         try {
             documentFormat = DocumentFormat.valueOf(format.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid format: " + format + ". Supported formats: docx, pdf", e);
+            throw new IllegalArgumentException("Invalid format: " + format + ". Supported: docx, pdf", e);
         }
 
-        byte[] documentContent = downloadService.downloadDocument(templateId, documentFormat, DocumentType.TEMPLATE);
+        byte[] content = templateService.downloadTemplate(templateId, documentFormat);
 
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=template-" + templateId + "." + format.toLowerCase())
-                .header("Content-Type", downloadService.getContentType(documentFormat))
-                .body(documentContent);
+                .contentType(MediaType.parseMediaType(Utils.getContentType(documentFormat)))
+                .body(content);
     }
-
 }
-

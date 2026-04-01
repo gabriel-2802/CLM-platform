@@ -5,7 +5,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.download.document.providers.DocumentProvider;
 import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.services.file.actions.FileZipService;
+import clm.demo.utils.ZipUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -26,7 +26,6 @@ import java.io.IOException;
 @Slf4j
 public class DocumentDownloadService {
 
-    private final FileZipService zipService;
     private final FileConverterService converterService;
     private final DocumentProviderRegistry providerRegistry;
 
@@ -56,7 +55,7 @@ public class DocumentDownloadService {
         // single repository call — returns both compressed bytes and native format
         DocumentResult result = provider.getDocument(documentId);
 
-        byte[] decompressedContent = zipService.decompress(result.compressedContent());
+        byte[] decompressedContent = ZipUtils.decompress(result.compressedContent());
 
         // if already in target format, return directly — no conversion needed
         if (result.nativeFormat() == targetFormat) {

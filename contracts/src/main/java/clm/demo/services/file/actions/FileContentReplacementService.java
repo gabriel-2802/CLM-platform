@@ -8,6 +8,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.PlaceholderProcessor;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionResultWithSpans;
 import clm.demo.utils.PlaceholderProcessor.SubstitutionSpan;
+import clm.demo.utils.ZipUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.*;
@@ -32,7 +33,6 @@ import java.util.*;
 public class FileContentReplacementService {
 
     private final FileConverterService fileConverterService;
-    private final FileZipService       fileZipService;
 
     // -------------------------------------------------------------------------
     // Public API
@@ -48,7 +48,7 @@ public class FileContentReplacementService {
 
         Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
         List<TemplateField> ordered      = sortedFields(template);
-        byte[] templateBytes             = fileZipService.decompress(template.getDocumentContent());
+        byte[] templateBytes             = ZipUtils.decompress(template.getDocumentContent());
 
         byte[] pdf = switch (template.getDocumentFormat()) {
             case DOCX -> {

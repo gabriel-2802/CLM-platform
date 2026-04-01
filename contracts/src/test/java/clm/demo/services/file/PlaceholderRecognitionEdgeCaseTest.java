@@ -1,12 +1,10 @@
 package clm.demo.services.file;
 
-import clm.demo.models.Contract;
-import clm.demo.models.ContractFieldValue;
 import clm.demo.models.Template;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.services.file.actions.FileConverterService;
-import clm.demo.services.file.actions.FileZipService;
+import clm.demo.utils.ZipUtils;
 import clm.demo.utils.PlaceholderProcessor;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,7 +45,7 @@ class PlaceholderRecognitionEdgeCaseTest {
     private FileConverterService fileConverterService;
 
     @Mock
-    private FileZipService fileZipService;
+    private ZipUtils fileZipService;
 
     private PlaceholderProcessorTestHelper placeholderHelper;
 
@@ -270,7 +268,7 @@ class PlaceholderRecognitionEdgeCaseTest {
     void testSubstitutionWithEmptyValues() {
         String template = "First .... and second .....";
         String result = placeholderHelper.substitute(template, 
-                List.of("", null));
+                Arrays.asList("", null));
         
         // Null values should leave placeholder intact
         log.info("Result with empty values: {}", result);

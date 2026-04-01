@@ -12,8 +12,6 @@ import static clm.demo.utils.Constants.PLACEHOLDER_PATTERN;
 /**
  * Utility methods for detecting and replacing dot-sequence placeholders in contract text.
  *
- * <p>All methods expect <em>normalized</em> text — call {@link #normalize(String)} first
- * so that {@code startOffset}/{@code endOffset} offsets are consistent across platforms.</p>
  */
 @UtilityClass
 public class PlaceholderProcessor {
@@ -56,19 +54,14 @@ public class PlaceholderProcessor {
      *   </li>
      * </ol>
      *
-     * <p>Expanding ellipsis characters to their ASCII dot equivalents before matching
-     * means {@link clm.demo.utils.Constants#PLACEHOLDER_PATTERN} only needs to handle
-     * ASCII {@code .}, offsets remain byte-stable for writeback, and the 4-dot minimum
-     * threshold is applied uniformly regardless of how the document was authored.</p>
      *
-     * <p>Must be called on raw extracted text before any other method here.</p>
      */
     public static String normalize(String raw) {
         if (raw == null) return "";
         return raw
                 .replace("\r\n", "\n")
                 .replace("\r",   "\n")
-                // Unicode dot-like glyphs → ASCII dots
+                // unicode dot-like glyphs → ASCII dots
                 .replace("\u2026", "...") // HORIZONTAL ELLIPSIS  → 3 dots
                 .replace("\u22EF", "...") // MIDLINE ELLIPSIS      → 3 dots
                 .replace("\u2025", "..")  // TWO DOT LEADER        → 2 dots
@@ -95,15 +88,6 @@ public class PlaceholderProcessor {
         }
 
         return results;
-    }
-
-    /**
-     * Replaces every placeholder with a fixed literal string.
-     */
-    public static String substituteAll(String normalizedContent, String replacement) {
-        if (normalizedContent == null) return "";
-        return PLACEHOLDER_PATTERN.matcher(normalizedContent)
-                .replaceAll(Matcher.quoteReplacement(replacement));
     }
 
     /**
@@ -140,11 +124,6 @@ public class PlaceholderProcessor {
      * rewritten text — enabling proportional writeback into individual Word runs
      * without corrupting per-run formatting.
      *
-     * <p>Spans use offsets in the <em>original</em> string only. The writeback loop in
-     * {@link clm.demo.services.file.actions.FileContentReplacementService} uses these
-     * to translate each run's original character range into a slice of the rewritten
-     * string via a cumulative delta, rather than a character-by-character cursor.</p>
-     *
      * @param normalizedContent the merged paragraph text (must already be normalized)
      * @param resolver          occurrence-index → replacement string (null = keep original dots)
      * @return rewritten text, fill count, and one {@link SubstitutionSpan} per placeholder found
@@ -159,7 +138,7 @@ public class PlaceholderProcessor {
         int replaced = 0;
 
         while (matcher.find()) {
-            // Capture original-string offsets BEFORE appendReplacement moves the matcher.
+            // capture original-string offsets BEFORE appendReplacement moves the matcher.
             int origStart = matcher.start();
             int origEnd   = matcher.end();
 

@@ -10,10 +10,12 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.ContractService;
 import clm.demo.services.download.DocumentDownloadService;
+import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,43 +25,46 @@ import java.io.IOException;
 import java.util.List;
 
 @RestController
-@Slf4j
 @RequiredArgsConstructor
 @RequestMapping("/api/contracts")
 public class ContractController {
+
     private final ContractService contractService;
     private final DocumentDownloadService downloadService;
 
     @PostMapping("/generate")
-    ResponseEntity<ContractResponseDTO> generateContracts(@Valid @RequestBody GenContractRequest request) {
-        ContractResponseDTO responseDTO = contractService.generateContract(request);
-        return ResponseEntity.ok(responseDTO);
+    public ResponseEntity<ContractResponseDTO> generateContract(@Valid @RequestBody GenContractRequest request) {
+        return ResponseEntity.ok(contractService.generateContract(request));
     }
 
-    @PutMapping(value = "upload/signed/{contractId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    ResponseEntity<String> uploadSignedContract(@PathVariable Long contractId, @RequestParam("file") MultipartFile file) throws IOException {
+    @PostMapping(value = "/{contractId}/upload-signed", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ContractResponseDTO> uploadSignedContract(@PathVariable Long contractId, @RequestParam("file") MultipartFile file) throws IOException {
         if (file.isEmpty()) {
             throw new IllegalArgumentException("File cannot be empty");
         }
-        
-        contractService.uploadSignedContract(contractId, file.getBytes());
-        return ResponseEntity.ok("Signed contract uploaded successfully and status updated to ACTIVE");
+        return ResponseEntity.ok(contractService.uploadSignedContract(contractId, file.getBytes()));
     }
 
-    @PutMapping("terminate/{contractId}")
-    ResponseEntity<String> terminateContract(@PathVariable Long contractId, @RequestBody @Valid ContractTerminationRequest request) {
+    @PatchMapping("/{contractId}/terminate")
+    public ResponseEntity<Void> terminateContract(@PathVariable Long contractId, @Valid @RequestBody ContractTerminationRequest request) {
         contractService.terminateContract(contractId, request);
-        return ResponseEntity.ok("Contract terminated successfully");
+        return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/all")
-    ResponseEntity<List<ContractResponseDTO>> getAllContracts() {
-        return contractService.getAll();
+    @GetMapping
+    public ResponseEntity<List<ContractResponseDTO>> getAll(@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
+        Page<ContractResponseDTO> result = contractService.getAll(page, size);
+        return result.isEmpty()
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(result.getContent());
     }
 
     @GetMapping("/search")
-    ResponseEntity<List<ContractResponseDTO>> searchContracts(@RequestBody SearchRequest request) {
-        return contractService.search(request);
+    public ResponseEntity<List<ContractResponseDTO>> search(@RequestBody SearchRequest request) {
+        Page<ContractResponseDTO> result = contractService.search(request);
+        return result.isEmpty()
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.ok(result.getContent());
     }
 
     /**
@@ -68,42 +73,36 @@ public class ContractController {
      * Supports both SIGNED and UNSIGNED contracts.
      *
      * @param contractId the contract ID to download
-     * @param type the contract type (signed or unsigned)
-     * @param format the desired output format (docx or pdf)
+     * @param type       the contract type (signed or unsigned)
+     * @param format     the desired output format (docx or pdf)
      * @return 200 OK with the file as binary attachment
      * @throws IllegalArgumentException       if the type or format is invalid
      * @throws FileConversionException        if conversion fails
      * @throws UnsupportedConversionException if the format combination is unsupported
      * @throws IOException                    if decompression fails
      */
-    @GetMapping("/download/{type}/{format}/{contractId}")
-    ResponseEntity<byte[]> downloadContract(
-            @PathVariable @NotNull Long contractId,
-            @PathVariable @NotNull String type,
-            @PathVariable @NotNull String format) throws IOException {
-        
+    @GetMapping("/download/{contractId}/{type}/{format}")
+    public ResponseEntity<byte[]> downloadContract(@PathVariable @NotNull Long contractId, @PathVariable @NotNull String type, @PathVariable @NotNull String format) throws IOException {
+
         DocumentFormat documentFormat;
         try {
             documentFormat = DocumentFormat.valueOf(format.toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid format: " + format + ". Supported formats: docx, pdf", e);
+            throw new IllegalArgumentException("Invalid format: " + format + ". Supported: docx, pdf", e);
         }
 
         DocumentType documentType;
         try {
             documentType = DocumentType.valueOf(type.toUpperCase() + "_CONTRACT");
         } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid contract type: " + type + ". Supported types: signed, unsigned", e);
+            throw new IllegalArgumentException("Invalid type: " + type + ". Supported: signed, unsigned", e);
         }
 
-        byte[] documentContent = downloadService.downloadDocument(contractId, documentFormat, documentType);
+        byte[] content = downloadService.downloadDocument(contractId, documentFormat, documentType);
 
         return ResponseEntity.ok()
                 .header("Content-Disposition", "attachment; filename=contract-" + contractId + "." + format.toLowerCase())
-                .header("Content-Type", downloadService.getContentType(documentFormat))
-                .body(documentContent);
+                .contentType(MediaType.parseMediaType(Utils.getContentType(documentFormat)))
+                .body(content);
     }
-    
-    
 }
-
