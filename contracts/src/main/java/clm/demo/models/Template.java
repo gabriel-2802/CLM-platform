@@ -52,6 +52,7 @@ public class Template {
      */
     @Lob
     @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "document_content", nullable = false)
     private byte[] documentContent;
 

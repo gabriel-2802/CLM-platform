@@ -2,6 +2,7 @@ package clm.demo.models;
 
 import clm.demo.models.enums.ContractStatus;
 import jakarta.persistence.*;
+import jakarta.persistence.Basic;
 import lombok.*;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
@@ -65,17 +66,21 @@ public class Contract {
 
     /** * The final filled document.
      * <b>Note:</b> Stored as BYTEA. Nullable - set after document generation completes.
+     * Lazily loaded to avoid fetching large binary data on contract queries.
      */
     @Lob
     @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "document_content")
     private byte[] documentContent;
 
     /** * The signed version of the document (populated when contract is signed).
      * <b>Note:</b> Stored as BYTEA. Nullable - only set after signature/ACTIVE status.
+     * Lazily loaded to avoid fetching large binary data on contract queries.
      */
     @Lob
     @JdbcTypeCode(SqlTypes.VARBINARY)
+    @Basic(fetch = FetchType.LAZY)
     @Column(name = "signed_document_content")
     private byte[] signedDocument;
 
