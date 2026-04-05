@@ -1,5 +1,6 @@
 package clm.demo.utils.file;
 
+import clm.demo.utils.Constants;
 import lombok.experimental.UtilityClass;
 
 import java.util.ArrayList;
@@ -7,7 +8,6 @@ import java.util.List;
 import java.util.function.IntFunction;
 import java.util.regex.Matcher;
 
-import static clm.demo.utils.Constants.PLACEHOLDER_PATTERN;
 
 /**
  * Utility methods for detecting and replacing dot-sequence placeholders in contract text.
@@ -75,7 +75,7 @@ public class PlaceholderProcessor {
      */
     public static List<PlaceholderProcessor.PlaceholderRecord> findPlaceholders(String normalizedContent) {
         List<PlaceholderRecord> results = new ArrayList<>();
-        Matcher matcher = PLACEHOLDER_PATTERN.matcher(normalizedContent);
+        Matcher matcher = Constants.getPlaceholderPattern().matcher(normalizedContent);
         int position = 0;
 
         while (matcher.find()) {
@@ -100,7 +100,7 @@ public class PlaceholderProcessor {
      */
     public static SubstitutionResult substituteEach(String normalizedContent, IntFunction<String> resolver) {
         StringBuilder sb = new StringBuilder();
-        Matcher matcher = PLACEHOLDER_PATTERN.matcher(normalizedContent);
+        Matcher matcher = Constants.getPlaceholderPattern().matcher(normalizedContent);
         int index = 0;
         int replaced = 0;
 
@@ -132,7 +132,7 @@ public class PlaceholderProcessor {
             String normalizedContent, IntFunction<String> resolver) {
 
         StringBuilder sb      = new StringBuilder();
-        Matcher matcher       = PLACEHOLDER_PATTERN.matcher(normalizedContent);
+        Matcher matcher       = Constants.getPlaceholderPattern().matcher(normalizedContent);
         List<SubstitutionSpan> spans = new ArrayList<>();
         int index    = 0;
         int replaced = 0;

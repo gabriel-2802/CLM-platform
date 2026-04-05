@@ -90,7 +90,7 @@ public class DocxNormalizer {
         if (merged.isEmpty()) return;
 
         SubstitutionResultWithSpans result =
-                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> Constants.PLACEHOLDER);
+                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> Constants.getPlaceholder());
 
         if (!result.anyFilled()) return;
 
