@@ -111,11 +111,29 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       cell: ({ row }) =>
         row.original.contractGen ? (
           <span className="text-blue-700 underline">
-            <Link href="#">{row.original.contractGen}</Link>
+            {row.original.contractGen}
           </span>
         ) : (
           <GenerateContractModal client={row.original} />
         ),
+    },
+    {
+      id: "viewContract",
+      header: "Vizualizeaza contract",
+      enableSorting: false,
+      cell: ({ row }) =>
+        row.original.contractId ? (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
+              window.open(`${baseUrl}/api/contracts/download/${row.original.contractId}/unsigned/pdf`, "_blank");
+            }}
+          >
+            Vizualizeaza
+          </Button>
+        ) : null,
     },
     {
       accessorKey: "contractSemnat",

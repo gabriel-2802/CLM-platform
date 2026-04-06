@@ -27,6 +27,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/contracts")
+@Slf4j
 public class ContractController {
 
     private final ContractService contractService;
@@ -138,10 +139,12 @@ public class ContractController {
             throw new IllegalArgumentException("Invalid type: " + type + ". Supported: signed, unsigned", e);
         }
 
+        log.info("Downloading contract {} in format {} (type: {})", contractId, format, type);
+
         byte[] content = downloadService.downloadDocument(contractId, documentFormat, documentType);
 
         return ResponseEntity.ok()
-                .header("Content-Disposition", "attachment; filename=contract-" + contractId + "." + format.toLowerCase())
+                .header("Content-Disposition", "inline; filename=contract-" + contractId + "." + format.toLowerCase())
                 .contentType(MediaType.parseMediaType(Utils.getContentType(documentFormat)))
                 .body(content);
     }

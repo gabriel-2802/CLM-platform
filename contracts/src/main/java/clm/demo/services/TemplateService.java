@@ -221,8 +221,56 @@ public class TemplateService {
 
         List<TemplateField> savedFields = templateFieldRepository.saveAll(updatedFields);
 
+        // Update template's isFullyMapped flag if all fields have labels
+        Template template = templateRepository.findById(request.getTemplateId())
+                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
+        
+        long mappedCount = template.getTemplateFields().stream()
+                .filter(f -> f.getFieldLabel() != null && !f.getFieldLabel().isBlank())
+                .count();
+        
+        boolean isFullyMapped = !template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount();
+        template.setIsFullyMapped(isFullyMapped);
+        templateRepository.save(template);
+
         return savedFields.stream()
                 .map(TemplateFieldResponseDTO::new)
                 .toList();
+    }
+    /**
+     * Returns the list of fields available for visual mapping, categorized by source.
+     *
+     * @return AvailableFieldResponseDTO with client and contract metadata fields
+     */
+    public AvailableFieldResponseDTO getAvailableMappingFields() {
+        return AvailableFieldResponseDTO.builder()
+                .groups(List.of(
+                        AvailableFieldResponseDTO.FieldGroup.builder()
+                                .groupName("Informații Client (Automate)")
+                                .options(List.of(
+                                        new AvailableFieldResponseDTO.FieldOption("Nume / Denumire Client", "CLIENT_NAME", "Denumirea oficială a firmei sau persoanei."),
+                                        new AvailableFieldResponseDTO.FieldOption("CUI Client", "CLIENT_CUI", "Codul Unic de Înregistrare."),
+                                        new AvailableFieldResponseDTO.FieldOption("Adresa Sediu Social", "CLIENT_ADDRESS", "Adresa completă a sediului social."),
+                                        new AvailableFieldResponseDTO.FieldOption("Tip Firma", "CLIENT_TYPE", "Forma juridică (SRL, PFA, etc.)."),
+                                        new AvailableFieldResponseDTO.FieldOption("Administrație Fiscală", "CLIENT_ADMIN", "Administrația fiscală de care aparține.")
+                                ))
+                                .build(),
+                        AvailableFieldResponseDTO.FieldGroup.builder()
+                                .groupName("Informații Contract (Standard)")
+                                .options(List.of(
+                                        new AvailableFieldResponseDTO.FieldOption("Data Început", "CONTRACT_START_DATE", "Data de la care contractul devine activ."),
+                                        new AvailableFieldResponseDTO.FieldOption("Data Sfârșit", "CONTRACT_END_DATE", "Data de expirare a contractului."),
+                                        new AvailableFieldResponseDTO.FieldOption("Valoare Totală", "CONTRACT_VALUE", "Valoarea financiară a contractului."),
+                                        new AvailableFieldResponseDTO.FieldOption("Notițe", "CONTRACT_NOTES", "Observații adiționale salvate la generare.")
+                                ))
+                                .build(),
+                        AvailableFieldResponseDTO.FieldGroup.builder()
+                                .groupName("Alte Opțiuni")
+                                .options(List.of(
+                                        new AvailableFieldResponseDTO.FieldOption("Manual (Input Utilizator)", "MANUAL", "Utilizatorul va introduce manual valoarea la fiecare generare.")
+                                ))
+                                .build()
+                ))
+                .build();
     }
 }

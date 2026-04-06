@@ -15,6 +15,7 @@ export type Row = {
   tarifBilant?: number
   contractGen?: string
   contractSemnat?: string
+  contractId?: number
   probleme?: string[]
 }
 
@@ -32,6 +33,20 @@ export async function getClientRows(): Promise<Row[]> {
       users: { select: { user: { select: { id: true, name: true, email: true } } } },
     },
   })
+
+  const latestContracts: any[] = await prisma.$queryRaw`
+    SELECT id, client_id, created_at 
+    FROM contracts.generated_contract 
+    WHERE id IN (
+      SELECT MAX(id) 
+      FROM contracts.generated_contract 
+      GROUP BY client_id
+    )
+  `;
+
+  const contractMap = new Map<number, any>(
+    latestContracts.map((c) => [c.client_id, c])
+  );
 
   return clients.map((c) => {
     const earliestDeLa = c.puncteDeLucru
@@ -53,6 +68,8 @@ export async function getClientRows(): Promise<Row[]> {
       if (!c.detalii.registruUC) problems.push("Registru UC")
     }
 
+    const latestContract = contractMap.get(c.id);
+
     return {
       id: c.id,
       name: c.denumire,
@@ -61,14 +78,15 @@ export async function getClientRows(): Promise<Row[]> {
       panaLa: toISODate(latestPanaLa ?? null),
       users: c.users
         ? c.users
-            .map((uc) => uc.user.name || uc.user.email)
-            .filter((s): s is string => !!s)
-            .sort((a, b) => a.localeCompare(b))
+          .map((uc) => uc.user.name || uc.user.email)
+          .filter((s): s is string => !!s)
+          .sort((a, b) => a.localeCompare(b))
         : undefined,
       tarifConta: undefined,
       tarifBilant: undefined,
-      contractGen: undefined,
+      contractGen: latestContract ? `Gen. la ${toISODate(latestContract.created_at)}` : undefined,
       contractSemnat: undefined,
+      contractId: latestContract ? latestContract.id : undefined,
       probleme: problems.length ? problems : undefined,
     }
   })
@@ -169,11 +187,11 @@ export async function getClient(id: number): Promise<ClientDetails | null> {
     probleme: problems.length ? problems : undefined,
     detalii: c.detalii
       ? {
-          manualPoliticiContabile: !!c.detalii.manualPoliticiContabile,
-          regulamentOrdineInterioara: !!c.detalii.regulamentOrdineInterioara,
-          ofSpalareBani: !!c.detalii.ofSpalareBani,
-          registruUC: !!c.detalii.registruUC,
-        }
+        manualPoliticiContabile: !!c.detalii.manualPoliticiContabile,
+        regulamentOrdineInterioara: !!c.detalii.regulamentOrdineInterioara,
+        ofSpalareBani: !!c.detalii.ofSpalareBani,
+        registruUC: !!c.detalii.registruUC,
+      }
       : undefined,
   }
 }

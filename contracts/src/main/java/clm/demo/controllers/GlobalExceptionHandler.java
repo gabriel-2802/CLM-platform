@@ -3,6 +3,8 @@ package clm.demo.controllers;
 import clm.demo.dto.responses.ErrorResponseDTO;
 import clm.demo.exceptions.*;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.validation.FieldError;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Intercepts exceptions across all controllers to provide consistent JSON error responses.
@@ -36,6 +39,18 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleIllegalArgumentException(IllegalArgumentException e) {
         log.warn("invalid argument provided: {}", e.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, "Invalid request", e.getMessage());
+    }
+
+    /**
+     * Handles validation errors in request body (@Valid).
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
+        List<String> errors = e.getBindingResult().getFieldErrors().stream()
+                .map(FieldError::getDefaultMessage)
+                .toList();
+        log.warn("request validation failed: {}", errors);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", String.join(", ", errors));
     }
 
     /**
@@ -130,6 +145,15 @@ public class GlobalExceptionHandler {
         log.warn("contract generation failed — missing mandatory fields: {}", e.getMissingFields());
         return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field mappings",
                 "Missing mandatory fields: " + String.join(", ", e.getMissingFields()));
+    }
+
+    /**
+     * Handles cases where a template is not fully mapped before generation.
+     */
+    @ExceptionHandler(TemplateIncompleteException.class)
+    public ResponseEntity<ErrorResponseDTO> handleTemplateIncompleteException(TemplateIncompleteException e) {
+        log.warn("contract generation rejected — template incomplete: {}", e.getMessage());
+        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Template configuration incomplete", e.getMessage());
     }
 
     /**

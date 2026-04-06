@@ -12,8 +12,8 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 import org.docx4j.Docx4J;
+import org.docx4j.openpackaging.exceptions.Docx4JException;
 import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
-import org.springframework.core.convert.ConversionException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -116,9 +116,11 @@ public class FileUtils {
 
             ByteArrayOutputStream pdfOut = new ByteArrayOutputStream();
             Docx4J.toPDF(wordPackage, pdfOut);
-            return pdfOut.toByteArray();
+            byte[] pdfBytes = pdfOut.toByteArray();
+            log.info("DOCX => PDF conversion successful (produced {} bytes)", pdfBytes.length);
+            return pdfBytes;
 
-        } catch (ConversionException e) {
+        } catch (Docx4JException e) {
             throw new IOException("docx4j PDF conversion failed: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new IOException("unexpected docx4j error during DOCX => PDF: " + e.getMessage(), e);

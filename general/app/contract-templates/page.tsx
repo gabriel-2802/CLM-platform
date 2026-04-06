@@ -1,5 +1,6 @@
 import { getTemplates, deleteTemplate } from "@/actions/contract-templates"
 import { UploadTemplateDialog } from "@/components/upload-template-dialog"
+import { TemplateMappingModal } from "./template-mapping-modal"
 
 export default async function ContractTemplatesPage() {
   const templates = await getTemplates()
@@ -25,6 +26,9 @@ export default async function ContractTemplatesPage() {
                 File
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Mapped
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Created
               </th>
               <th scope="col" className="relative px-6 py-3">
@@ -35,20 +39,29 @@ export default async function ContractTemplatesPage() {
           <tbody className="bg-white divide-y divide-gray-200">
             {templates.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                   No templates uploaded yet.
                 </td>
               </tr>
             ) : (
-              templates.map((template) => (
+              templates.map((template: any) => (
                 <tr key={template.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm font-medium text-gray-900">{template.name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <a href={template.filePath.startsWith('/api') ? template.filePath : `/api${template.filePath}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900 font-medium">
-                      {template.fileName}
+                    <a href={`/api/templates/download/${template.id}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900 font-medium">
+                      Download DOCX
                     </a>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {template.fullyMapped ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Complet ({template.fieldCount} fields)
+                      </span>
+                    ) : (
+                      <TemplateMappingModal templateId={template.id} templateName={template.name} fieldCount={template.fieldCount} />
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(template.createdAt).toLocaleDateString()}

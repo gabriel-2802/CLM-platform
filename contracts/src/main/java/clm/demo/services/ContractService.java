@@ -21,6 +21,7 @@ import clm.demo.utils.file.FileUtils;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
+import org.springframework.jdbc.core.JdbcTemplate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
 
 import static clm.demo.utils.Constants.DEFAULT_PAGE;
 import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
@@ -56,6 +59,7 @@ public class ContractService {
     private final GeneratedContractMapper generatedContractMapper;
 
     private final ContractSpecification contractSpecification;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -63,7 +67,6 @@ public class ContractService {
      * @param request the contract generation request
      * @return a ContractResponseDTO with the newly generated contract details
      * @throws ResourceNotFoundException      if template is not found
-     * @throws TemplateIncompleteException    if template is not fully mapped
      * @throws MissingMandatoryFieldException if required fields are missing values
      */
     @Transactional
@@ -71,18 +74,26 @@ public class ContractService {
         Template template = contractTemplateRepository.findById(request.templateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found with ID: " + request.templateId()));
 
-        if (!template.getIsFullyMapped()) {
-            throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
-        }
+        // fetch client data from the public schema and merge into mappings
+        Map<String, String> autoData = fetchClientData(request.clientId());
+        
+        // Add contract metadata to autoData
+        autoData.put("CONTRACT_START_DATE", request.startDate() != null ? request.startDate().toString() : "");
+        autoData.put("CONTRACT_END_DATE", request.endDate() != null ? request.endDate().toString() : "");
+        autoData.put("CONTRACT_VALUE", request.value() != null ? String.format("%.2f", request.value()) : "");
+        autoData.put("CONTRACT_NOTES", request.notes() != null ? request.notes() : "");
 
-        validateMandatoryFields(template, request.mappings());
+        Map<String, String> mergedMappings = new HashMap<>(request.mappings());
+        autoData.forEach((key, value) -> mergedMappings.putIfAbsent(key, value));
+
+        validateMandatoryFields(template, mergedMappings);
 
         // save early to obtain a DB-assigned ID required by ContractFieldValue FK.
         Contract contract = contractGenerationMapper.toContractEntity(request, template);
         contract = generatedContractRepository.save(contract);
 
         // build field values against the persisted contract
-        List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, request.mappings());
+        List<ContractFieldValue> fieldValues = buildFieldValues(contract, template, mergedMappings);
         if (!fieldValues.isEmpty()) {
             contractFieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
@@ -105,6 +116,30 @@ public class ContractService {
         }
 
         return generatedContractMapper.toResponseDTO(contract);
+    }
+
+    /**
+     * Fetches client details from the public schema using JdbcTemplate.
+     * This bridges the two isolated schemas for data injection.
+     *
+     * @param clientId the ID of the client in the public schema
+     * @return a map of property labels to their database values
+     */
+    private Map<String, String> fetchClientData(Long clientId) {
+        String sql = "SELECT denumire as name, cui, adresa as address, tip as type, administratie as admin FROM public.\"Client\" WHERE id = ?";
+        try {
+            Map<String, Object> data = jdbcTemplate.queryForMap(sql, clientId);
+            Map<String, String> result = new HashMap<>();
+            result.put("CLIENT_NAME", String.valueOf(data.getOrDefault("name", "")));
+            result.put("CLIENT_CUI", String.valueOf(data.getOrDefault("cui", "")));
+            result.put("CLIENT_ADDRESS", String.valueOf(data.getOrDefault("address", "")));
+            result.put("CLIENT_TYPE", String.valueOf(data.getOrDefault("type", "")));
+            result.put("CLIENT_ADMIN", String.valueOf(data.getOrDefault("admin", "")));
+            return result;
+        } catch (Exception e) {
+            log.warn("Failed to fetch client data for ID {}: {}", clientId, e.getMessage());
+            return new HashMap<>();
+        }
     }
 
     /**
