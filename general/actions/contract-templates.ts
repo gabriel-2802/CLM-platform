@@ -51,6 +51,8 @@ export async function getTemplates() {
     return [];
   }
 
+  if (res.status === 204) return [];
+
   const data = await res.json();
   const content = data.content || data || [];
 

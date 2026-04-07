@@ -2,7 +2,6 @@ package clm.demo.utils.docx;
 
 import clm.demo.utils.Constants;
 import clm.demo.utils.file.PlaceholderProcessor;
-import clm.demo.utils.file.PlaceholderProcessor.SubstitutionResultWithSpans;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
@@ -12,7 +11,6 @@ import org.apache.poi.xwpf.usermodel.XWPFRun;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.util.List;
 
 /**
  * Normalizes all dot-sequence placeholders in a DOCX document to exactly four dots ({@code ....}).
@@ -73,28 +71,15 @@ public class DocxNormalizer {
      * @param paragraph the DOCX paragraph to normalize — called on raw upload-time content
      */
     private static void normalizeParagraph(XWPFParagraph paragraph) {
-        List<XWPFRun> runs = paragraph.getRuns();
-        if (runs.isEmpty()) return;
-
-        int[] runStarts = new int[runs.size() + 1];
-        StringBuilder merged = new StringBuilder();
-
-        for (int i = 0; i < runs.size(); i++) {
-            runStarts[i] = merged.length();
-            // normalize() is called here because this runs on raw user input —
-            // the only place in the codebase where untrusted text is processed
-            merged.append(PlaceholderProcessor.normalize(runs.get(i).getText(0)));
+        for (XWPFRun run : paragraph.getRuns()) {
+            String text = run.getText(0);
+            if (text == null || text.isEmpty()) continue;
+            String normalized = PlaceholderProcessor.normalize(text);
+            String fixed = Constants.getPlaceholderPattern().matcher(normalized).replaceAll("....");
+            if (!fixed.equals(text)) {
+                run.setText(fixed, 0);
+            }
         }
-        runStarts[runs.size()] = merged.length();
-
-        if (merged.isEmpty()) return;
-
-        SubstitutionResultWithSpans result =
-                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> Constants.getPlaceholder());
-
-        if (!result.anyFilled()) return;
-
-        DocxUtils.writebackSpans(runs, runStarts, result.text(), result.spans());
     }
 }
 

@@ -102,7 +102,8 @@ public class DocxFiller {
 
         for (int i = 0; i < runs.size(); i++) {
             runStarts[i] = merged.length();
-            merged.append(runs.get(i).getText(0));
+            String t = runs.get(i).getText(0);
+            merged.append(t != null ? t : "");
         }
         runStarts[runs.size()] = merged.length();
 

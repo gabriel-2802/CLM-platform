@@ -55,13 +55,19 @@ export default async function ContractTemplatesPage() {
                     </a>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {template.fullyMapped ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                        Complet ({template.fieldCount} fields)
-                      </span>
-                    ) : (
-                      <TemplateMappingModal templateId={template.id} templateName={template.name} fieldCount={template.fieldCount} />
-                    )}
+                    <div className="flex items-center gap-2">
+                      {template.fullyMapped && (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Complet ({template.fieldCount} câmpuri)
+                        </span>
+                      )}
+                      <TemplateMappingModal
+                        templateId={template.id}
+                        templateName={template.name}
+                        fieldCount={template.fieldCount}
+                        fullyMapped={template.fullyMapped}
+                      />
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {new Date(template.createdAt).toLocaleDateString()}

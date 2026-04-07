@@ -13,7 +13,6 @@ import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.TemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
-import clm.demo.utils.docx.DocxNormalizer;
 import clm.demo.utils.file.FileParser;
 import clm.demo.utils.file.FileUtils;
 import clm.demo.utils.file.PlaceholderProcessor;
@@ -80,9 +79,6 @@ public class TemplateService {
             byte[] docxBytes = uploadedFormat == DocumentFormat.PDF
                     ? FileUtils.convert(fileBytes, DocumentFormat.PDF, DocumentFormat.DOCX)
                     : fileBytes;
-
-            // normalize every placeholder to exactly 4 dots before storing
-            docxBytes = DocxNormalizer.normalizePlaceholdersInDocx(docxBytes);
 
             Template template = templateRepository.save(
                     Template.builder()

@@ -237,23 +237,6 @@
 				</configuration>
 			</plugin>
 
-			<!-- Hibernate: bytecode enhancement for lazy initialization -->
-			<plugin>
-				<groupId>org.hibernate.orm.tooling</groupId>
-				<artifactId>hibernate-enhance-maven-plugin</artifactId>
-				<version>6.6.46.Final</version>
-				<executions>
-					<execution>
-						<goals>
-							<goal>enhance</goal>
-						</goals>
-						<configuration>
-							<enableLazyInitialization>true</enableLazyInitialization>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-
 		</plugins>
 	</build>
 
