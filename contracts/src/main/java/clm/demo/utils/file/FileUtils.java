@@ -18,6 +18,8 @@ import org.docx4j.openpackaging.packages.WordprocessingMLPackage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.GZIPInputStream;
 
@@ -103,27 +105,51 @@ public class FileUtils {
     }
 
     /**
-     * Converts DOCX bytes to PDF using the docx4j XSL-FO / Apache FOP pipeline.
+     * Converts DOCX bytes to PDF using LibreOffice headless mode.
+     * Produces accurate PDF output with correct font rendering on Linux.
      *
      * @param docxData raw bytes of the DOCX document
      * @return PDF document bytes
-     * @throws IOException if reading, writing, or the docx4j conversion fails
+     * @throws IOException if the conversion process fails
      */
     private static byte[] convertDocxToPdf(byte[] docxData) throws IOException {
+        Path tempDir = Files.createTempDirectory("docx2pdf-");
         try {
-            WordprocessingMLPackage wordPackage = WordprocessingMLPackage
-                    .load(new ByteArrayInputStream(docxData));
+            Path docxFile = tempDir.resolve("input.docx");
+            Files.write(docxFile, docxData);
 
-            ByteArrayOutputStream pdfOut = new ByteArrayOutputStream();
-            Docx4J.toPDF(wordPackage, pdfOut);
-            byte[] pdfBytes = pdfOut.toByteArray();
-            log.info("DOCX => PDF conversion successful (produced {} bytes)", pdfBytes.length);
+            ProcessBuilder pb = new ProcessBuilder(
+                    "libreoffice", "--headless", "--convert-to", "pdf",
+                    "--outdir", tempDir.toString(),
+                    docxFile.toString()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            String output = new String(process.getInputStream().readAllBytes());
+            int exitCode = process.waitFor();
+
+            if (exitCode != 0) {
+                throw new IOException("LibreOffice conversion failed (exit " + exitCode + "): " + output);
+            }
+
+            Path pdfFile = tempDir.resolve("input.pdf");
+            if (!Files.exists(pdfFile)) {
+                throw new IOException("LibreOffice did not produce output PDF. Output: " + output);
+            }
+
+            byte[] pdfBytes = Files.readAllBytes(pdfFile);
+            log.info("DOCX => PDF conversion successful via LibreOffice (produced {} bytes)", pdfBytes.length);
             return pdfBytes;
 
-        } catch (Docx4JException e) {
-            throw new IOException("docx4j PDF conversion failed: " + e.getMessage(), e);
-        } catch (Exception e) {
-            throw new IOException("unexpected docx4j error during DOCX => PDF: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("LibreOffice conversion interrupted", e);
+        } finally {
+            // clean up temp files
+            try (var stream = Files.walk(tempDir)) {
+                stream.sorted(java.util.Comparator.reverseOrder())
+                      .forEach(p -> p.toFile().delete());
+            }
         }
     }
 

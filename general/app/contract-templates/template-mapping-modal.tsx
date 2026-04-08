@@ -29,12 +29,10 @@ const PLACEHOLDER_REGEX = /\.{4,}|…+|_{5,}/g
 export function TemplateMappingModal({
   templateId,
   templateName,
-  fieldCount,
   fullyMapped = false,
 }: {
   templateId: number
   templateName: string
-  fieldCount: number
   fullyMapped?: boolean
 }) {
   const [open, setOpen] = useState(false)
@@ -109,7 +107,12 @@ export function TemplateMappingModal({
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload = fields.map((f) => ({
+      // Only save fields that were visible in the document preview.
+      // If mammoth detected fewer placeholders than the backend field count
+      // (e.g. because some placeholders are in headers/footers not rendered by mammoth),
+      // the extra fields are excluded so they don't get defaulted to "MANUAL".
+      const visibleFieldCount = hasRealContent && detectedCount > 0 ? detectedCount : fields.length
+      const payload = fields.slice(0, visibleFieldCount).map((f) => ({
         fieldId: f.id,
         fieldLabel: mappingsRef.current[f.id] || "MANUAL",
       }))

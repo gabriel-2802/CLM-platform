@@ -64,7 +64,6 @@ export default async function ContractTemplatesPage() {
                       <TemplateMappingModal
                         templateId={template.id}
                         templateName={template.name}
-                        fieldCount={template.fieldCount}
                         fullyMapped={template.fullyMapped}
                       />
                     </div>
