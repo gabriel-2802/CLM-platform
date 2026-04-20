@@ -2,30 +2,30 @@ package clm.demo.services.download.document.providers;
 
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.SignedDocumentNotAvailableException;
-import clm.demo.models.Contract;
+import clm.demo.models.Appendix;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
-import clm.demo.repositories.ContractRepository;
+import clm.demo.repositories.AppendixRepository;
 import clm.demo.services.download.DocumentResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public class SignedContractProvider implements DocumentProvider {
+public class SignedAppendixProvider implements DocumentProvider {
 
-    private final ContractRepository contractRepository;
+    private final AppendixRepository appendixRepository;
 
     @Override
     public DocumentResult getDocument(Long documentId) {
-        Contract contract = contractRepository.findById(documentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + documentId));
+        Appendix appendix = appendixRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appendix not found: " + documentId));
 
-        if (contract.getSignedDocumentContent() == null) {
+        if (appendix.getSignedDocumentContent() == null) {
             throw new SignedDocumentNotAvailableException(documentId);
         }
 
-        return new DocumentResult(contract.getSignedDocumentContent(), DocumentFormat.PDF);
+        return new DocumentResult(appendix.getSignedDocumentContent(), DocumentFormat.PDF);
     }
 
     @Override
@@ -35,6 +35,6 @@ public class SignedContractProvider implements DocumentProvider {
 
     @Override
     public DocumentType getDocumentType() {
-        return DocumentType.SIGNED_CONTRACT;
+        return DocumentType.SIGNED_APPENDIX;
     }
 }
