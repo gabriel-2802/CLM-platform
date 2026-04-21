@@ -5,6 +5,7 @@ import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.TemplateUploadResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
+import clm.demo.dto.responses.AvailableFieldResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
