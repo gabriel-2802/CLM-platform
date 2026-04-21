@@ -75,7 +75,7 @@ public class ContractService {
             throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
         }
 
-        Map<String, String> autoData = fetchClientData(request.clientId());
+        Map<String, String> autoData = fetchClientData(request.clientId().intValue());
         autoData.put("CONTRACT_START_DATE", request.startDate() != null ? request.startDate().toString() : "");
         autoData.put("CONTRACT_END_DATE", request.endDate() != null ? request.endDate().toString() : "");
         autoData.put("CONTRACT_VALUE", request.value() != null ? String.format("%.2f", request.value()) : "");
