@@ -268,7 +268,7 @@ public class ContractService {
         LocalDate today = LocalDate.now();
         LocalDate deadline = today.plusDays(withinDays);
         return generatedContractRepository
-                .findExpiringContracts(ContractStatus.ACTIVE, today, deadline)
+                .findExpiringContracts(List.of(ContractStatus.ACTIVE, ContractStatus.PENDING_SIGNATURE), today, deadline)
                 .stream()
                 .map(generatedContractMapper::toResponseDTO)
                 .toList();

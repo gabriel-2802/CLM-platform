@@ -36,16 +36,16 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
                                 @Param("today") LocalDate today);
 
     /**
-     * Returns all ACTIVE contracts whose end date falls within [today, deadline].
+     * Returns all ACTIVE or PENDING_SIGNATURE contracts whose end date falls within [today, deadline].
      * Used by the notifications service to warn about contracts expiring soon.
      */
     @Query("""
         SELECT c FROM Contract c
-        WHERE c.contractStatus = :active
+        WHERE c.contractStatus IN :statuses
         AND c.contractEndDate BETWEEN :today AND :deadline
         ORDER BY c.contractEndDate ASC
     """)
-    List<Contract> findExpiringContracts(@Param("active") ContractStatus active,
+    List<Contract> findExpiringContracts(@Param("statuses") List<ContractStatus> statuses,
                                          @Param("today") LocalDate today,
                                          @Param("deadline") LocalDate deadline);
 
