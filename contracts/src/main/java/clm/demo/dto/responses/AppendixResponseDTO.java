@@ -6,8 +6,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -16,22 +14,18 @@ import java.util.List;
 @AllArgsConstructor
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class ContractResponseDTO {
+public class AppendixResponseDTO {
 
     private Long id;
+    private Long contractId;
     private Long templateId;
-    private Integer clientId;
-    private String contractStatus;
+    private String title;
+    private String appendixStatus;
+    private String documentFormat;
     private Integer generatedBy;
     private String generatedByMail;
-    private BigDecimal contractValue;
-    private LocalDate contractStartDate;
-    private LocalDate contractEndDate;
     private String notes;
-    private LocalDate terminationDate;
-    private String reasonsForTermination;
     private LocalDateTime createdAt;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;
-    private List<AppendixResponseDTO> appendices;
 }

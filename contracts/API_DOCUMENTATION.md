@@ -1,4 +1,4 @@
-# Contract Template Management API Reference
+# CLM Platform - API Reference
 
 > **Base URL:** `/api`  
 > **Content-Type:** `application/json` unless noted  
@@ -254,7 +254,7 @@ Map or update field labels on a template. The `templateId` in the request body m
 
 ### `DELETE /api/templates/{templateId}`
 
-Delete a template. Cascade deletes all associated `TemplateField` rows and generated contracts.
+Delete a template and all its `TemplateField` rows. Blocked if any document (contract or appendix) still references the template.
 
 **Request**
 
@@ -273,6 +273,7 @@ DELETE /api/templates/7
 | Status | Reason |
 |--------|--------|
 | `404` | Template not found |
+| `409` | Template is referenced by one or more documents |
 
 ---
 
@@ -311,7 +312,7 @@ Content-Disposition: attachment; filename=template-7.pdf
 
 ### `POST /api/contracts/generate`
 
-Generate a contract from a fully mapped template. Validates required fields, persists entities, and generates DOCX/PDF output.
+Generate a contract from a fully mapped template. Validates required fields, persists entities, and produces a PDF output stored as BYTEA.
 
 **Request** — `application/json`
 
@@ -358,10 +359,7 @@ Generate a contract from a fully mapped template. Validates required fields, per
   "contractStartDate": "2026-04-01",
   "contractEndDate": "2027-03-31",
   "notes": "Renewal of previous agreement",
-  "terminationDate": null,
-  "reasonsForTermination": null,
   "createdAt": "2026-04-01T10:00:00",
-  "updatedAt": "2026-04-01T10:00:00",
   "fieldValues": [
     {
       "id": 201,
@@ -413,22 +411,13 @@ POST /api/contracts/88/upload-signed
   "contractStartDate": "2026-04-01",
   "contractEndDate": "2027-03-31",
   "notes": "Renewal of previous agreement",
-  "terminationDate": null,
-  "reasonsForTermination": null,
   "createdAt": "2026-04-01T10:00:00",
-  "updatedAt": "2026-04-01T11:30:00",
   "fieldValues": [
     {
-      "id": 45,
-      "templateFieldId": 37,
-      "fieldLabel": "c_name",
-      "fieldValue": "NAME GABRIEL"
-    },
-    {
-      "id": 46,
-      "templateFieldId": 38,
-      "fieldLabel": "c_comp",
-      "fieldValue": "COMPANY VALENTIN"
+      "id": 201,
+      "templateFieldId": 101,
+      "fieldLabel": "Client Name",
+      "fieldValue": "Acme Corp"
     }
   ]
 }
@@ -440,7 +429,6 @@ POST /api/contracts/88/upload-signed
 |--------|--------|
 | `400` | Empty file |
 | `404` | Contract not found |
-| `409` | Contract is not in a state that accepts a signed upload |
 | `422` | PDF conversion failed |
 
 ---
@@ -508,10 +496,7 @@ GET /api/contracts?page=0&size=20
     "contractStartDate": "2026-04-01",
     "contractEndDate": "2027-03-31",
     "notes": "Renewal of previous agreement",
-    "terminationDate": null,
-    "reasonsForTermination": null,
     "createdAt": "2026-04-01T10:00:00",
-    "updatedAt": "2026-04-01T11:30:00",
     "fieldValues": [
       {
         "id": 201,
@@ -536,7 +521,7 @@ Filter and search contracts. Accepts a JSON body despite being a GET request (ma
 
 | Field | Type | Default | Notes |
 |-------|------|---------|-------|
-| `notes` | `String` | `null` | Free-text search |
+| `notes` | `String` | `null` | Free-text trigram search |
 | `contractStatus` | `Enum` | `null` | `PENDING_SIGNATURE`, `ACTIVE`, `TERMINATED`, `ARCHIVED` |
 | `clientId` | `Integer` | `null` | Filter by client |
 | `generatedBy` | `Integer` | `null` | Filter by creator |
@@ -550,15 +535,10 @@ Filter and search contracts. Accepts a JSON body despite being a GET request (ma
 
 ```json
 {
-  "notes": null,
-  "contractStatus": null,
-  "clientId": null,
-  "generatedBy": null,
-  "labelValues": [],
-  "templateName": null,
-  "templateDescription": null,
-  "createdAfter": null,
-  "createdBefore": null,
+  "contractStatus": "ACTIVE",
+  "clientId": 42,
+  "labelValues": ["Acme", "USD"],
+  "createdAfter": "2026-01-01",
   "page": 0,
   "size": 20
 }
@@ -604,5 +584,361 @@ Content-Disposition: attachment; filename=contract-88.pdf
 | Status | Reason |
 |--------|--------|
 | `400` | Invalid `type` or `format` value |
-| `404` | Contract missing, or signed artifact not yet uploaded |
+| `404` | Contract not found, or signed document not yet uploaded |
+| `422` | Format conversion failed |
+
+---
+
+## Report Endpoints
+
+Used exclusively by the **notification microservice** to build email digests. Both endpoints return plain `ContractResponseDTO` objects — the caller uses the `id` field to fetch document bytes via the internal download endpoint (`GET /api/contracts/download/{contractId}/...`) and attaches them to outbound emails. No external URLs are embedded in the response.
+
+---
+
+### `GET /api/contracts/report/expiring`
+
+Returns all `ACTIVE` contracts whose `contractEndDate` falls within the next `days` days (inclusive of today).
+
+**Request**
+
+| Query Param | Required | Constraints | Notes |
+|-------------|----------|-------------|-------|
+| `days` | YES | `≥ 1` | Look-ahead window in calendar days |
+
+```
+GET /api/contracts/report/expiring?days=30
+```
+
+**Response** — `200 OK` — same shape as `GET /api/contracts`
+
+```json
+[
+  {
+    "id": 88,
+    "templateId": 7,
+    "clientId": 42,
+    "contractStatus": "ACTIVE",
+    "generatedBy": 1,
+    "generatedByMail": "staff@company.com",
+    "contractValue": 15000.00,
+    "contractStartDate": "2026-04-01",
+    "contractEndDate": "2026-05-15",
+    "notes": "Renewal of previous agreement",
+    "createdAt": "2026-04-01T10:00:00"
+  }
+]
+```
+
+> Returns `204 No Content` when no contracts match. Results ordered by `contractEndDate ASC`.
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | `days` is less than `1` |
+
+---
+
+### `GET /api/contracts/report/inactive-clients`
+
+Returns `ACTIVE` contracts where **every other contract the client holds within the look-back window carries the same `contractValue`** — meaning no monetary renegotiation has occurred in that period. Clients whose rate changed at any point within the window are excluded.
+
+**Request**
+
+| Query Param | Required | Constraints | Notes |
+|-------------|----------|-------------|-------|
+| `months` | YES | `≥ 1` | Minimum age of the contract in calendar months |
+
+```
+GET /api/contracts/report/inactive-clients?months=6
+```
+
+**Response** — `200 OK` — same shape as `GET /api/contracts`
+
+```json
+[
+  {
+    "id": 55,
+    "templateId": 3,
+    "clientId": 17,
+    "contractStatus": "ACTIVE",
+    "generatedBy": 2,
+    "generatedByMail": "ops@company.com",
+    "contractValue": 8000.00,
+    "contractStartDate": "2025-09-01",
+    "contractEndDate": "2026-08-31",
+    "createdAt": "2025-09-01T08:30:00"
+  }
+]
+```
+
+> Returns `204 No Content` when no contracts match. Results ordered by `clientId ASC`, then `contractStartDate ASC`.
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | `months` is less than `1` |
+
+---
+
+## Appendix Endpoints
+
+Appendices are auxiliary documents attached to a contract. They can be **fillable** (generated from a template, signed via the same DRAFT → SIGNED flow) or **non-fillable** (uploaded directly in any format).
+
+> Fillability is implicit: an appendix with a `templateId` is fillable; one without is a direct upload.
+
+---
+
+### `POST /api/appendices/generate`
+
+Generate a fillable appendix from a template and attach it to a contract.
+
+**Request** — `application/json`
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `contractId` | YES | Parent contract |
+| `templateId` | YES | Must reference a fully mapped template |
+| `title` | YES | Free-form label for the appendix |
+| `userId` | NO | Staff member generating the appendix |
+| `userMail` | NO | Valid email format |
+| `notes` | NO | Optional context |
+| `mappings` | YES | `Map<String, String>` — key = `fieldLabel`, value = content |
+
+```json
+{
+  "contractId": 88,
+  "templateId": 9,
+  "title": "Exhibit A – Scope of Work",
+  "userId": 1,
+  "userMail": "staff@company.com",
+  "notes": "Defines deliverables",
+  "mappings": {
+    "Project Name": "Platform Rewrite",
+    "Budget": "50000"
+  }
+}
+```
+
+**Response** — `200 OK`
+
+```json
+{
+  "id": 12,
+  "contractId": 88,
+  "templateId": 9,
+  "title": "Exhibit A – Scope of Work",
+  "appendixStatus": "DRAFT",
+  "documentFormat": "PDF",
+  "generatedBy": 1,
+  "generatedByMail": "staff@company.com",
+  "notes": "Defines deliverables",
+  "createdAt": "2026-04-01T10:05:00",
+  "fieldValues": [
+    {
+      "id": 301,
+      "templateFieldId": 201,
+      "fieldLabel": "Project Name",
+      "fieldValue": "Platform Rewrite"
+    }
+  ]
+}
+```
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | Missing required field value in mappings |
+| `404` | Contract or template not found |
+| `422` | Document generation / DOCX rendering failed |
+
+---
+
+### `POST /api/appendices/upload`
+
+Upload a non-fillable appendix directly and attach it to a contract. Format is auto-detected from file magic bytes.
+
+**Request** — `multipart/form-data`
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `contractId` | YES | Parent contract |
+| `title` | YES | Free-form label |
+| `file` | YES | DOCX or PDF |
+| `userId` | NO | Staff member uploading |
+| `userMail` | NO | Uploader's email |
+| `notes` | NO | Optional context |
+
+```
+POST /api/appendices/upload
+Content-Type: multipart/form-data
+
+contractId=88&title=ID+Copy&file=<binary>
+```
+
+**Response** — `200 OK`
+
+```json
+{
+  "id": 13,
+  "contractId": 88,
+  "title": "ID Copy",
+  "appendixStatus": "DRAFT",
+  "documentFormat": "PDF",
+  "createdAt": "2026-04-01T10:10:00"
+}
+```
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | Empty file or missing required fields |
+| `404` | Contract not found |
+| `415` | File is not DOCX or PDF |
+| `422` | Storage failure |
+
+---
+
+### `POST /api/appendices/{appendixId}/upload-signed`
+
+Attach a signed version of an appendix. Converts DOCX to PDF internally, then transitions status to `SIGNED`.
+
+**Request** — `multipart/form-data`
+
+| Param | Required | Notes |
+|-------|----------|-------|
+| `appendixId` (path) | YES | e.g. `12` |
+| `file` | YES | Signed DOCX or PDF |
+
+```
+POST /api/appendices/12/upload-signed
+```
+
+**Response** — `200 OK`
+
+```json
+{
+  "id": 12,
+  "contractId": 88,
+  "templateId": 9,
+  "title": "Exhibit A – Scope of Work",
+  "appendixStatus": "SIGNED",
+  "documentFormat": "PDF",
+  "createdAt": "2026-04-01T10:05:00"
+}
+```
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | Empty file |
+| `404` | Appendix not found |
+| `422` | PDF conversion failed |
+
+---
+
+### `GET /api/appendices/contract/{contractId}`
+
+List all appendices for a contract.
+
+**Request**
+
+| Path Param | Required | Example |
+|------------|----------|---------|
+| `contractId` | YES | `88` |
+
+```
+GET /api/appendices/contract/88
+```
+
+**Response** — `200 OK`
+
+```json
+[
+  {
+    "id": 12,
+    "contractId": 88,
+    "templateId": 9,
+    "title": "Exhibit A – Scope of Work",
+    "appendixStatus": "SIGNED",
+    "documentFormat": "PDF",
+    "createdAt": "2026-04-01T10:05:00"
+  },
+  {
+    "id": 13,
+    "contractId": 88,
+    "title": "ID Copy",
+    "appendixStatus": "DRAFT",
+    "documentFormat": "PDF",
+    "createdAt": "2026-04-01T10:10:00"
+  }
+]
+```
+
+> Returns `204 No Content` when no appendices exist for the contract.
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `404` | Contract not found |
+
+---
+
+### `DELETE /api/appendices/{appendixId}`
+
+Delete an appendix and its audit trail field values.
+
+**Request**
+
+| Path Param | Required | Example |
+|------------|----------|---------|
+| `appendixId` | YES | `12` |
+
+```
+DELETE /api/appendices/12
+```
+
+**Response** — `204 No Content` (no body)
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `404` | Appendix not found |
+
+---
+
+### `GET /api/appendices/download/{appendixId}/{type}/{format}`
+
+Download an appendix as DOCX or PDF.
+
+**Request**
+
+| Path Param | Required | Values |
+|------------|----------|--------|
+| `appendixId` | YES | e.g. `12` |
+| `type` | YES | `unsigned` or `signed` |
+| `format` | YES | `docx` or `pdf` |
+
+```
+GET /api/appendices/download/12/signed/pdf
+```
+
+**Response** — `200 OK` (binary attachment)
+
+```
+Content-Disposition: attachment; filename=appendix-12.pdf
+```
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `400` | Invalid `type` or `format` value |
+| `404` | Appendix not found, or signed document not yet uploaded |
 | `422` | Format conversion failed |

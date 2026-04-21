@@ -7,12 +7,13 @@ import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.TemplateFieldOwnershipException;
 import clm.demo.exceptions.TemplateUploadException;
 import clm.demo.exceptions.DuplicateTemplateNameException;
-import clm.demo.mappers.ContractTemplateMapper;
-import clm.demo.models.Template;
+import clm.demo.mappers.DocumentTemplateMapper;
+import clm.demo.models.DocumentTemplate;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
-import clm.demo.repositories.TemplateRepository;
+import clm.demo.repositories.DocumentTemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
+import clm.demo.utils.docx.DocxNormalizer;
 import clm.demo.utils.file.FileParser;
 import clm.demo.utils.file.FileUtils;
 import clm.demo.utils.file.PlaceholderProcessor;
@@ -31,37 +32,20 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-/**
- * Service for managing contract templates.
- * Handles template upload, parsing, field extraction, and mapping operations.
- */
-
 @Service
 @RequiredArgsConstructor
 public class TemplateService {
 
-    private final TemplateRepository templateRepository;
+    private final DocumentTemplateRepository templateRepository;
     private final TemplateFieldRepository templateFieldRepository;
+    private final DocumentTemplateMapper templateMapper;
 
-    private final ContractTemplateMapper contractTemplateMapper;
-
-    /**
-     * Uploads and parses a new contract template from an uploaded file.
-     * Extracts placeholders and creates TemplateField entities.
-     *
-     * @param request containing file, template name, and description
-     * @return TemplateUploadResponseDTO with template info and document text with placeholders replaced by field IDs
-     * @throws IllegalArgumentException if file is empty
-     * @throws DuplicateTemplateNameException if a template with the same name already exists
-     */
     @Transactional
     public TemplateUploadResponseDTO uploadTemplate(UploadTemplateRequest request) {
-
         if (request.getFile().isEmpty()) {
             throw new IllegalArgumentException("File cannot be empty");
         }
 
-        // check if a template with the same name already exists
         if (templateRepository.findByTemplateName(request.getTemplateName()).isPresent()) {
             throw new DuplicateTemplateNameException(
                     "Template with name '" + request.getTemplateName() + "' already exists"
@@ -69,19 +53,18 @@ public class TemplateService {
         }
 
         try {
-            // read file bytes once
             byte[] fileBytes = request.getFile().getBytes();
-
             DocumentFormat uploadedFormat = Utils.detectDocumentFormat(fileBytes);
             FileParser.ParsedDocument parsedDoc = FileParser.parseTemplate(request.getFile(), uploadedFormat);
 
-            // convert to DOCX if uploaded as PDF
             byte[] docxBytes = uploadedFormat == DocumentFormat.PDF
                     ? FileUtils.convert(fileBytes, DocumentFormat.PDF, DocumentFormat.DOCX)
                     : fileBytes;
 
-            Template template = templateRepository.save(
-                    Template.builder()
+            docxBytes = DocxNormalizer.normalizePlaceholdersInDocx(docxBytes);
+
+            DocumentTemplate template = templateRepository.save(
+                    DocumentTemplate.builder()
                             .templateName(request.getTemplateName())
                             .description(request.getDescription())
                             .documentFormat(DocumentFormat.DOCX)
@@ -90,17 +73,15 @@ public class TemplateService {
                             .build()
             );
 
-            // create TemplateField entities for each placeholder
             List<TemplateField> savedFields = templateFieldRepository.saveAll(
                     IntStream.range(0, parsedDoc.placeholderCount())
                             .mapToObj(position -> TemplateField.builder()
-                                    .contractTemplate(template)
+                                    .documentTemplate(template)
                                     .fieldPosition(position)
                                     .build())
                             .toList()
             );
 
-            // simple positional replace
             String documentText = replaceWithFieldIds(parsedDoc.documentText(), savedFields);
 
             return TemplateUploadResponseDTO.builder()
@@ -114,15 +95,6 @@ public class TemplateService {
         }
     }
 
-    /**
-     * Replaces each dot-sequence placeholder in the normalized document text
-     * with a {{fieldId}} token, matched positionally to savedFields.
-     * Safe because the text is already normalized : all placeholders are exactly 4 dots.
-     *
-     * @param normalizedText the already-normalized document text
-     * @param savedFields list of TemplateField entities with assigned IDs, in position order
-     * @return document text with placeholders replaced by {{fieldId}}
-     */
     private String replaceWithFieldIds(String normalizedText, List<TemplateField> savedFields) {
         return PlaceholderProcessor.substituteEach(
                 normalizedText,
@@ -130,40 +102,20 @@ public class TemplateService {
         ).text();
     }
 
-    /**
-     * Retrieves a template by ID with all its fields.
-     *
-     * @param templateId the template ID
-     * @return TemplateResponseDTO containing template details
-     * @throws ResourceNotFoundException if template not found
-     */
     @Transactional(readOnly = true)
     public TemplateResponseDTO getTemplate(Long templateId) {
         return templateRepository.findById(templateId)
-                .map(contractTemplateMapper::toResponseDTO)
+                .map(templateMapper::toResponseDTO)
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + templateId));
     }
 
-    /**
-     * Retrieves all templates with pagination, sorted by creation date descending.
-     *
-     * @param page zero-based page index
-     * @param size number of records per page
-     * @return page of TemplateResponseDTOs
-     */
     @Transactional(readOnly = true)
     public Page<TemplateResponseDTO> getAllTemplates(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return templateRepository.findAll(pageable)
-                .map(contractTemplateMapper::toResponseDTO);
+                .map(templateMapper::toResponseDTO);
     }
 
-    /**
-     * Deletes a template by ID along with all associated fields and mappings.
-     *
-     * @param templateId the template ID
-     * @throws ResourceNotFoundException if template not found
-     */
     @Transactional
     public void deleteTemplate(Long templateId) {
         if (!templateRepository.existsById(templateId)) {
@@ -172,22 +124,12 @@ public class TemplateService {
         templateRepository.deleteById(templateId);
     }
 
-    /**
-     * Batch updates field mappings for a template.
-     * Allows setting labels, data types, required status, and format patterns for multiple fields at once.
-     *
-     * @param request containing templateId and list of field mapping definitions
-     * @return list of TemplateFieldResponseDTO with all updated fields
-     * @throws ResourceNotFoundException       if template or any field not found
-     * @throws TemplateFieldOwnershipException if a field does not belong to the template
-     */
     @Transactional
     public List<TemplateFieldResponseDTO> updateFieldLabels(FieldMappingRequest request) {
         if (!templateRepository.existsById(request.getTemplateId())) {
             throw new ResourceNotFoundException("Template not found: " + request.getTemplateId());
         }
 
-        // fetch all fields in one query instead of N individual lookups
         Set<Long> fieldIds = request.getMappings().stream()
                 .map(FieldMappingRequest.FieldMappingDefinition::getFieldId)
                 .collect(Collectors.toSet());
@@ -202,7 +144,7 @@ public class TemplateService {
                     if (field == null) {
                         throw new ResourceNotFoundException("Field not found: " + mapping.getFieldId());
                     }
-                    if (!field.getContractTemplate().getId().equals(request.getTemplateId())) {
+                    if (!field.getDocumentTemplate().getId().equals(request.getTemplateId())) {
                         throw new TemplateFieldOwnershipException(
                                 "Field " + mapping.getFieldId() + " does not belong to template " + request.getTemplateId()
                         );
@@ -217,27 +159,21 @@ public class TemplateService {
 
         List<TemplateField> savedFields = templateFieldRepository.saveAll(updatedFields);
 
-        // Update template's isFullyMapped flag if all fields have labels
-        Template template = templateRepository.findById(request.getTemplateId())
+        DocumentTemplate template = templateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
-        
+
         long mappedCount = template.getTemplateFields().stream()
                 .filter(f -> f.getFieldLabel() != null && !f.getFieldLabel().isBlank())
                 .count();
-        
-        boolean isFullyMapped = !template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount();
-        template.setIsFullyMapped(isFullyMapped);
+
+        template.setIsFullyMapped(!template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount());
         templateRepository.save(template);
 
         return savedFields.stream()
                 .map(TemplateFieldResponseDTO::new)
                 .toList();
     }
-    /**
-     * Returns the list of fields available for visual mapping, categorized by source.
-     *
-     * @return AvailableFieldResponseDTO with client and contract metadata fields
-     */
+
     public AvailableFieldResponseDTO getAvailableMappingFields() {
         return AvailableFieldResponseDTO.builder()
                 .groups(List.of(

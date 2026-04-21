@@ -5,7 +5,6 @@ import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.TemplateUploadResponseDTO;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
-import clm.demo.dto.responses.AvailableFieldResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.TemplateService;
@@ -25,8 +24,7 @@ import java.util.List;
 
 /**
  * REST controller for contract template lifecycle operations.
- * Handles HTTP request/response logic and delegates business logic to
- * TemplateService.
+ * Handles HTTP request/response logic and delegates business logic to TemplateService.
  * Exception handling is centralized in GlobalExceptionHandler.
  */
 @RestController
@@ -45,8 +43,7 @@ public class TemplateController {
      * @return 201 Created with parsed template details
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<TemplateUploadResponseDTO> uploadTemplate(
-            @ModelAttribute @Valid UploadTemplateRequest request) {
+    public ResponseEntity<TemplateUploadResponseDTO> uploadTemplate(@ModelAttribute @Valid UploadTemplateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(templateService.uploadTemplate(request));
     }
 
@@ -80,15 +77,13 @@ public class TemplateController {
 
     /**
      * Batch updates field mappings for a template.
-     * Maps multiple template placeholders to labels, data types, and validation
-     * rules.
+     * Maps multiple template placeholders to labels, data types, and validation rules.
      *
      * @param request containing template ID and list of field mapping definitions
      * @return 200 OK with updated field details
      */
     @PutMapping("/{templateId}/labels")
-    public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(
-            @RequestBody @Valid FieldMappingRequest request) {
+    public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(@RequestBody @Valid FieldMappingRequest request) {
         return ResponseEntity.ok(templateService.updateFieldLabels(request));
     }
 
@@ -127,20 +122,8 @@ public class TemplateController {
         byte[] content = downloadService.downloadDocument(templateId, documentFormat, DocumentType.TEMPLATE);
 
         return ResponseEntity.ok()
-                .header("Content-Disposition",
-                        "attachment; filename=template-" + templateId + "." + format.toLowerCase())
+                .header("Content-Disposition", "attachment; filename=template-" + templateId + "." + format.toLowerCase())
                 .contentType(MediaType.parseMediaType(Utils.getContentType(documentFormat)))
                 .body(content);
-    }
-
-    /**
-     * Retrieves the list of fields available for mapping placeholders to database data.
-     * Includes client properties (name, cui, etc.) and contract metadata.
-     *
-     * @return 200 OK with grouped available fields
-     */
-    @GetMapping("/available-mapping-fields")
-    public ResponseEntity<AvailableFieldResponseDTO> getAvailableMappingFields() {
-        return ResponseEntity.ok(templateService.getAvailableMappingFields());
     }
 }

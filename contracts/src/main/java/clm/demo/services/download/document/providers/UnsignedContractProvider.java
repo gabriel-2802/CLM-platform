@@ -7,24 +7,14 @@ import clm.demo.models.enums.DocumentType;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.services.download.DocumentResult;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-/**
- * Document provider for generated contracts.
- * Contracts are only stored in — and downloadable as — PDF format.
- */
-@Slf4j
 @Component
 @RequiredArgsConstructor
 public class UnsignedContractProvider implements DocumentProvider {
 
     private final ContractRepository contractRepository;
 
-    /**
-     * Fetches the contract in a single repository call and returns both the
-     * compressed content and its native format (always PDF) together.
-     */
     @Override
     public DocumentResult getDocument(Long documentId) {
         Contract contract = contractRepository.findById(documentId)
@@ -39,7 +29,6 @@ public class UnsignedContractProvider implements DocumentProvider {
 
     @Override
     public boolean supportsFormat(DocumentFormat targetFormat) {
-        // contracts are always stored as PDF and can only be downloaded as PDF
         return targetFormat == DocumentFormat.PDF || targetFormat == DocumentFormat.DOCX;
     }
 
