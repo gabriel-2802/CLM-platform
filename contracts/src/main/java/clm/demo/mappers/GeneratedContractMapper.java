@@ -11,12 +11,9 @@ public interface GeneratedContractMapper {
 
     @Mapping(source = "documentTemplate.id", target = "templateId")
     @Mapping(source = "contractStatus",      target = "contractStatus", qualifiedByName = "enumToString")
+    @Mapping(source = "generatedBy",         target = "generatedBy")
+    @Mapping(source = "generatedByMail",     target = "generatedByMail")
     @Mapping(source = "fieldValues",         target = "fieldValues")
     @Mapping(source = "appendices",          target = "appendices")
     ContractResponseDTO toResponseDTO(Contract entity);
-
-    @Named("enumToString")
-    default String enumToString(Object value) {
-        return value != null ? value.toString() : null;
-    }
 }

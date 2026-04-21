@@ -1,6 +1,7 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.requests.GenAppendixRequest;
+import clm.demo.dto.requests.UploadDirectAppendixRequest;
 import clm.demo.dto.responses.AppendixResponseDTO;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
@@ -8,7 +9,6 @@ import clm.demo.services.AppendixService;
 import clm.demo.services.download.DocumentDownloadService;
 import clm.demo.utils.Utils;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -40,17 +40,11 @@ public class AppendixController {
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AppendixResponseDTO> uploadDirectAppendix(
-            @RequestParam @NotNull Long contractId,
-            @RequestParam @NotBlank String title,
-            @RequestParam("file") MultipartFile file,
-            @RequestParam(required = false) Integer userId,
-            @RequestParam(required = false) String userMail,
-            @RequestParam(required = false) String notes) throws IOException {
+            @ModelAttribute @Valid UploadDirectAppendixRequest request) throws IOException {
 
-        if (file.isEmpty()) throw new IllegalArgumentException("File cannot be empty");
+        if (request.getFile().isEmpty()) throw new IllegalArgumentException("File cannot be empty");
 
-        return ResponseEntity.ok(
-                appendixService.uploadDirectAppendix(contractId, title, file.getBytes(), userId, userMail, notes));
+        return ResponseEntity.ok(appendixService.uploadDirectAppendix(request));
     }
 
     /**

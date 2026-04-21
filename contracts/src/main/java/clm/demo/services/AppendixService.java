@@ -1,6 +1,7 @@
 package clm.demo.services;
 
 import clm.demo.dto.requests.GenAppendixRequest;
+import clm.demo.dto.requests.UploadDirectAppendixRequest;
 import clm.demo.dto.responses.AppendixResponseDTO;
 import clm.demo.exceptions.*;
 import clm.demo.mappers.AppendixMapper;
@@ -101,23 +102,23 @@ public class AppendixService {
      * Format is auto-detected from file magic bytes.
      */
     @Transactional
-    public AppendixResponseDTO uploadDirectAppendix(Long contractId, String title, byte[] fileBytes,
-                                                     Integer userId, String userMail, String notes) {
-        Contract contract = contractRepository.findById(contractId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
-
-        DocumentFormat format = Utils.detectDocumentFormat(fileBytes);
+    public AppendixResponseDTO uploadDirectAppendix(UploadDirectAppendixRequest request) {
+        Contract contract = contractRepository.findById(request.getContractId())
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + request.getContractId()));
 
         try {
+            byte[] fileBytes = request.getFile().getBytes();
+            DocumentFormat format = Utils.detectDocumentFormat(fileBytes);
+
             Appendix appendix = Appendix.builder()
                     .contract(contract)
-                    .title(title)
-                    .generatedBy(userId)
-                    .generatedByMail(userMail)
-                    .notes(notes)
+                    .title(request.getTitle())
+                    .generatedBy(request.getUserId())
+                    .generatedByMail(request.getUserMail())
+                    .notes(request.getNotes())
                     .documentContent(FileUtils.compress(fileBytes))
                     .documentFormat(format)
-                    .appendixStatus(AppendixStatus.DRAFT)
+                    .appendixStatus(AppendixStatus.SIGNED)
                     .build();
 
             return appendixMapper.toResponseDTO(appendixRepository.save(appendix));

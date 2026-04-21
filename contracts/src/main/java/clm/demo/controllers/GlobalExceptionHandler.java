@@ -7,6 +7,7 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -71,16 +72,25 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(FileConversionException.class)
     public ResponseEntity<ErrorResponseDTO> handleFileConversionException(FileConversionException e) {
         log.error("document conversion failed: ", e);
-        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Document conversion failed", e.getMessage());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Document conversion failed", e.getMessage());
     }
 
     /**
-     * Handles failures during template file upload and processing.
+     * Handles duplicate template name attempts during template upload.
+     */
+    @ExceptionHandler(DuplicateTemplateNameException.class)
+    public ResponseEntity<ErrorResponseDTO> handleDuplicateTemplateNameException(DuplicateTemplateNameException e) {
+        log.warn("template upload rejected — duplicate name: {}", e.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, "Template name already exists", e.getMessage());
+    }
+
+    /**
+     * Handles failures during template upload and processing.
      */
     @ExceptionHandler(TemplateUploadException.class)
     public ResponseEntity<ErrorResponseDTO> handleTemplateUploadException(TemplateUploadException e) {
         log.error("template upload failed: ", e);
-        return buildResponse(HttpStatus.UNPROCESSABLE_ENTITY, "Template upload failed", e.getMessage());
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Template upload failed", e.getMessage());
     }
 
     /**
@@ -169,6 +179,20 @@ public class GlobalExceptionHandler {
         log.error("database access error: ", e);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Database error",
                 "A database error occurred. Please contact support.");
+    }
+
+    /**
+     * Catch-all for any unexpected exceptions to prevent 500 white-label error pages.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponseDTO> handleHttpRequestMethodNotSupportedException(HttpRequestMethodNotSupportedException e) {
+        log.warn("unsupported HTTP method: {}", e.getMessage());
+        String method = e.getMethod();
+        String supportedMethods = String.join(", ", e.getSupportedHttpMethods() != null 
+            ? e.getSupportedHttpMethods().stream().map(Object::toString).toList() 
+            : java.util.List.of("Unknown"));
+        String details = String.format("HTTP method '%s' is not supported for this endpoint. Supported methods: %s", method, supportedMethods);
+        return buildResponse(HttpStatus.METHOD_NOT_ALLOWED, "Invalid request method", details);
     }
 
     /**
