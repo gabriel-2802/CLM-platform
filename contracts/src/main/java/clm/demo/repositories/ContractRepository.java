@@ -13,6 +13,8 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * Repository for the {@link Contract} entity.
@@ -32,4 +34,33 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
     int archiveExpiredContracts(@Param("archived") ContractStatus archived,
                                 @Param("active")   ContractStatus active,
                                 @Param("today") LocalDate today);
+
+    /**
+     * Returns all ACTIVE contracts whose end date falls within [today, deadline].
+     * Used by the notifications service to warn about contracts expiring soon.
+     */
+    @Query("""
+        SELECT c FROM Contract c
+        WHERE c.contractStatus = :active
+        AND c.contractEndDate BETWEEN :today AND :deadline
+        ORDER BY c.contractEndDate ASC
+    """)
+    List<Contract> findExpiringContracts(@Param("active") ContractStatus active,
+                                         @Param("today") LocalDate today,
+                                         @Param("deadline") LocalDate deadline);
+
+    /**
+     * Returns the most recent contract per client, but only for clients whose
+     * last contract was created before {@code cutoff}.
+     * Used to detect clients that haven't been renegotiated recently.
+     */
+    @Query("""
+        SELECT c FROM Contract c
+        WHERE c.createdAt = (
+            SELECT MAX(c2.createdAt) FROM Contract c2 WHERE c2.clientId = c.clientId
+        )
+        AND c.createdAt < :cutoff
+        ORDER BY c.createdAt ASC
+    """)
+    List<Contract> findClientsNotRenegotiatedSince(@Param("cutoff") LocalDateTime cutoff);
 }

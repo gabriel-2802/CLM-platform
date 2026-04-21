@@ -109,6 +109,34 @@ public class ContractController {
     }
 
     /**
+     * Returns ACTIVE contracts expiring within the next {@code withinDays} days.
+     * Intended for the notifications microservice to build its monthly digest.
+     *
+     * @param withinDays look-ahead window in days (default 30)
+     * @return 200 OK with list of expiring contracts, or 204 if none
+     */
+    @GetMapping("/report/expiring")
+    public ResponseEntity<List<ContractResponseDTO>> getExpiringContracts(
+            @RequestParam(defaultValue = "30") int withinDays) {
+        List<ContractResponseDTO> result = contractService.getExpiringContracts(withinDays);
+        return result.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(result);
+    }
+
+    /**
+     * Returns one contract per client that hasn't had a new contract created in the
+     * last {@code sinceMonths} months. Intended for the notifications microservice.
+     *
+     * @param sinceMonths inactivity threshold in months (default 6)
+     * @return 200 OK with list of contracts, or 204 if none
+     */
+    @GetMapping("/report/inactive-clients")
+    public ResponseEntity<List<ContractResponseDTO>> getInactiveClients(
+            @RequestParam(defaultValue = "6") int sinceMonths) {
+        List<ContractResponseDTO> result = contractService.getClientsNotRenegotiated(sinceMonths);
+        return result.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(result);
+    }
+
+    /**
      * Downloads a contract in the specified format (DOCX or PDF).
      * If the contract is stored in another format, automatically converts it.
      * Supports both SIGNED and UNSIGNED contracts.

@@ -32,6 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -252,6 +254,42 @@ public class ContractService {
                 page.getNumber(), page.getTotalPages());
 
         return page.map(generatedContractMapper::toResponseDTO);
+    }
+
+    /**
+     * Returns all ACTIVE contracts whose end date falls within the next {@code withinDays} days.
+     * Called by the notifications microservice to build the expiry warning digest.
+     *
+     * @param withinDays number of days to look ahead (e.g. 30 for "expiring in the next month")
+     * @return list of contracts expiring soon, ordered by end date ascending
+     */
+    @Transactional(readOnly = true)
+    public List<ContractResponseDTO> getExpiringContracts(int withinDays) {
+        LocalDate today = LocalDate.now();
+        LocalDate deadline = today.plusDays(withinDays);
+        return generatedContractRepository
+                .findExpiringContracts(ContractStatus.ACTIVE, today, deadline)
+                .stream()
+                .map(generatedContractMapper::toResponseDTO)
+                .toList();
+    }
+
+    /**
+     * Returns the most recent contract for each client that has not had any new
+     * contract created in the last {@code sinceMonths} months.
+     * Called by the notifications microservice to identify clients not renegotiated recently.
+     *
+     * @param sinceMonths how many months of inactivity to look back (e.g. 6)
+     * @return one contract per inactive client, ordered by creation date ascending
+     */
+    @Transactional(readOnly = true)
+    public List<ContractResponseDTO> getClientsNotRenegotiated(int sinceMonths) {
+        LocalDateTime cutoff = LocalDateTime.now().minusMonths(sinceMonths);
+        return generatedContractRepository
+                .findClientsNotRenegotiatedSince(cutoff)
+                .stream()
+                .map(generatedContractMapper::toResponseDTO)
+                .toList();
     }
 
     /**
