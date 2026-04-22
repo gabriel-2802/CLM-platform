@@ -35,12 +35,13 @@ export async function getClientRows(): Promise<Row[]> {
   })
 
   const latestContracts: any[] = await prisma.$queryRaw`
-    SELECT id, client_id, created_at 
-    FROM contracts.generated_contract 
-    WHERE id IN (
-      SELECT MAX(id) 
-      FROM contracts.generated_contract 
-      GROUP BY client_id
+    SELECT d.id, c.client_id, d.created_at
+    FROM clm.contract c
+    JOIN clm.document d ON d.id = c.document_id
+    WHERE d.id IN (
+      SELECT MAX(c2.document_id)
+      FROM clm.contract c2
+      GROUP BY c2.client_id
     )
   `;
 
