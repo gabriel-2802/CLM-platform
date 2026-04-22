@@ -39,6 +39,7 @@ public class TemplateService {
     private final DocumentTemplateRepository templateRepository;
     private final TemplateFieldRepository templateFieldRepository;
     private final DocumentTemplateMapper templateMapper;
+    private final FileUtils fileUtils;
 
     @Transactional
     public TemplateUploadResponseDTO uploadTemplate(UploadTemplateRequest request) {
@@ -58,7 +59,7 @@ public class TemplateService {
             FileParser.ParsedDocument parsedDoc = FileParser.parseTemplate(request.getFile(), uploadedFormat);
 
             byte[] docxBytes = uploadedFormat == DocumentFormat.PDF
-                    ? FileUtils.convert(fileBytes, DocumentFormat.PDF, DocumentFormat.DOCX)
+                    ? fileUtils.convert(fileBytes, DocumentFormat.PDF, DocumentFormat.DOCX)
                     : fileBytes;
 
             docxBytes = DocxNormalizer.normalizePlaceholdersInDocx(docxBytes);
@@ -68,7 +69,7 @@ public class TemplateService {
                             .templateName(request.getTemplateName())
                             .description(request.getDescription())
                             .documentFormat(DocumentFormat.DOCX)
-                            .documentContent(FileUtils.compress(docxBytes))
+                            .documentContent(fileUtils.compress(docxBytes))
                             .fieldCount(parsedDoc.placeholderCount())
                             .build()
             );

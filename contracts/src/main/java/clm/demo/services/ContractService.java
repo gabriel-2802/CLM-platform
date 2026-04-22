@@ -55,6 +55,7 @@ public class ContractService {
 
     private final ContractSpecification contractSpecification;
     private final JdbcTemplate jdbcTemplate;
+    private final FileUtils fileUtils;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -101,10 +102,10 @@ public class ContractService {
                     .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
                     .toList();
             Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
-            byte[] templateBytes = FileUtils.decompress(template.getDocumentContent());
+            byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
             byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
-            byte[] pdf = FileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
-            contract.setDocumentContent(FileUtils.compress(pdf));
+            byte[] pdf = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
+            contract.setDocumentContent(fileUtils.compress(pdf));
             contract.setDocumentFormat(DocumentFormat.PDF);
             contract = contractRepository.save(contract);
         } catch (IOException e) {
@@ -154,10 +155,10 @@ public class ContractService {
         try {
             DocumentFormat sourceFormat = Utils.detectDocumentFormat(fileBytes);
             byte[] pdfBytes = sourceFormat != DocumentFormat.PDF
-                    ? FileUtils.convert(fileBytes, sourceFormat, DocumentFormat.PDF)
+                    ? fileUtils.convert(fileBytes, sourceFormat, DocumentFormat.PDF)
                     : fileBytes;
 
-            contract.setSignedDocumentContent(FileUtils.compress(pdfBytes));
+            contract.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract = contractRepository.save(contract);
         } catch (IOException e) {

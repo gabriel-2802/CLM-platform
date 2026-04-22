@@ -23,6 +23,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class DocumentDownloadService {
     private final DocumentProviderRegistry providerRegistry;
+    private final FileUtils fileUtils;
 
     /**
      * Resolves the correct provider from the registry, decompresses the stored
@@ -47,13 +48,13 @@ public class DocumentDownloadService {
 
         try {
             DocumentResult result = provider.getDocument(documentId);
-            byte[] decompressed = FileUtils.decompress(result.compressedContent());
+            byte[] decompressed = fileUtils.decompress(result.compressedContent());
 
             if (result.nativeFormat() == targetFormat) {
                 return decompressed;
             }
 
-            return FileUtils.convert(decompressed, result.nativeFormat(), targetFormat);
+            return fileUtils.convert(decompressed, result.nativeFormat(), targetFormat);
 
         } catch (IOException e) {
             throw new FileConversionException("Failed to download document " + documentId + ": " + e.getMessage(), e);

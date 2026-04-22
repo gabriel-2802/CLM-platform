@@ -42,6 +42,7 @@ public class AppendixService {
     private final DocumentTemplateRepository templateRepository;
     private final DocumentFieldValueRepository fieldValueRepository;
     private final AppendixMapper appendixMapper;
+    private final FileUtils fileUtils;
 
     /**
      * Generates a fillable appendix from a template and attaches it to the given contract.
@@ -84,10 +85,10 @@ public class AppendixService {
                     .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
                     .toList();
             Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
-            byte[] templateBytes = FileUtils.decompress(template.getDocumentContent());
+            byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
             byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
-            byte[] pdf = FileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
-            appendix.setDocumentContent(FileUtils.compress(pdf));
+            byte[] pdf = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
+            appendix.setDocumentContent(fileUtils.compress(pdf));
             appendix.setDocumentFormat(DocumentFormat.PDF);
             appendix = appendixRepository.save(appendix);
         } catch (IOException e) {
@@ -116,7 +117,7 @@ public class AppendixService {
                     .generatedBy(request.getUserId())
                     .generatedByMail(request.getUserMail())
                     .notes(request.getNotes())
-                    .documentContent(FileUtils.compress(fileBytes))
+                    .documentContent(fileUtils.compress(fileBytes))
                     .documentFormat(format)
                     .appendixStatus(AppendixStatus.SIGNED)
                     .build();
@@ -138,10 +139,10 @@ public class AppendixService {
         try {
             DocumentFormat sourceFormat = Utils.detectDocumentFormat(fileBytes);
             byte[] pdfBytes = sourceFormat != DocumentFormat.PDF
-                    ? FileUtils.convert(fileBytes, sourceFormat, DocumentFormat.PDF)
+                    ? fileUtils.convert(fileBytes, sourceFormat, DocumentFormat.PDF)
                     : fileBytes;
 
-            appendix.setSignedDocumentContent(FileUtils.compress(pdfBytes));
+            appendix.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             appendix.setAppendixStatus(AppendixStatus.SIGNED);
             appendix = appendixRepository.save(appendix);
         } catch (IOException e) {
