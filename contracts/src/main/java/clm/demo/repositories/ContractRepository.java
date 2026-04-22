@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -50,6 +51,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
     @Query("""
         SELECT c FROM Contract c
         WHERE c.contractStatus = :status
+        AND c.createdAt < :cutoffDate
         AND NOT EXISTS (
             SELECT c2 FROM Contract c2
             WHERE c2.clientId = c.clientId
@@ -64,5 +66,5 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
         ORDER BY c.clientId ASC
     """)
     List<Contract> findInactiveClientContracts(@Param("status")     ContractStatus status,
-                                               @Param("cutoffDate") LocalDate cutoffDate);
+                                               @Param("cutoffDate") LocalDateTime cutoffDate);
 }

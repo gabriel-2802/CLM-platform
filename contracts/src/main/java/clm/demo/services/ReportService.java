@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -36,7 +37,7 @@ public class ReportService {
 
     @Transactional(readOnly = true)
     public List<ContractResponseDTO> getInactiveClientContracts(int months) {
-        LocalDate cutoffDate = LocalDate.now().minusMonths(months);
+        LocalDateTime cutoffDate = LocalDate.now().minusMonths(months).atStartOfDay();
 
         log.info("Fetching ACTIVE contracts with no renegotiation since {} ({} months ago)", cutoffDate, months);
 
