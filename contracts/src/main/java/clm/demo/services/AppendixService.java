@@ -45,6 +45,7 @@ public class AppendixService {
     private final DocumentFieldValueRepository fieldValueRepository;
     private final AppendixMapper appendixMapper;
     private final FileUtils fileUtils;
+    private final DocumentGenerationUtil documentGenerationUtil;
 
     /**
      * Generates a fillable appendix from a template and attaches it to the given contract.
@@ -66,7 +67,7 @@ public class AppendixService {
             throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
         }
 
-        validateMandatoryFields(template, request.mappings());
+        documentGenerationUtil.validateMandatoryFields(template, request.mappings());
 
         Appendix appendix = Appendix.builder()
                 .contract(contract)
@@ -81,7 +82,7 @@ public class AppendixService {
         appendix = appendixRepository.save(appendix);
         log.debug("Appendix {} created in DRAFT status for contract {}", appendix.getId(), contract.getId());
 
-        List<DocumentFieldValue> fieldValues = buildFieldValues(appendix, template, request.mappings());
+        List<DocumentFieldValue> fieldValues = documentGenerationUtil.buildFieldValues(appendix, template, request.mappings());
         if (!fieldValues.isEmpty()) {
             fieldValueRepository.saveAll(fieldValues);
             appendix.setFieldValues(fieldValues);
@@ -92,7 +93,7 @@ public class AppendixService {
                     .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
                     .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
                     .toList();
-            Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
+            Map<String, String> labelToValue = documentGenerationUtil.buildLabelValueMap(fieldValues);
             byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
             byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
             byte[] pdf = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
@@ -196,50 +197,5 @@ public class AppendixService {
         }
         appendixRepository.deleteById(appendixId);
         log.info("Appendix {} deleted", appendixId);
-    }
-
-    // -------------------------------------------------------------------------
-    // Private helpers
-    // -------------------------------------------------------------------------
-
-    private void validateMandatoryFields(DocumentTemplate template, Map<String, String> mappings) {
-        List<String> missing = template.getTemplateFields().stream()
-                .filter(TemplateField::getIsRequired)
-                .filter(f -> f.getFieldLabel() != null)
-                .filter(f -> !mappings.containsKey(f.getFieldLabel()) || mappings.get(f.getFieldLabel()).isBlank())
-                .map(TemplateField::getFieldLabel)
-                .toList();
-
-        if (!missing.isEmpty()) {
-            throw new MissingMandatoryFieldException(
-                    "Missing mandatory field mappings: " + String.join(", ", missing), missing);
-        }
-    }
-
-    private List<DocumentFieldValue> buildFieldValues(Appendix appendix, DocumentTemplate template,
-                                                       Map<String, String> mappings) {
-        List<DocumentFieldValue> fieldValues = new ArrayList<>();
-        for (TemplateField field : template.getTemplateFields()) {
-            if (field.getFieldLabel() == null) continue;
-            String value = mappings.get(field.getFieldLabel());
-            if (value == null || value.isBlank()) continue;
-            fieldValues.add(DocumentFieldValue.builder()
-                    .document(appendix)
-                    .templateField(field)
-                    .fieldValue(value)
-                    .build());
-        }
-        return fieldValues;
-    }
-
-    private static Map<String, String> buildLabelValueMap(List<DocumentFieldValue> fieldValues) {
-        Map<String, String> map = new HashMap<>(fieldValues.size() * 2);
-        for (DocumentFieldValue dfv : fieldValues) {
-            TemplateField field = dfv.getTemplateField();
-            if (field != null && field.getFieldLabel() != null && dfv.getFieldValue() != null) {
-                map.put(field.getFieldLabel(), dfv.getFieldValue());
-            }
-        }
-        return map;
     }
 }

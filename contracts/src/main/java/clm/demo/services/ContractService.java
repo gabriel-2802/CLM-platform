@@ -22,11 +22,10 @@ import clm.demo.utils.docx.DocxFiller;
 import clm.demo.utils.file.FileUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import clm.demo.utils.Constants;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
@@ -55,6 +54,7 @@ public class ContractService {
 
     private final ContractSpecification contractSpecification;
     private final FileUtils fileUtils;
+    private final DocumentGenerationUtil documentGenerationUtil;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -75,12 +75,12 @@ public class ContractService {
             throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
         }
 
-        validateMandatoryFields(template, request.mappings());
+        documentGenerationUtil.validateMandatoryFields(template, request.mappings());
 
         Contract contract = generationMapper.toContractEntity(request, template);
         contract = contractRepository.save(contract);
 
-        List<DocumentFieldValue> fieldValues = buildFieldValues(contract, template, request.mappings());
+        List<DocumentFieldValue> fieldValues = documentGenerationUtil.buildFieldValues(contract, template, request.mappings());
         if (!fieldValues.isEmpty()) {
             fieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
@@ -91,7 +91,7 @@ public class ContractService {
                     .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
                     .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
                     .toList();
-            Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
+            Map<String, String> labelToValue = documentGenerationUtil.buildLabelValueMap(fieldValues);
             byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
             byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
             byte[] pdf = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
@@ -175,47 +175,5 @@ public class ContractService {
                 page.getNumber(), page.getTotalPages());
 
         return page.map(contractMapper::toResponseDTO);
-    }
-
-    private void validateMandatoryFields(DocumentTemplate template, Map<String, String> mappings) {
-        List<String> missing = template.getTemplateFields().stream()
-                .filter(TemplateField::getIsRequired)
-                .filter(f -> f.getFieldLabel() != null)
-                .filter(f -> !mappings.containsKey(f.getFieldLabel()) || mappings.get(f.getFieldLabel()).isBlank())
-                .map(TemplateField::getFieldLabel)
-                .toList();
-
-        if (!missing.isEmpty()) {
-            String message = "Missing mandatory field mappings: " + String.join(", ", missing);
-            log.warn(message);
-            throw new MissingMandatoryFieldException(message, missing);
-        }
-    }
-
-    private List<DocumentFieldValue> buildFieldValues(Contract contract, DocumentTemplate template,
-                                                       Map<String, String> mappings) {
-        List<DocumentFieldValue> fieldValues = new ArrayList<>();
-        for (TemplateField field : template.getTemplateFields()) {
-            if (field.getFieldLabel() == null) continue;
-            String value = mappings.get(field.getFieldLabel());
-            if (value == null || value.isBlank()) continue;
-            fieldValues.add(DocumentFieldValue.builder()
-                    .document(contract)
-                    .templateField(field)
-                    .fieldValue(value)
-                    .build());
-        }
-        return fieldValues;
-    }
-
-    private static Map<String, String> buildLabelValueMap(List<DocumentFieldValue> fieldValues) {
-        Map<String, String> map = new HashMap<>(fieldValues.size() * 2);
-        for (DocumentFieldValue dfv : fieldValues) {
-            TemplateField field = dfv.getTemplateField();
-            if (field != null && field.getFieldLabel() != null && dfv.getFieldValue() != null) {
-                map.put(field.getFieldLabel(), dfv.getFieldValue());
-            }
-        }
-        return map;
     }
 }
