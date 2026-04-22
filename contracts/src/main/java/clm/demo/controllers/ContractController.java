@@ -4,6 +4,7 @@ import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
+import clm.demo.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.ContractService;
@@ -14,12 +15,15 @@ import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 
 @Slf4j
@@ -31,18 +35,41 @@ public class ContractController {
     private final ContractService contractService;
     private final DocumentDownloadService downloadService;
 
+    /**
+     * Generates a new contract from a template.
+     * Returns {@code 201 Created} with a {@code Location} header pointing to the new resource.
+     */
     @PostMapping("/generate")
     public ResponseEntity<ContractResponseDTO> generateContract(@Valid @RequestBody GenContractRequest request) {
-        return ResponseEntity.ok(contractService.generateContract(request));
+        ContractResponseDTO response = contractService.generateContract(request);
+        URI location = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/contracts/{id}")
+                .buildAndExpand(response.getId())
+                .toUri();
+        return ResponseEntity.created(location).body(response);
     }
 
+    /**
+     * Uploads a signed document for an existing {@code PENDING_SIGNATURE} contract
+     * and transitions it to {@code ACTIVE}.
+     */
     @PostMapping(value = "/{contractId}/upload-signed", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<ContractResponseDTO> uploadSignedContract(@PathVariable Long contractId,
-                                                                     @RequestParam("file") MultipartFile file) throws IOException {
+    public ResponseEntity<ContractResponseDTO> uploadSignedContract(
+            @PathVariable Long contractId,
+            @RequestParam("file") @NotNull MultipartFile file) {
+
         if (file.isEmpty()) throw new IllegalArgumentException("File cannot be empty");
-        return ResponseEntity.ok(contractService.uploadSignedContract(contractId, file.getBytes()));
+
+        try {
+            return ResponseEntity.ok(contractService.uploadSignedContract(contractId, file.getBytes()));
+        } catch (IOException e) {
+            throw new FileConversionException("Failed to read uploaded file: " + e.getMessage(), e);
+        }
     }
 
+    /**
+     * Terminates an {@code ACTIVE} contract.
+     */
     @PutMapping("/terminate/{contractId}")
     public ResponseEntity<Void> terminateContract(@PathVariable Long contractId,
                                                    @Valid @RequestBody ContractTerminationRequest request) {
@@ -59,7 +86,13 @@ public class ContractController {
                 : ResponseEntity.ok(result.getContent());
     }
 
-    @GetMapping("/search")
+    /**
+     * Searches contracts with optional filters.
+     *
+     * <p>Uses {@code POST} rather than {@code GET} because GET requests with a body are
+     * not supported by several HTTP clients and intermediaries (CDNs, proxies).</p>
+     */
+    @PostMapping("/search")
     public ResponseEntity<List<ContractResponseDTO>> search(@RequestBody SearchRequest request) {
         Page<ContractResponseDTO> result = contractService.search(request);
         return result.isEmpty()
@@ -69,11 +102,9 @@ public class ContractController {
 
     /**
      * Downloads a contract in the specified format (DOCX or PDF).
-     * If the contract is stored in another format, automatically converts it.
-     * Supports both SIGNED and UNSIGNED contracts.
      *
-     * @param type   "signed" or "unsigned"
-     * @param format "pdf" or "docx"
+     * @param type   {@code signed} or {@code unsigned}
+     * @param format {@code pdf} or {@code docx}
      */
     @GetMapping("/download/{contractId}/{type}/{format}")
     public ResponseEntity<byte[]> downloadContract(@PathVariable @NotNull Long contractId,

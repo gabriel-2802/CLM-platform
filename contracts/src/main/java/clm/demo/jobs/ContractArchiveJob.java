@@ -1,4 +1,4 @@
-package jobs;
+package clm.demo.jobs;
 
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.repositories.ContractRepository;
@@ -9,10 +9,18 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDate;
 
+/**
+ * Scheduled job that archives contracts whose end date has passed.
+ *
+ * <p>Runs daily at midnight (configurable via {@code job.archive-contracts.cron}).
+ * Transitions every {@link ContractStatus#ACTIVE} contract whose
+ * {@code contractEndDate < today} to {@link ContractStatus#ARCHIVED}.</p>
+ */
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class ContractArchiveJob {
+
     private final ContractRepository contractRepository;
 
     @Scheduled(cron = "${job.archive-contracts.cron:0 0 0 * * *}")
@@ -22,6 +30,6 @@ public class ContractArchiveJob {
                 ContractStatus.ACTIVE,
                 LocalDate.now()
         );
-        log.info("Archived {} expired contracts", count);
+        log.info("Archived {} expired contract(s)", count);
     }
 }

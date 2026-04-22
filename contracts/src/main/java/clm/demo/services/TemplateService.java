@@ -19,6 +19,7 @@ import clm.demo.utils.file.FileUtils;
 import clm.demo.utils.file.PlaceholderProcessor;
 import clm.demo.utils.Utils;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -32,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TemplateService {
@@ -49,8 +51,7 @@ public class TemplateService {
 
         if (templateRepository.findByTemplateName(request.getTemplateName()).isPresent()) {
             throw new DuplicateTemplateNameException(
-                    "Template with name '" + request.getTemplateName() + "' already exists"
-            );
+                    "Template with name '" + request.getTemplateName() + "' already exists");
         }
 
         try {
@@ -82,6 +83,8 @@ public class TemplateService {
                                     .build())
                             .toList()
             );
+
+            log.info("Template '{}' uploaded: {} placeholder(s) extracted", template.getTemplateName(), savedFields.size());
 
             String documentText = replaceWithFieldIds(parsedDoc.documentText(), savedFields);
 
@@ -123,6 +126,7 @@ public class TemplateService {
             throw new ResourceNotFoundException("Template not found: " + templateId);
         }
         templateRepository.deleteById(templateId);
+        log.info("Template {} deleted", templateId);
     }
 
     @Transactional
@@ -147,8 +151,7 @@ public class TemplateService {
                     }
                     if (!field.getDocumentTemplate().getId().equals(request.getTemplateId())) {
                         throw new TemplateFieldOwnershipException(
-                                "Field " + mapping.getFieldId() + " does not belong to template " + request.getTemplateId()
-                        );
+                                "Field " + mapping.getFieldId() + " does not belong to template " + request.getTemplateId());
                     }
                     field.setFieldLabel(mapping.getFieldLabel());
                     field.setDataType(Utils.convertStringToDataType(mapping.getDataType()));
@@ -167,8 +170,12 @@ public class TemplateService {
                 .filter(f -> f.getFieldLabel() != null && !f.getFieldLabel().isBlank())
                 .count();
 
-        template.setIsFullyMapped(!template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount());
+        boolean fullyMapped = !template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount();
+        template.setIsFullyMapped(fullyMapped);
         templateRepository.save(template);
+
+        log.info("Template {} field labels updated: {}/{} fields mapped",
+                template.getId(), mappedCount, template.getFieldCount());
 
         return savedFields.stream()
                 .map(TemplateFieldResponseDTO::new)

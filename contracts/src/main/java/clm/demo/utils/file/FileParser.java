@@ -49,7 +49,7 @@ public class FileParser {
         };
     }
 
-    private String extractPdf(MultipartFile file) throws IOException {
+    private static String extractPdf(MultipartFile file) throws IOException {
         try (PDDocument document = Loader.loadPDF(file.getBytes())) {
             String text = new PDFTextStripper().getText(document);
             log.info("parsed PDF '{}': {} chars", file.getOriginalFilename(), text.length());
@@ -68,7 +68,7 @@ public class FileParser {
      * remain accurate — skipping them would shift every subsequent
      * {@code startOffset}/{@code endOffset}.</p>
      */
-    private String extractDocx(MultipartFile file) throws IOException {
+    private static String extractDocx(MultipartFile file) throws IOException {
         try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
             StringBuilder sb = new StringBuilder();
             // Preserve blank lines as empty entries to keep placeholder offsets accurate.
@@ -83,7 +83,7 @@ public class FileParser {
         }
     }
     
-    private void validateFile(MultipartFile file) {
+    private static void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty())
             throw new IllegalArgumentException("File cannot be null or empty");
         if (file.getSize() > MAX_FILE_SIZE)

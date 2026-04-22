@@ -100,7 +100,7 @@ public class FileUtils {
                     throw new UnsupportedConversionException(sourceFormat.name(), targetFormat.name());
                 }
                 case PDF -> {
-                    if (targetFormat == DocumentFormat.DOCX) yield convertWithLibreOffice(data, "pdf", "docx");
+                    if (targetFormat == DocumentFormat.DOCX) yield convertPdfToDocx(data);
                     throw new UnsupportedConversionException(sourceFormat.name(), targetFormat.name());
                 }
             };
@@ -201,6 +201,46 @@ public class FileUtils {
                     });
         } catch (IOException e) {
             log.warn("Failed to clean up temp directory: {}", tempDir, e);
+        }
+    }
+
+    /**
+     * Converts a PDF to DOCX by extracting text and creating a DOCX document.
+     * Uses Apache PDFBox to extract text and Apache POI to create the DOCX.
+     *
+     * @param pdfData the raw bytes of the PDF document
+     * @return DOCX bytes containing the extracted text
+     * @throws IOException if PDF reading or DOCX creation fails
+     */
+    private byte[] convertPdfToDocx(byte[] pdfData) throws IOException {
+        try {
+            PDDocument pdDocument = Loader.loadPDF(pdfData);
+            PDFTextStripper stripper = new PDFTextStripper();
+            String extractedText = stripper.getText(pdDocument);
+            pdDocument.close();
+
+            XWPFDocument docxDocument = new XWPFDocument();
+            String[] paragraphs = extractedText.split("\n");
+
+            for (String paragraphText : paragraphs) {
+                if (!paragraphText.trim().isEmpty()) {
+                    XWPFParagraph paragraph = docxDocument.createParagraph();
+                    XWPFRun run = paragraph.createRun();
+                    run.setText(paragraphText);
+                }
+            }
+
+            ByteArrayOutputStream docxOutput = new ByteArrayOutputStream();
+            docxDocument.write(docxOutput);
+            docxDocument.close();
+
+            byte[] docxBytes = docxOutput.toByteArray();
+            log.info("PDF to DOCX conversion successful: {} bytes produced", docxBytes.length);
+            return docxBytes;
+
+        } catch (IOException e) {
+            log.error("Failed to convert PDF to DOCX: {}", e.getMessage(), e);
+            throw e;
         }
     }
 }

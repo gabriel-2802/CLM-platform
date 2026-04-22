@@ -7,17 +7,16 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
-import java.math.BigDecimal;
-
 @Mapper(componentModel = "spring")
 public interface ContractGenerationMapper {
 
     @Mapping(target = "id",                    ignore = true)
     @Mapping(source = "request.clientId",      target = "clientId")
+    @Mapping(source = "request.userId",        target = "generatedBy",      qualifiedByName = "toInteger")
     @Mapping(source = "request.userMail",      target = "generatedByMail")
     @Mapping(source = "request.startDate",     target = "contractStartDate")
     @Mapping(source = "request.endDate",       target = "contractEndDate")
-    @Mapping(source = "request.value",         target = "contractValue", qualifiedByName = "toDecimal")
+    @Mapping(source = "request.value",         target = "contractValue")
     @Mapping(source = "template",              target = "documentTemplate")
     @Mapping(source = "request.notes",         target = "notes")
     @Mapping(target = "contractStatus",        ignore = true)
@@ -30,8 +29,9 @@ public interface ContractGenerationMapper {
     @Mapping(target = "appendices",            ignore = true)
     Contract toContractEntity(GenContractRequest request, DocumentTemplate template);
 
-    @Named("toDecimal")
-    default BigDecimal toDecimal(Double value) {
-        return value != null ? BigDecimal.valueOf(value) : null;
+    /** Narrows Long userId to Integer generatedBy (contract IDs fit well within Integer range). */
+    @Named("toInteger")
+    default Integer toInteger(Long value) {
+        return value != null ? value.intValue() : null;
     }
 }

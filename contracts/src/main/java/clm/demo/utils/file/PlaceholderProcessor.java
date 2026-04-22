@@ -11,14 +11,11 @@ import java.util.regex.Matcher;
 
 /**
  * Utility methods for detecting and replacing dot-sequence placeholders in contract text.
- *
  */
 @UtilityClass
 public class PlaceholderProcessor {
 
-    /**
-     * Internal immutable record for placeholder data.
-     */
+    /** Internal immutable record for placeholder data. */
     public record PlaceholderRecord(int occurrenceIndex, String prevText, int startOffset, int endOffset) {}
 
     /** Result of {@link #substituteEach}: the rewritten text plus how many placeholders were filled. */
@@ -46,22 +43,19 @@ public class PlaceholderProcessor {
      *   <li>Line endings → {@code \n}</li>
      *   <li>Unicode dot-like glyphs → ASCII {@code .}:
      *     <ul>
-     *       <li>U+2026 HORIZONTAL ELLIPSIS → {@code ...} (3 dots — its visual meaning)</li>
+     *       <li>U+2026 HORIZONTAL ELLIPSIS → {@code ...} (3 dots)</li>
      *       <li>U+2025 TWO DOT LEADER      → {@code ..}  (2 dots)</li>
      *       <li>U+FF0E FULLWIDTH FULL STOP → {@code .}   (1 dot)</li>
      *       <li>U+22EF MIDLINE ELLIPSIS    → {@code ...} (3 dots)</li>
      *     </ul>
      *   </li>
      * </ol>
-     *
-     *
      */
     public static String normalize(String raw) {
         if (raw == null) return "";
         return raw
                 .replace("\r\n", "\n")
                 .replace("\r",   "\n")
-                // unicode dot-like glyphs → ASCII dots
                 .replace("\u2026", "...") // HORIZONTAL ELLIPSIS  → 3 dots
                 .replace("\u22EF", "...") // MIDLINE ELLIPSIS      → 3 dots
                 .replace("\u2025", "..")  // TWO DOT LEADER        → 2 dots
@@ -73,9 +67,9 @@ public class PlaceholderProcessor {
      *
      * @return ordered list of {@link PlaceholderRecord}, one per match
      */
-    public static List<PlaceholderProcessor.PlaceholderRecord> findPlaceholders(String normalizedContent) {
+    public static List<PlaceholderRecord> findPlaceholders(String normalizedContent) {
         List<PlaceholderRecord> results = new ArrayList<>();
-        Matcher matcher = Constants.getPlaceholderPattern().matcher(normalizedContent);
+        Matcher matcher = Constants.PLACEHOLDER_PATTERN.matcher(normalizedContent);
         int position = 0;
 
         while (matcher.find()) {
@@ -100,7 +94,7 @@ public class PlaceholderProcessor {
      */
     public static SubstitutionResult substituteEach(String normalizedContent, IntFunction<String> resolver) {
         StringBuilder sb = new StringBuilder();
-        Matcher matcher = Constants.getPlaceholderPattern().matcher(normalizedContent);
+        Matcher matcher = Constants.PLACEHOLDER_PATTERN.matcher(normalizedContent);
         int index = 0;
         int replaced = 0;
 
@@ -132,23 +126,20 @@ public class PlaceholderProcessor {
             String normalizedContent, IntFunction<String> resolver) {
 
         StringBuilder sb      = new StringBuilder();
-        Matcher matcher       = Constants.getPlaceholderPattern().matcher(normalizedContent);
+        Matcher matcher       = Constants.PLACEHOLDER_PATTERN.matcher(normalizedContent);
         List<SubstitutionSpan> spans = new ArrayList<>();
         int index    = 0;
         int replaced = 0;
 
         while (matcher.find()) {
-            // capture original-string offsets BEFORE appendReplacement moves the matcher.
             int origStart = matcher.start();
             int origEnd   = matcher.end();
 
-            String value      = resolver.apply(index++);
+            String value       = resolver.apply(index++);
             boolean didReplace = value != null;
-            String  actual    = didReplace ? value : matcher.group();
+            String  actual     = didReplace ? value : matcher.group();
 
             matcher.appendReplacement(sb, Matcher.quoteReplacement(actual));
-
-            // origStart / origEnd are fixed; replacementLen is the length written.
             spans.add(new SubstitutionSpan(origStart, origEnd, actual.length(), didReplace));
 
             if (didReplace) replaced++;

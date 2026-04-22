@@ -12,12 +12,22 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * A contract template stored as a normalised DOCX document.
+ *
+ * <p>{@code @Getter}/{@code @Setter} are used instead of {@code @Data} to avoid
+ * generating {@code equals/hashCode} over all fields — which would include the
+ * {@code documentContent} byte array (very expensive) and the {@code templateFields}
+ * collection (infinite-loop risk with bidirectional relationships).</p>
+ */
 @Entity
 @Table(name = "document_template", schema = "clm")
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString(exclude = {"documentContent", "templateFields"})
 public class DocumentTemplate {
 
     @Id

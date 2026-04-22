@@ -4,7 +4,9 @@ import clm.demo.exceptions.UnsupportedFileException;
 import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
 import lombok.experimental.UtilityClass;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @UtilityClass
 public class Utils {
 
@@ -37,6 +39,7 @@ public class Utils {
         try {
             return DataType.valueOf(dataTypeStr.toUpperCase());
         } catch (IllegalArgumentException e) {
+            log.warn("Unknown data type '{}', defaulting to STRING", dataTypeStr);
             return DataType.STRING;
         }
     }

@@ -6,14 +6,23 @@ import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+/**
+ * A single placeholder field extracted from a {@link DocumentTemplate}.
+ *
+ * <p>{@code @Getter}/{@code @Setter} are used instead of {@code @Data} to avoid
+ * generating {@code equals/hashCode} over all fields, including the lazy-loaded
+ * {@code documentTemplate} relationship.</p>
+ */
 @Entity
 @Table(name = "template_field", schema = "clm", indexes = {
         @Index(name = "idx_template_field_template_position", columnList = "template_id, field_position")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString(exclude = {"documentTemplate"})
 public class TemplateField {
 
     @Id

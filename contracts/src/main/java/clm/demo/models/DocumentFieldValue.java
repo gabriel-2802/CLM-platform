@@ -9,6 +9,11 @@ import java.time.LocalDateTime;
 /**
  * Audit trail record for each field value injected into any generated document.
  *
+ * <p>{@code @Getter}/{@code @Setter} are used instead of {@code @Data} to avoid
+ * generating {@code equals/hashCode} over lazy-loaded relationship fields, which
+ * would trigger unintended DB queries and risk infinite recursion in bidirectional
+ * associations.</p>
+ *
  * @see Document
  * @see TemplateField
  */
@@ -17,10 +22,12 @@ import java.time.LocalDateTime;
         @Index(name = "idx_document_field_value_document", columnList = "document_id"),
         @Index(name = "idx_document_field_value_field",    columnList = "template_field_id")
 })
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString(exclude = {"document", "templateField"})
 public class DocumentFieldValue {
 
     @Id

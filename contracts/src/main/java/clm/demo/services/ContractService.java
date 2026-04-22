@@ -22,7 +22,7 @@ import clm.demo.utils.docx.DocxFiller;
 import clm.demo.utils.file.FileUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import clm.demo.utils.Constants;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,8 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -147,7 +145,7 @@ public class ContractService {
         }
 
         contract.setContractStatus(ContractStatus.TERMINATED);
-        contract.setTerminationDate(request.getTerminationDate().toLocalDate());
+        contract.setTerminationDate(request.getTerminationDate());
         contract.setReasonsForTermination(request.getReasons());
         contractRepository.save(contract);
     }

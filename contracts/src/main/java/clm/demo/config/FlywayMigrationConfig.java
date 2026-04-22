@@ -1,7 +1,7 @@
 package clm.demo.config;
 
 import clm.demo.exceptions.DatabaseValidationException;
-import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
@@ -16,7 +16,7 @@ import javax.sql.DataSource;
  *
  */
 @Configuration
-@AllArgsConstructor
+@RequiredArgsConstructor
 @Slf4j
 public class FlywayMigrationConfig {
 
