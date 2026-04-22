@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
 
-// Labels that are auto-populated by the backend — not shown to the user
+// Labels auto-populated from the client record — not shown to the user
 const AUTO_LABELS = new Set([
   "CLIENT_NAME",
   "CLIENT_CUI",
@@ -22,6 +22,8 @@ const AUTO_LABELS = new Set([
   "CONTRACT_END_DATE",
   "CONTRACT_VALUE",
   "CONTRACT_NOTES",
+  "TARIF_CONTA",
+  "TARIF_BILANT",
 ])
 
 export function GenerateContractModal({ client }: { client: any }) {
@@ -31,19 +33,13 @@ export function GenerateContractModal({ client }: { client: any }) {
   const [templateFields, setTemplateFields] = useState<any[]>([])
   const [loadingFields, setLoadingFields] = useState(false)
   const [generating, setGenerating] = useState(false)
-
-  // keyed by field.id (number) to avoid collision when multiple MANUAL fields exist
   const [manualValues, setManualValues] = useState<Record<number, string>>({})
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
-  const [contractValue, setContractValue] = useState("")
   const [notes, setNotes] = useState("")
 
   // Load templates on open
   useEffect(() => {
     if (!open) return
     getTemplates().then((all) => {
-      // Only show fully mapped templates — unmapped ones can't generate a valid contract
       setTemplates(all.filter((t: any) => t.fullyMapped))
       setSelectedTemplate("")
       setTemplateFields([])
@@ -80,24 +76,18 @@ export function GenerateContractModal({ client }: { client: any }) {
       .catch(() => setTemplateFields([]))
       .finally(() => setLoadingFields(false))
 
-    // Pre-fill dates
-    const today = new Date()
-    setStartDate(today.toISOString().split("T")[0])
-    today.setFullYear(today.getFullYear() + 1)
-    setEndDate(today.toISOString().split("T")[0])
-    setContractValue("")
     setNotes("")
   }, [selectedTemplate])
 
   const manualFields = templateFields.filter((f) => !AUTO_LABELS.has(f.fieldLabel))
-  const needsValue = templateFields.some((f) => f.fieldLabel === "CONTRACT_VALUE")
   const needsNotes = templateFields.some((f) => f.fieldLabel === "CONTRACT_NOTES")
 
   const isFormValid =
     selectedTemplate !== "" &&
-    startDate !== "" &&
-    endDate !== "" &&
     manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
+
+  const fmt = (val: number | undefined | null) =>
+    val != null ? String(parseFloat(String(val)).toFixed(2)) : ""
 
   const handleGenerate = async () => {
     setGenerating(true)
@@ -109,9 +99,11 @@ export function GenerateContractModal({ client }: { client: any }) {
       mappings["CLIENT_ADDRESS"]      = client.adresa        || ""
       mappings["CLIENT_TYPE"]         = client.tip           || ""
       mappings["CLIENT_ADMIN"]        = client.administratie || ""
-      mappings["CONTRACT_START_DATE"] = startDate
-      mappings["CONTRACT_END_DATE"]   = endDate
-      mappings["CONTRACT_VALUE"]      = contractValue ? String(parseFloat(contractValue).toFixed(2)) : ""
+      mappings["CONTRACT_START_DATE"] = client.deLa          || ""
+      mappings["CONTRACT_END_DATE"]   = client.panaLa        || ""
+      mappings["CONTRACT_VALUE"]      = fmt(client.tarifConta)
+      mappings["TARIF_CONTA"]         = fmt(client.tarifConta)
+      mappings["TARIF_BILANT"]        = fmt(client.tarifBilant)
       mappings["CONTRACT_NOTES"]      = notes || ""
 
       manualFields.forEach((f) => {
@@ -123,10 +115,10 @@ export function GenerateContractModal({ client }: { client: any }) {
         userId: 1,
         userMail: "admin@clm.com",
         clientId: client.id,
-        startDate,
-        endDate,
+        startDate: client.deLa || "",
+        endDate: client.panaLa || "",
         mappings,
-        value: contractValue ? parseFloat(contractValue) : null,
+        value: client.tarifConta ?? null,
         notes: notes || null,
       }
 
@@ -198,58 +190,37 @@ export function GenerateContractModal({ client }: { client: any }) {
 
           {selectedTemplate && !loadingFields && (
             <div className="space-y-4 border rounded-md p-4 bg-muted/20">
-              {/* Standard dates */}
+              {/* Summary of auto-filled values from client row */}
               <h4 className="font-medium text-sm text-muted-foreground border-b pb-2">
-                Informații standard
+                Informații preluate din fișa clientului
               </h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>
-                    Data de început <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    required
-                  />
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span className="text-muted-foreground">De la: </span>
+                  <span className="font-medium">{client.deLa || "—"}</span>
                 </div>
-                <div className="space-y-2">
-                  <Label>
-                    Data de sfârșit <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    required
-                  />
+                <div>
+                  <span className="text-muted-foreground">Până la: </span>
+                  <span className="font-medium">{client.panaLa || "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tarif conta: </span>
+                  <span className="font-medium">{client.tarifConta != null ? client.tarifConta : "—"}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tarif bilanț: </span>
+                  <span className="font-medium">{client.tarifBilant != null ? client.tarifBilant : "—"}</span>
                 </div>
               </div>
 
-              {(needsValue || needsNotes) && (
-                <div className="grid grid-cols-2 gap-4">
-                  {needsValue && (
-                    <div className="space-y-2">
-                      <Label>Valoare contract (RON)</Label>
-                      <Input
-                        type="number"
-                        placeholder="ex. 1500"
-                        value={contractValue}
-                        onChange={(e) => setContractValue(e.target.value)}
-                      />
-                    </div>
-                  )}
-                  {needsNotes && (
-                    <div className="space-y-2">
-                      <Label>Notițe</Label>
-                      <Input
-                        placeholder="Detalii adiționale..."
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                      />
-                    </div>
-                  )}
+              {needsNotes && (
+                <div className="space-y-2">
+                  <Label>Notițe</Label>
+                  <Input
+                    placeholder="Detalii adiționale..."
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
                 </div>
               )}
 
