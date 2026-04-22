@@ -42,7 +42,7 @@ public class ContractApiService {
     public List<ContractSummaryDTO> fetchExpiringContracts() {
         try {
             List<ContractSummaryDTO> result = contractsRestClient.get()
-                    .uri("/api/contracts/report/expiring?withinDays={days}", expiryWarningDays)
+                    .uri("/api/contracts/report/expiring?days={days}", expiryWarningDays)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         log.warn("Contracts API returned {} for expiring contracts endpoint", res.getStatusCode());
@@ -68,7 +68,7 @@ public class ContractApiService {
     public List<ContractSummaryDTO> fetchInactiveClientContracts() {
         try {
             List<ContractSummaryDTO> result = contractsRestClient.get()
-                    .uri("/api/contracts/report/inactive-clients?sinceMonths={months}", inactivityMonths)
+                    .uri("/api/contracts/report/inactive-clients?months={months}", inactivityMonths)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         log.warn("Contracts API returned {} for inactive-clients endpoint", res.getStatusCode());
