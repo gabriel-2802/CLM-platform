@@ -1,5 +1,86 @@
 # CLM Platform Setup & Commands Guide
 
+---
+
+## Pornirea aplicației (toate microserviciile)
+
+Aplicația are 4 componente care trebuie pornite **în această ordine**:
+
+```
+[PostgreSQL Docker] → [Contracts :8080] → [Notifications :8082] → [Frontend :3000]
+```
+
+### Pas 1 — Baza de date (Docker)
+
+```bash
+docker-compose up -d
+```
+
+Verificare: `docker ps` → containerul `clm_postgres` trebuie să apară ca `healthy`.
+
+---
+
+### Pas 2 — Microserviciul de contracte (port 8080)
+
+```bash
+cd contracts
+JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64 apache-maven-3.9.6/bin/mvn spring-boot:run
+```
+
+> **Prima pornire sau după schimbarea de branch:** adaugă `clean` înainte de `spring-boot:run`  
+> `apache-maven-3.9.6/bin/mvn clean spring-boot:run`  
+> (curăță fișierele compilate vechi care pot cauza conflicte)
+
+Verificare: `curl http://localhost:8080/api/contracts` → răspunde cu 200 sau 204.
+
+---
+
+### Pas 3 — Microserviciul de notificări (port 8082)
+
+Înainte de prima pornire, configurează [notifications/src/main/resources/application.properties](notifications/src/main/resources/application.properties):
+
+```properties
+notification.recipients=adresa@email.com      # adresa care primește rapoartele
+spring.mail.password=xxxx xxxx xxxx xxxx      # App Password Gmail (16 caractere)
+```
+
+Pornire (din rădăcina proiectului):
+
+```bash
+cd notifications
+JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64 ../contracts/apache-maven-3.9.6/bin/mvn spring-boot:run
+```
+
+Verificare: `curl http://localhost:8082/notifications/preview` → returnează JSON cu contractele găsite.
+
+> Mail-ul se trimite automat în ziua de 1 a lunii la ora 8:00 (configurabil prin `notification.cron`).  
+> Pentru a testa imediat: `curl -X POST http://localhost:8082/notifications/trigger`
+
+---
+
+### Pas 4 — Frontend Next.js (port 3000)
+
+```bash
+cd general
+nvm use 20
+npm run dev
+```
+
+Verificare: deschide [http://localhost:3000](http://localhost:3000) în browser.
+
+---
+
+### Rezumat porturi
+
+| Serviciu | Port | Comandă de verificare |
+|---|---|---|
+| PostgreSQL | 5432 | `docker ps` |
+| Contracts | 8080 | `curl http://localhost:8080/api/contracts` |
+| Notifications | 8082 | `curl http://localhost:8082/notifications/preview` |
+| Frontend | 3000 | browser: http://localhost:3000 |
+
+---
+
 **Database Setup: Docker Only** - No local PostgreSQL required. All database initialization happens via Docker.
 
 ## Prerequisites
