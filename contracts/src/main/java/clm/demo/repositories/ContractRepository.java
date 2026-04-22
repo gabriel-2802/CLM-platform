@@ -51,6 +51,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
     @Query("""
         SELECT c FROM Contract c
         WHERE c.contractStatus = :status
+        AND c.createdAt < :cutoffDate
         AND NOT EXISTS (
             SELECT c2 FROM Contract c2
             WHERE c2.clientId = c.clientId
