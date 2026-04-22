@@ -8,6 +8,9 @@ export type Row = {
   id: number
   name: string
   tip: string
+  cui?: string
+  adresa?: string
+  administratie?: string
   deLa?: string
   panaLa?: string
   users?: string[]
@@ -35,12 +38,13 @@ export async function getClientRows(): Promise<Row[]> {
   })
 
   const latestContracts: any[] = await prisma.$queryRaw`
-    SELECT id, client_id, created_at 
-    FROM contracts.generated_contract 
-    WHERE id IN (
-      SELECT MAX(id) 
-      FROM contracts.generated_contract 
-      GROUP BY client_id
+    SELECT d.id, c.client_id, d.created_at
+    FROM clm.contract c
+    JOIN clm.document d ON d.id = c.document_id
+    WHERE d.id IN (
+      SELECT MAX(c2.document_id)
+      FROM clm.contract c2
+      GROUP BY c2.client_id
     )
   `;
 
@@ -74,6 +78,9 @@ export async function getClientRows(): Promise<Row[]> {
       id: c.id,
       name: c.denumire,
       tip: c.tip,
+      cui: c.cui,
+      adresa: c.adresa ?? undefined,
+      administratie: c.administratie,
       deLa: toISODate(earliestDeLa ?? c.dataVerificarii),
       panaLa: toISODate(latestPanaLa ?? null),
       users: c.users

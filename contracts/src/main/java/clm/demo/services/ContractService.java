@@ -56,8 +56,6 @@ public class ContractService {
 
     /**
      * Generates a new contract from a template with provided field mappings.
-     * Client data (name, CUI, address, etc.) is automatically fetched from the
-     * public schema and merged with user-provided mappings before field injection.
      *
      * @param request the contract generation request
      * @return a ContractResponseDTO with the newly generated contract details

@@ -102,10 +102,18 @@ export function GenerateContractModal({ client }: { client: any }) {
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      // Build mappings: key = fieldLabel, value = user input.
-      // For "MANUAL" fields we use the field label as key — if multiple fields share
-      // the same label the backend receives one key, which is a known design limitation.
       const mappings: Record<string, string> = {}
+
+      mappings["CLIENT_NAME"]         = client.name          || ""
+      mappings["CLIENT_CUI"]          = client.cui           || ""
+      mappings["CLIENT_ADDRESS"]      = client.adresa        || ""
+      mappings["CLIENT_TYPE"]         = client.tip           || ""
+      mappings["CLIENT_ADMIN"]        = client.administratie || ""
+      mappings["CONTRACT_START_DATE"] = startDate
+      mappings["CONTRACT_END_DATE"]   = endDate
+      mappings["CONTRACT_VALUE"]      = contractValue ? String(parseFloat(contractValue).toFixed(2)) : ""
+      mappings["CONTRACT_NOTES"]      = notes || ""
+
       manualFields.forEach((f) => {
         mappings[f.fieldLabel] = manualValues[f.id] ?? ""
       })
