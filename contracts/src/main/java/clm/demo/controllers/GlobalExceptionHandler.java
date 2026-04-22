@@ -2,6 +2,7 @@ package clm.demo.controllers;
 
 import clm.demo.dto.responses.ErrorResponseDTO;
 import clm.demo.exceptions.*;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.FieldError;
@@ -12,6 +13,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,6 +55,16 @@ public class GlobalExceptionHandler {
                 .toList();
         log.warn("request validation failed: {}", errors);
         return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", String.join(", ", errors));
+    }
+
+    /**
+     * Handles cases where a required multipart file or form part is missing from the request.
+     */
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMissingServletRequestPartException(MissingServletRequestPartException e) {
+        log.warn("required multipart part missing: {}", e.getRequestPartName());
+        String details = String.format("Required field '%s' is missing. Please ensure all required fields are included in your request.", e.getRequestPartName());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field", details);
     }
 
     /**
@@ -125,6 +138,29 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponseDTO> handleInvalidContractStateException(InvalidContractStateException e) {
         log.warn("invalid contract state transition: {}", e.getMessage());
         return buildResponse(HttpStatus.CONFLICT, "Invalid contract state", e.getMessage());
+    }
+
+    /**
+     * Handles attempts to perform an illegal state transition on an appendix
+     * (e.g., uploading a signed document to an appendix that is already SIGNED).
+     */
+    @ExceptionHandler(InvalidAppendixStateException.class)
+    public ResponseEntity<ErrorResponseDTO> handleInvalidAppendixStateException(InvalidAppendixStateException e) {
+        log.warn("invalid appendix state transition: {}", e.getMessage());
+        return buildResponse(HttpStatus.CONFLICT, "Invalid appendix state", e.getMessage());
+    }
+
+    /**
+     * Handles Bean Validation failures triggered by {@code @Validated} + {@code @Valid}
+     * on service-layer method parameters (e.g., null required fields).
+     */
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleConstraintViolationException(ConstraintViolationException e) {
+        List<String> errors = e.getConstraintViolations().stream()
+                .map(cv -> cv.getPropertyPath() + ": " + cv.getMessage())
+                .toList();
+        log.warn("constraint violation: {}", errors);
+        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed", String.join(", ", errors));
     }
 
     /**
@@ -217,6 +253,18 @@ public class GlobalExceptionHandler {
             : java.util.List.of("Unknown"));
         String details = String.format("HTTP method '%s' is not supported for this endpoint. Supported methods: %s", method, supportedMethods);
         return buildResponse(HttpStatus.METHOD_NOT_ALLOWED, "Invalid request method", details);
+    }
+
+    /**
+     * Handles cases where a requested endpoint or resource is not found.
+     * This typically occurs when a request path does not match any defined endpoint.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("endpoint not found: {} {}", e.getHttpMethod(), e.getResourcePath());
+        String details = String.format("The requested endpoint '%s %s' does not exist. Please check the API documentation for available endpoints.",
+                e.getHttpMethod(), e.getResourcePath());
+        return buildResponse(HttpStatus.NOT_FOUND, "Endpoint not found", details);
     }
 
     /**

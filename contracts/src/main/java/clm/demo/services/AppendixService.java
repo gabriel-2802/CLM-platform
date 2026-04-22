@@ -28,6 +28,8 @@ import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,9 +48,14 @@ public class AppendixService {
 
     /**
      * Generates a fillable appendix from a template and attaches it to the given contract.
+     * The appendix is created in {@link AppendixStatus#DRAFT} status; it transitions to
+     * {@link AppendixStatus#SIGNED} only when a signed document is uploaded via
+     * {@link #uploadSignedAppendix}.
      */
     @Transactional
     public AppendixResponseDTO generateAppendix(@Valid GenAppendixRequest request) {
+        log.info("Generating appendix for contract {} from template {}", request.contractId(), request.templateId());
+
         Contract contract = contractRepository.findById(request.contractId())
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + request.contractId()));
 
@@ -72,6 +79,7 @@ public class AppendixService {
                 .build();
 
         appendix = appendixRepository.save(appendix);
+        log.debug("Appendix {} created in DRAFT status for contract {}", appendix.getId(), contract.getId());
 
         List<DocumentFieldValue> fieldValues = buildFieldValues(appendix, template, request.mappings());
         if (!fieldValues.isEmpty()) {
@@ -82,7 +90,7 @@ public class AppendixService {
         try {
             List<TemplateField> ordered = template.getTemplateFields().stream()
                     .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
-                    .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
+                    .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
                     .toList();
             Map<String, String> labelToValue = buildLabelValueMap(fieldValues);
             byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
@@ -91,6 +99,7 @@ public class AppendixService {
             appendix.setDocumentContent(fileUtils.compress(pdf));
             appendix.setDocumentFormat(DocumentFormat.PDF);
             appendix = appendixRepository.save(appendix);
+            log.info("Appendix {} generated successfully ({} field(s) filled)", appendix.getId(), fieldValues.size());
         } catch (IOException e) {
             throw new ContractGenerationFailException("Failed to generate appendix document: " + e.getMessage());
         }
@@ -100,10 +109,14 @@ public class AppendixService {
 
     /**
      * Uploads a non-fillable appendix directly (no template, no field values).
+     * The appendix is immediately set to {@link AppendixStatus#SIGNED} since the
+     * uploaded file is treated as the final, authoritative document.
      * Format is auto-detected from file magic bytes.
      */
     @Transactional
-    public AppendixResponseDTO uploadDirectAppendix(UploadDirectAppendixRequest request) {
+    public AppendixResponseDTO uploadDirectAppendix(@Valid UploadDirectAppendixRequest request) {
+        log.info("Uploading direct appendix for contract {}", request.getContractId());
+
         Contract contract = contractRepository.findById(request.getContractId())
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + request.getContractId()));
 
@@ -117,24 +130,36 @@ public class AppendixService {
                     .generatedBy(request.getUserId())
                     .generatedByMail(request.getUserMail())
                     .notes(request.getNotes())
-                    .documentContent(fileUtils.compress(fileBytes))
+                    .signedDocumentContent(fileUtils.compress(fileBytes))
                     .documentFormat(format)
                     .appendixStatus(AppendixStatus.SIGNED)
                     .build();
 
-            return appendixMapper.toResponseDTO(appendixRepository.save(appendix));
+            AppendixResponseDTO response = appendixMapper.toResponseDTO(appendixRepository.save(appendix));
+            log.info("Direct appendix {} uploaded as SIGNED for contract {}", response.getId(), contract.getId());
+            return response;
         } catch (IOException e) {
             throw new FileConversionException("Failed to store appendix document: " + e.getMessage(), e);
         }
     }
 
     /**
-     * Uploads a signed appendix, auto-converts to PDF, and transitions status to SIGNED.
+     * Uploads a signed document for an existing {@link AppendixStatus#DRAFT} appendix,
+     * auto-converts it to PDF, and transitions the status to {@link AppendixStatus#SIGNED}.
+     *
+     * @throws InvalidAppendixStateException if the appendix is already {@link AppendixStatus#SIGNED}
      */
     @Transactional
     public AppendixResponseDTO uploadSignedAppendix(Long appendixId, byte[] fileBytes) {
+        log.info("Uploading signed document for appendix {}", appendixId);
+
         Appendix appendix = appendixRepository.findById(appendixId)
                 .orElseThrow(() -> new ResourceNotFoundException("Appendix not found: " + appendixId));
+
+        if (appendix.getAppendixStatus() == AppendixStatus.SIGNED) {
+            throw new InvalidAppendixStateException(
+                    "Appendix " + appendixId + " is already SIGNED and cannot accept another signed document.");
+        }
 
         try {
             DocumentFormat sourceFormat = Utils.detectDocumentFormat(fileBytes);
@@ -145,6 +170,7 @@ public class AppendixService {
             appendix.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             appendix.setAppendixStatus(AppendixStatus.SIGNED);
             appendix = appendixRepository.save(appendix);
+            log.info("Appendix {} transitioned DRAFT → SIGNED", appendixId);
         } catch (IOException e) {
             throw new FileConversionException("Failed to process signed appendix: " + e.getMessage(), e);
         }
@@ -169,7 +195,12 @@ public class AppendixService {
             throw new ResourceNotFoundException("Appendix not found: " + appendixId);
         }
         appendixRepository.deleteById(appendixId);
+        log.info("Appendix {} deleted", appendixId);
     }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
 
     private void validateMandatoryFields(DocumentTemplate template, Map<String, String> mappings) {
         List<String> missing = template.getTemplateFields().stream()
@@ -202,7 +233,7 @@ public class AppendixService {
     }
 
     private static Map<String, String> buildLabelValueMap(List<DocumentFieldValue> fieldValues) {
-        Map<String, String> map = new java.util.HashMap<>(fieldValues.size() * 2);
+        Map<String, String> map = new HashMap<>(fieldValues.size() * 2);
         for (DocumentFieldValue dfv : fieldValues) {
             TemplateField field = dfv.getTemplateField();
             if (field != null && field.getFieldLabel() != null && dfv.getFieldValue() != null) {

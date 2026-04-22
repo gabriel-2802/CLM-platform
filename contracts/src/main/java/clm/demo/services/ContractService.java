@@ -54,7 +54,6 @@ public class ContractService {
     private final GeneratedContractMapper contractMapper;
 
     private final ContractSpecification contractSpecification;
-    private final JdbcTemplate jdbcTemplate;
     private final FileUtils fileUtils;
 
     /**
@@ -68,7 +67,7 @@ public class ContractService {
      * @throws MissingMandatoryFieldException if required fields are missing values
      */
     @Transactional
-    public ContractResponseDTO generateContract(@Valid GenContractRequest request) {
+    public ContractResponseDTO generateContract(GenContractRequest request) {
         DocumentTemplate template = templateRepository.findById(request.templateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.templateId()));
 
@@ -76,21 +75,12 @@ public class ContractService {
             throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
         }
 
-        Map<String, String> autoData = fetchClientData(request.clientId().intValue());
-        autoData.put("CONTRACT_START_DATE", request.startDate() != null ? request.startDate().toString() : "");
-        autoData.put("CONTRACT_END_DATE", request.endDate() != null ? request.endDate().toString() : "");
-        autoData.put("CONTRACT_VALUE", request.value() != null ? String.format("%.2f", request.value()) : "");
-        autoData.put("CONTRACT_NOTES", request.notes() != null ? request.notes() : "");
-
-        Map<String, String> mergedMappings = new HashMap<>(request.mappings());
-        autoData.forEach(mergedMappings::putIfAbsent);
-
-        validateMandatoryFields(template, mergedMappings);
+        validateMandatoryFields(template, request.mappings());
 
         Contract contract = generationMapper.toContractEntity(request, template);
         contract = contractRepository.save(contract);
 
-        List<DocumentFieldValue> fieldValues = buildFieldValues(contract, template, mergedMappings);
+        List<DocumentFieldValue> fieldValues = buildFieldValues(contract, template, request.mappings());
         if (!fieldValues.isEmpty()) {
             fieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
@@ -113,30 +103,6 @@ public class ContractService {
         }
 
         return contractMapper.toResponseDTO(contract);
-    }
-
-    /**
-     * Fetches client details from the public schema using JdbcTemplate.
-     * Bridges the two isolated schemas to auto-populate contract field values.
-     *
-     * @param clientId the client ID in the public schema
-     * @return map of field keys to their values; empty map if client not found or query fails
-     */
-    private Map<String, String> fetchClientData(Integer clientId) {
-        String sql = "SELECT denumire as name, cui, adresa as address, tip as type, administratie as admin FROM public.\"Client\" WHERE id = ?";
-        try {
-            Map<String, Object> data = jdbcTemplate.queryForMap(sql, clientId);
-            Map<String, String> result = new HashMap<>();
-            result.put("CLIENT_NAME",    String.valueOf(data.getOrDefault("name",    "")));
-            result.put("CLIENT_CUI",     String.valueOf(data.getOrDefault("cui",     "")));
-            result.put("CLIENT_ADDRESS", String.valueOf(data.getOrDefault("address", "")));
-            result.put("CLIENT_TYPE",    String.valueOf(data.getOrDefault("type",    "")));
-            result.put("CLIENT_ADMIN",   String.valueOf(data.getOrDefault("admin",   "")));
-            return result;
-        } catch (Exception e) {
-            log.warn("Failed to fetch client data for ID {}: {}", clientId, e.getMessage());
-            return new HashMap<>();
-        }
     }
 
     /**

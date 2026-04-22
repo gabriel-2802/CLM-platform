@@ -16,7 +16,7 @@ import java.io.IOException;
  * Normalizes all dot-sequence placeholders in a DOCX document to exactly four dots ({@code ....}).
  *
  * <p>storing a canonical fixed-width placeholder means the regex in
- * {@link clm.demo.utils.Constants#PLACEHOLDER_PATTERN} always matches runs of the same
+ *  always matches runs of the same
  * predictable length, reducing span-delta arithmetic during contract generation and
  * eliminating edge cases from long dot sequences fragmenting across many XML runs.</p>
  *

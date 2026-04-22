@@ -47,6 +47,7 @@ public class ContractSpecification {
                 predicates.add(cb.equal(root.get("contractStatus"), request.contractStatus()));
             }
 
+
             // 3. clientId — B-tree: idx_contract_client
             if (request.clientId() != null) {
                 predicates.add(cb.equal(root.get("clientId"), request.clientId()));
