@@ -144,7 +144,7 @@ export function GenerateContractModal({ client }: { client: any }) {
 
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Generează Contract — {client.name || "Client"}</DialogTitle>
+          <DialogTitle>Genereaza Contract - {client.name || "Client"}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -153,12 +153,12 @@ export function GenerateContractModal({ client }: { client: any }) {
             <Label>Șablon de contract</Label>
             <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
               <SelectTrigger>
-                <SelectValue placeholder="Alege un șablon mapzat..." />
+                <SelectValue placeholder="Alege un șablon mapat..." />
               </SelectTrigger>
               <SelectContent>
                 {templates.length === 0 ? (
                   <SelectItem value="__none__" disabled>
-                    Niciun șablon complet mapzat
+                    Niciun șablon complet mapat
                   </SelectItem>
                 ) : (
                   templates.map((t) => (
