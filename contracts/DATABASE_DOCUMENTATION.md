@@ -606,13 +606,16 @@ TERMINATED → ARCHIVED (archive terminated contracts)
 
 | Value | Description | Lifecycle Stage |
 |-------|-------------|-----------------|
-| `DRAFT` | Appendix created (generated or uploaded) but not yet signed | Initial state |
-| `SIGNED` | Signed version has been uploaded | Terminal state |
+| `DRAFT` | Appendix was **generated from a template** — awaiting a signed copy | Initial state (generated only) |
+| `SIGNED` | Appendix is fully signed — either uploaded directly, or had a signed copy attached | Terminal state |
 
 **State Transitions**:
 ```
-DRAFT → SIGNED (when signed appendix is uploaded via POST /api/appendices/{id}/upload-signed)
+Generated appendix:  DRAFT → SIGNED (via POST /api/appendices/{id}/upload-signed)
+Direct upload:       created directly as SIGNED (no separate signing step)
 ```
+
+> **Rule**: Directly uploaded appendices (`POST /api/appendices/upload`) skip `DRAFT` entirely and are persisted as `SIGNED` immediately. Only template-generated appendices (`POST /api/appendices/generate`) start as `DRAFT`.
 
 ---
 
@@ -823,7 +826,8 @@ public class Appendix extends Document {
 ```java
 @Entity
 @Table(name = "document_template", schema = "clm")
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@ToString(exclude = {"documentContent", "templateFields"})
 public class DocumentTemplate {
 
     @Id
@@ -885,7 +889,8 @@ public class DocumentTemplate {
 @Table(name = "template_field", schema = "clm", indexes = {
     @Index(name = "idx_template_field_template_position", columnList = "template_id, field_position")
 })
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@ToString(exclude = {"documentTemplate"})
 public class TemplateField {
 
     @Id
@@ -935,7 +940,8 @@ public class TemplateField {
     @Index(name = "idx_document_field_value_document", columnList = "document_id"),
     @Index(name = "idx_document_field_value_field",    columnList = "template_field_id")
 })
-@Data @NoArgsConstructor @AllArgsConstructor @Builder
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@ToString(exclude = {"document", "templateField"})
 public class DocumentFieldValue {
 
     @Id

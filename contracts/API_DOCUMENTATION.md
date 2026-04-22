@@ -48,6 +48,7 @@
 | `UnsupportedFileException` | `415` | Unsupported file format |
 | `FileConversionException`, `TemplateUploadException` | `422` | Document conversion failed / Template upload failed |
 | `InvalidContractStateException`, `SignedDocumentNotAvailableException` | `409` | Invalid contract state / Signed document not available |
+| `InvalidAppendixStateException` | `409` | Appendix is already SIGNED or in an invalid state for the operation |
 | `ContractGenerationFailException`, generic `Exception` | `500` | Contract generation failed / Internal server error |
 
 ---
@@ -325,7 +326,7 @@ Generate a contract from a fully mapped template. Validates required fields, per
 | `startDate` | YES | ISO date — contract validity start |
 | `endDate` | YES | ISO date — contract validity end |
 | `mappings` | YES | `Map<String, String>` — key = `fieldLabel`, value = content |
-| `value` | NO | Monetary contract value |
+| `value` | NO | Monetary contract value (`BigDecimal` — use decimal notation, e.g. `15000.00`) |
 | `notes` | NO | Optional context |
 
 ```json
@@ -345,7 +346,9 @@ Generate a contract from a fully mapped template. Validates required fields, per
 }
 ```
 
-**Response** — `200 OK`
+**Response** — `201 Created`
+
+> A `Location` header is returned pointing to the new resource: `Location: /api/contracts/88`
 
 ```json
 {
@@ -384,7 +387,7 @@ Generate a contract from a fully mapped template. Validates required fields, per
 
 ### `POST /api/contracts/{contractId}/upload-signed`
 
-Attach a signed document to a contract. Converts DOCX uploads to PDF internally, then transitions status to `ACTIVE`.
+Attach a signed document to a contract. Converts DOCX uploads to PDF internally, then transitions status to `ACTIVE`. The contract must be in `PENDING_SIGNATURE` state.
 
 **Request** — `multipart/form-data`
 
@@ -429,6 +432,7 @@ POST /api/contracts/88/upload-signed
 |--------|--------|
 | `400` | Empty file |
 | `404` | Contract not found |
+| `409` | Contract is not in `PENDING_SIGNATURE` state |
 | `422` | PDF conversion failed |
 
 ---
@@ -445,12 +449,12 @@ Terminate an active contract. Only contracts with status `ACTIVE` can be termina
 
 | Body Field | Required | Notes |
 |------------|----------|-------|
-| `terminationDate` | YES | ISO timestamp — converted to `LocalDate` internally |
+| `terminationDate` | YES | ISO date (`yyyy-MM-dd`) |
 | `reasons` | NO | Free-text explanation |
 
 ```json
 {
-  "terminationDate": "2026-04-01T00:00:00",
+  "terminationDate": "2026-04-01",
   "reasons": "Client requested early exit"
 }
 ```
@@ -513,9 +517,9 @@ GET /api/contracts?page=0&size=20
 
 ---
 
-### `GET /api/contracts/search`
+### `POST /api/contracts/search`
 
-Filter and search contracts. Accepts a JSON body despite being a GET request (maintained for backward compatibility).
+Filter and search contracts. Uses `POST` instead of `GET` because several HTTP clients and intermediaries (CDNs, proxies) do not support GET requests with a body.
 
 **Request** — `application/json` body, all fields optional
 
@@ -558,6 +562,7 @@ Filter and search contracts. Accepts a JSON body despite being a GET request (ma
 ---
 
 ### `GET /api/contracts/download/{contractId}/{type}/{format}`
+
 
 Download a contract as DOCX or PDF, either the unsigned original or the signed version.
 
@@ -721,7 +726,9 @@ Generate a fillable appendix from a template and attach it to a contract.
 }
 ```
 
-**Response** — `200 OK`
+**Response** — `201 Created`
+
+> A `Location` header is returned pointing to the new resource: `Location: /api/appendices/12`
 
 ```json
 {
@@ -758,7 +765,7 @@ Generate a fillable appendix from a template and attach it to a contract.
 
 ### `POST /api/appendices/upload`
 
-Upload a non-fillable appendix directly and attach it to a contract. Format is auto-detected from file magic bytes.
+Upload a non-fillable appendix directly and attach it to a contract. Format is auto-detected from file magic bytes. Direct uploads are immediately set to `SIGNED` status — no separate upload-signed step is required.
 
 **Request** — `multipart/form-data`
 
@@ -778,14 +785,16 @@ Content-Type: multipart/form-data
 contractId=88&title=ID+Copy&file=<binary>
 ```
 
-**Response** — `200 OK`
+**Response** — `201 Created`
+
+> A `Location` header is returned pointing to the new resource: `Location: /api/appendices/13`
 
 ```json
 {
   "id": 13,
   "contractId": 88,
   "title": "ID Copy",
-  "appendixStatus": "DRAFT",
+  "appendixStatus": "SIGNED",
   "documentFormat": "PDF",
   "createdAt": "2026-04-01T10:10:00"
 }
@@ -804,7 +813,7 @@ contractId=88&title=ID+Copy&file=<binary>
 
 ### `POST /api/appendices/{appendixId}/upload-signed`
 
-Attach a signed version of an appendix. Converts DOCX to PDF internally, then transitions status to `SIGNED`.
+Attach a signed version of an appendix. Converts DOCX to PDF internally, then transitions status to `SIGNED`. The appendix must be in `DRAFT` state — already-`SIGNED` appendices are rejected.
 
 **Request** — `multipart/form-data`
 
@@ -837,6 +846,7 @@ POST /api/appendices/12/upload-signed
 |--------|--------|
 | `400` | Empty file |
 | `404` | Appendix not found |
+| `409` | Appendix is already `SIGNED` |
 | `422` | PDF conversion failed |
 
 ---
