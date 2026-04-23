@@ -157,16 +157,6 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       ),
     },
     {
-      id: "incheie",
-      header: "Incheie",
-      enableSorting: false,
-      cell: () => (
-        <Button variant="destructive" size="sm">
-          incheie
-        </Button>
-      ),
-    },
-    {
       accessorKey: "tarifConta",
       header: "Tarif servicii conta",
       enableSorting: true,
@@ -256,6 +246,16 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
         ) : (
           <Button variant="destructive" size="sm">incarca</Button>
         ),
+    },
+    {
+      id: "incheie",
+      header: "Incheie",
+      enableSorting: false,
+      cell: () => (
+        <Button variant="destructive" size="sm">
+          incheie
+        </Button>
+      ),
     },
     {
       id: "probleme",
