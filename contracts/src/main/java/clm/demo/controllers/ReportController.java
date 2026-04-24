@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
@@ -39,11 +40,13 @@ public class ReportController {
             expiry-alert email digests. Results are ordered by `contractEndDate ASC`.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Expiring contracts returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class))))
-    @ApiResponse(responseCode = "204", description = "No contracts expiring within the given window",
-        content = @Content)
-    @ApiResponse(responseCode = "400", description = "days must be ≥ 1", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Expiring contracts returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class)))),
+        @ApiResponse(responseCode = "204", description = "No contracts expiring within the given window",
+            content = @Content),
+        @ApiResponse(responseCode = "400", description = "days must be ≥ 1", content = @Content)
+    })
     @GetMapping("/expiring")
     public ResponseEntity<List<ContractResponseDTO>> getExpiringContracts(
             @Parameter(description = "Look-ahead window in calendar days (must be ≥ 1)", required = true, example = "30")
@@ -64,11 +67,13 @@ public class ReportController {
             are excluded. Results are ordered by `clientId ASC`, then `contractStartDate ASC`.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Inactive-client contracts returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class))))
-    @ApiResponse(responseCode = "204", description = "No matching contracts found",
-        content = @Content)
-    @ApiResponse(responseCode = "400", description = "months must be ≥ 1", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Inactive-client contracts returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class)))),
+        @ApiResponse(responseCode = "204", description = "No matching contracts found",
+            content = @Content),
+        @ApiResponse(responseCode = "400", description = "months must be ≥ 1", content = @Content)
+    })
     @GetMapping("/inactive-clients")
     public ResponseEntity<List<ContractResponseDTO>> getInactiveClientContracts(
             @Parameter(description = "Minimum contract age in calendar months (must be ≥ 1)", required = true, example = "6")

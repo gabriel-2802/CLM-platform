@@ -6,7 +6,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 /**
  * Configuration class to enable scheduling for background jobs.
  * <p>By annotating with @EnableScheduling, we allow the application to run scheduled tasks defined in
- * other components.</p>
+ * other components (e.g., {@link jobs.ContractArchiveJob}).</p>
  */
 @Configuration
 @EnableScheduling

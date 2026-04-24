@@ -17,6 +17,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -55,15 +56,17 @@ public class ContractController {
             Returns `201 Created` with a `Location` header pointing to the new resource.
             """
     )
-    @ApiResponse(responseCode = "201", description = "Contract created — Location header points to the new resource",
-        headers = @Header(name = "Location", description = "URI of the created contract"),
-        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Missing required field value in mappings",
-        content = @Content)
-    @ApiResponse(responseCode = "404", description = "Template not found",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Contract generation or DOCX rendering failed",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Contract created — Location header points to the new resource",
+            headers = @Header(name = "Location", description = "URI of the created contract"),
+            content = @Content(schema = @Schema(implementation = ContractResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Missing required field value in mappings",
+            content = @Content),
+        @ApiResponse(responseCode = "404", description = "Template not found",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Contract generation or DOCX rendering failed",
+            content = @Content)
+    })
     @PostMapping("/generate")
     public ResponseEntity<ContractResponseDTO> generateContract(
             @Valid @RequestBody GenContractRequest request) {
@@ -87,13 +90,15 @@ public class ContractController {
             to PDF internally, and transitions the contract status to `ACTIVE`.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Contract is now ACTIVE",
-        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Empty file", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Contract is not in PENDING_SIGNATURE state",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "PDF conversion failed", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Contract is now ACTIVE",
+            content = @Content(schema = @Schema(implementation = ContractResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Empty file", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content),
+        @ApiResponse(responseCode = "409", description = "Contract is not in PENDING_SIGNATURE state",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "PDF conversion failed", content = @Content)
+    })
     @PostMapping(value = "/{contractId}/upload-signed", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ContractResponseDTO> uploadSignedContract(
             @Parameter(description = "Contract ID", required = true, example = "88")
@@ -118,9 +123,11 @@ public class ContractController {
         summary     = "Terminate an ACTIVE contract",
         description = "Records the termination date and reason, and transitions the contract status to `TERMINATED`. Only `ACTIVE` contracts can be terminated."
     )
-    @ApiResponse(responseCode = "204", description = "Contract terminated", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Contract terminated", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content),
+        @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
+    })
     @PutMapping("/terminate/{contractId}")
     public ResponseEntity<Void> terminateContract(
             @Parameter(description = "Contract ID", required = true, example = "88")
@@ -138,9 +145,11 @@ public class ContractController {
         summary     = "List all contracts",
         description = "Returns a paginated list of all contracts ordered by creation date descending."
     )
-    @ApiResponse(responseCode = "200", description = "Contracts returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class))))
-    @ApiResponse(responseCode = "204", description = "No contracts found", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Contracts returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class)))),
+        @ApiResponse(responseCode = "204", description = "No contracts found", content = @Content)
+    })
     @GetMapping
     public ResponseEntity<List<ContractResponseDTO>> getAll(
             @Parameter(description = "Zero-based page index", example = "0")
@@ -163,11 +172,13 @@ public class ContractController {
             Returns `204 No Content` when no contracts match.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Matching contracts returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class))))
-    @ApiResponse(responseCode = "204", description = "No contracts match the given filters",
-        content = @Content)
-    @ApiResponse(responseCode = "400", description = "Invalid filter values", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Matching contracts returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class)))),
+        @ApiResponse(responseCode = "204", description = "No contracts match the given filters",
+            content = @Content),
+        @ApiResponse(responseCode = "400", description = "Invalid filter values", content = @Content)
+    })
     @PostMapping("/search")
     public ResponseEntity<List<ContractResponseDTO>> search(
             @RequestBody SearchRequest request) {
@@ -185,11 +196,13 @@ public class ContractController {
         summary     = "Download a contract file",
         description = "Downloads the unsigned or signed contract binary in DOCX or PDF format."
     )
-    @ApiResponse(responseCode = "200", description = "File returned as binary attachment")
-    @ApiResponse(responseCode = "400", description = "Invalid type or format value", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract not found, or signed document not yet uploaded",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Format conversion failed", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "File returned as binary attachment"),
+        @ApiResponse(responseCode = "400", description = "Invalid type or format value", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract not found, or signed document not yet uploaded",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Format conversion failed", content = @Content)
+    })
     @GetMapping("/download/{contractId}/{type}/{format}")
     public ResponseEntity<byte[]> downloadContract(
             @Parameter(description = "Contract ID", required = true, example = "88")

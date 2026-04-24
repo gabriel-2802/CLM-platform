@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -49,20 +50,22 @@ public class TemplateController {
     @Operation(
         summary     = "Upload a template",
         description = """
-            Parses a DOCX or PDF file for dot-sequence placeholders (4+ dots), normalises them,
-            and persists the template with its extracted fields.
+            Parses a DOCX or PDF file for dot-sequence placeholders (4+ dots), normalises them
+            to exactly four dots, and persists the template with its extracted fields.
             PDFs are automatically converted to DOCX internally before storage.
             Returns the parsed document text with placeholders replaced by `{{fieldId}}` tokens.
             """
     )
-    @ApiResponse(responseCode = "201", description = "Template created successfully",
-        content = @Content(schema = @Schema(implementation = TemplateUploadResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Empty file or duplicate template name",
-        content = @Content)
-    @ApiResponse(responseCode = "415", description = "File is not DOCX or PDF",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Document parse or conversion failure",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Template created successfully",
+            content = @Content(schema = @Schema(implementation = TemplateUploadResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Empty file or duplicate template name",
+            content = @Content),
+        @ApiResponse(responseCode = "415", description = "File is not DOCX or PDF",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Document parse or conversion failure",
+            content = @Content)
+    })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<TemplateUploadResponseDTO> uploadTemplate(
             @ModelAttribute @Valid UploadTemplateRequest request) {
@@ -77,8 +80,10 @@ public class TemplateController {
         summary     = "List all templates",
         description = "Returns a paginated list of all templates ordered by creation date descending."
     )
-    @ApiResponse(responseCode = "200", description = "Templates returned")
-    @ApiResponse(responseCode = "204", description = "No templates found", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Templates returned"),
+        @ApiResponse(responseCode = "204", description = "No templates found", content = @Content)
+    })
     @GetMapping
     public ResponseEntity<List<TemplateResponseDTO>> getAllTemplates(
             @Parameter(description = "Zero-based page index", example = "0")
@@ -96,9 +101,11 @@ public class TemplateController {
         summary     = "Get a template by ID",
         description = "Retrieves a single template with all its parsed fields and current label mappings."
     )
-    @ApiResponse(responseCode = "200", description = "Template found",
-        content = @Content(schema = @Schema(implementation = TemplateResponseDTO.class)))
-    @ApiResponse(responseCode = "404", description = "Template not found", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Template found",
+            content = @Content(schema = @Schema(implementation = TemplateResponseDTO.class))),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content)
+    })
     @GetMapping("/{templateId}")
     public ResponseEntity<TemplateResponseDTO> getTemplate(
             @Parameter(description = "Template ID", required = true, example = "7")
@@ -119,11 +126,13 @@ public class TemplateController {
             The `templateId` in the request body must match the path parameter.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Fields updated successfully")
-    @ApiResponse(responseCode = "400", description = "Validation error or field belongs to a different template",
-        content = @Content)
-    @ApiResponse(responseCode = "404", description = "Template or field not found",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Fields updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Validation error or field belongs to a different template",
+            content = @Content),
+        @ApiResponse(responseCode = "404", description = "Template or field not found",
+            content = @Content)
+    })
     @PutMapping("/{templateId}/labels")
     public ResponseEntity<List<TemplateFieldResponseDTO>> updateFieldLabels(
             @Parameter(description = "Template ID the fields belong to", required = true, example = "7")
@@ -143,10 +152,12 @@ public class TemplateController {
             Blocked (409) if any contract or appendix still references this template.
             """
     )
-    @ApiResponse(responseCode = "204", description = "Template deleted", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Template not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Template is referenced by existing documents",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Template deleted", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content),
+        @ApiResponse(responseCode = "409", description = "Template is referenced by existing documents",
+            content = @Content)
+    })
     @DeleteMapping("/{templateId}")
     public ResponseEntity<Void> deleteTemplate(
             @Parameter(description = "Template ID", required = true, example = "7")
@@ -163,10 +174,12 @@ public class TemplateController {
         summary     = "Download a template file",
         description = "Downloads the template binary in the requested format. Converts on the fly if the stored format differs."
     )
-    @ApiResponse(responseCode = "200", description = "File returned as a binary attachment")
-    @ApiResponse(responseCode = "400", description = "Invalid format value", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Template not found", content = @Content)
-    @ApiResponse(responseCode = "422", description = "Format conversion failure", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "File returned as a binary attachment"),
+        @ApiResponse(responseCode = "400", description = "Invalid format value", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Template not found", content = @Content),
+        @ApiResponse(responseCode = "422", description = "Format conversion failure", content = @Content)
+    })
     @GetMapping("/download/{templateId}/{format}")
     public ResponseEntity<byte[]> downloadTemplate(
             @Parameter(description = "Template ID", required = true, example = "7")

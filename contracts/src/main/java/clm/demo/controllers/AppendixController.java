@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -50,15 +51,17 @@ public class AppendixController {
             Returns `201 Created` with a `Location` header pointing to the new resource.
             """
     )
-    @ApiResponse(responseCode = "201", description = "Appendix created in DRAFT state",
-        headers = @Header(name = "Location", description = "URI of the created appendix"),
-        content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Missing required field value in mappings",
-        content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract or template not found",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Document generation failed",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Appendix created in DRAFT state",
+            headers = @Header(name = "Location", description = "URI of the created appendix"),
+            content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Missing required field value in mappings",
+            content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract or template not found",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Document generation failed",
+            content = @Content)
+    })
     @PostMapping("/generate")
     public ResponseEntity<AppendixResponseDTO> generateAppendix(
             @Valid @RequestBody GenAppendixRequest request) {
@@ -80,17 +83,19 @@ public class AppendixController {
             Returns `201 Created` with a `Location` header pointing to the new resource.
             """
     )
-    @ApiResponse(responseCode = "201", description = "Appendix created and immediately SIGNED",
-        headers = @Header(name = "Location", description = "URI of the created appendix"),
-        content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Empty file or missing required fields",
-        content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract not found",
-        content = @Content)
-    @ApiResponse(responseCode = "415", description = "File is not DOCX or PDF",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Storage failure",
-        content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Appendix created and immediately SIGNED",
+            headers = @Header(name = "Location", description = "URI of the created appendix"),
+            content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Empty file or missing required fields",
+            content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract not found",
+            content = @Content),
+        @ApiResponse(responseCode = "415", description = "File is not DOCX or PDF",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Storage failure",
+            content = @Content)
+    })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AppendixResponseDTO> uploadDirectAppendix(
             @ModelAttribute @Valid UploadDirectAppendixRequest request) {
@@ -115,12 +120,14 @@ public class AppendixController {
             Already-`SIGNED` appendices are rejected with `409 Conflict`.
             """
     )
-    @ApiResponse(responseCode = "200", description = "Appendix is now SIGNED",
-        content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class)))
-    @ApiResponse(responseCode = "400", description = "Empty file", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Appendix not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Appendix is already SIGNED", content = @Content)
-    @ApiResponse(responseCode = "422", description = "PDF conversion failed", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Appendix is now SIGNED",
+            content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class))),
+        @ApiResponse(responseCode = "400", description = "Empty file", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Appendix not found", content = @Content),
+        @ApiResponse(responseCode = "409", description = "Appendix is already SIGNED", content = @Content),
+        @ApiResponse(responseCode = "422", description = "PDF conversion failed", content = @Content)
+    })
     @PostMapping(value = "/{appendixId}/upload-signed", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<AppendixResponseDTO> uploadSignedAppendix(
             @Parameter(description = "Appendix ID", required = true, example = "12")
@@ -147,11 +154,13 @@ public class AppendixController {
         summary     = "List all appendices for a contract",
         description = "Returns all appendices attached to the specified contract, ordered by creation date."
     )
-    @ApiResponse(responseCode = "200", description = "Appendices returned",
-        content = @Content(array = @ArraySchema(schema = @Schema(implementation = AppendixResponseDTO.class))))
-    @ApiResponse(responseCode = "204", description = "No appendices found for this contract",
-        content = @Content)
-    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Appendices returned",
+            content = @Content(array = @ArraySchema(schema = @Schema(implementation = AppendixResponseDTO.class)))),
+        @ApiResponse(responseCode = "204", description = "No appendices found for this contract",
+            content = @Content),
+        @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    })
     @GetMapping("/contract/{contractId}")
     public ResponseEntity<List<AppendixResponseDTO>> getAppendicesForContract(
             @Parameter(description = "Parent contract ID", required = true, example = "88")
@@ -171,8 +180,10 @@ public class AppendixController {
         summary     = "Delete an appendix",
         description = "Deletes the appendix and cascades to its audit-trail field values."
     )
-    @ApiResponse(responseCode = "204", description = "Appendix deleted", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Appendix not found", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Appendix deleted", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Appendix not found", content = @Content)
+    })
     @DeleteMapping("/{appendixId}")
     public ResponseEntity<Void> deleteAppendix(
             @Parameter(description = "Appendix ID", required = true, example = "12")
@@ -189,11 +200,13 @@ public class AppendixController {
         summary     = "Download an appendix file",
         description = "Downloads the unsigned or signed appendix binary in DOCX or PDF format."
     )
-    @ApiResponse(responseCode = "200", description = "File returned as binary attachment")
-    @ApiResponse(responseCode = "400", description = "Invalid type or format value", content = @Content)
-    @ApiResponse(responseCode = "404", description = "Appendix not found, or signed document not yet uploaded",
-        content = @Content)
-    @ApiResponse(responseCode = "422", description = "Format conversion failed", content = @Content)
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "File returned as binary attachment"),
+        @ApiResponse(responseCode = "400", description = "Invalid type or format value", content = @Content),
+        @ApiResponse(responseCode = "404", description = "Appendix not found, or signed document not yet uploaded",
+            content = @Content),
+        @ApiResponse(responseCode = "422", description = "Format conversion failed", content = @Content)
+    })
     @GetMapping("/download/{appendixId}/{type}/{format}")
     public ResponseEntity<byte[]> downloadAppendix(
             @Parameter(description = "Appendix ID", required = true, example = "12")

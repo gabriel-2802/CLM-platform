@@ -44,21 +44,17 @@ public class FlywayMigrationConfig {
                     .load();
             
             // repair flyway metadata if needed
-            repair(flyway);
+            try {
+                flyway.repair();
+            } catch (Exception e) {
+                log.info("Flyway repair failed (might be expected if no issues): {}", e.getMessage());
+            }
+            
             flyway.migrate();
-
             return flyway;
         } catch (FlywayException e) {
             log.error("Flyway migration failed: {}", e.getMessage(), e);
             throw new DatabaseValidationException("Database migration failed: " + e.getMessage(), e);
-        }
-    }
-
-    private void repair(Flyway flyway) {
-        try {
-            flyway.repair();
-        } catch (Exception e) {
-            log.info("Flyway repair failed (might be expected if no issues): {}", e.getMessage());
         }
     }
 }
