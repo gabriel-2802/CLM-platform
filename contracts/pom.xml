@@ -24,7 +24,7 @@
 
 	<!-- ==================== Properties ==================== -->
 	<properties>
-		<java.version>25</java.version>
+		<java.version>21</java.version>
 
 		<!-- Dependency versions -->
 		<mapstruct.version>1.6.3</mapstruct.version>
