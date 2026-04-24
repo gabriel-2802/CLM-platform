@@ -401,7 +401,7 @@ class GlobalExceptionHandlerTest {
         @Test
         void maps_to_422() throws Exception {
             mockMvc.perform(get("/probe/template-incomplete"))
-                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(status().isUnprocessableContent())
                     .andExpect(jsonPath("$.status").value(422));
         }
     }
