@@ -11,8 +11,10 @@ import org.springframework.dao.InvalidDataAccessResourceUsageException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -65,6 +67,31 @@ public class GlobalExceptionHandler {
         log.warn("required multipart part missing: {}", e.getRequestPartName());
         String details = String.format("Required field '%s' is missing. Please ensure all required fields are included in your request.", e.getRequestPartName());
         return buildResponse(HttpStatus.BAD_REQUEST, "Missing required field", details);
+    }
+
+    /**
+     * Handles cases where a required query or path parameter is absent from the request.
+     */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMissingServletRequestParameterException(
+            MissingServletRequestParameterException e) {
+        log.warn("required request parameter missing: {}", e.getParameterName());
+        String details = String.format("Required parameter '%s' is missing.", e.getParameterName());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Missing required parameter", details);
+    }
+
+    /**
+     * Handles method-level validation failures raised by Spring 7's HandlerMethodValidator
+     * (e.g., @Valid on @RequestBody when the validator is not configured via setValidator,
+     * or constraint violations on @RequestParam / @PathVariable annotated with bean-validation
+     * constraints on a @Validated controller).
+     */
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponseDTO> handleHandlerMethodValidationException(
+            HandlerMethodValidationException e) {
+        log.warn("handler method validation failed: {}", e.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, "Validation failed",
+                "One or more request parameters failed validation.");
     }
 
     /**

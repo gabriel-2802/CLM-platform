@@ -13,7 +13,7 @@ COPY src ./src
 RUN mvn package -DskipTests -q
 
 # ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
-FROM eclipse-temurin:25-jdk-noble
+FROM eclipse-temurin:21-jdk-noble
 
 # Install LibreOffice headless + fonts for DOCX/PDF conversion
 RUN apt-get update && apt-get install -y --no-install-recommends \
