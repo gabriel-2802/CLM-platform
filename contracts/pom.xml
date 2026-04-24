@@ -159,12 +159,7 @@
 		<!-- Test -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-flyway-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-mail-test</artifactId>
+			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -241,6 +236,8 @@
 						-javaagent:${net.bytebuddy:byte-buddy-agent:jar}
 						-XX:+EnableDynamicAgentLoading
 						-Xshare:off
+						--add-opens java.base/java.lang=ALL-UNNAMED
+						--sun-misc-unsafe-memory-access=allow
 					</argLine>
 				</configuration>
 			</plugin>
