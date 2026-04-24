@@ -6,7 +6,6 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -26,7 +25,7 @@ public class ContractSummaryDTO {
     private BigDecimal contractValue;
     private LocalDate contractStartDate;
     private LocalDate contractEndDate;
-    private LocalDateTime createdAt;
+    private LocalDate createdAt;
     private List<ContractFieldValueDTO> fieldValues;
 
     /**
