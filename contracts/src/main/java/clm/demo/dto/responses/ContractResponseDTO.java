@@ -30,6 +30,7 @@ public class ContractResponseDTO {
     private String notes;
     private LocalDate terminationDate;
     private String reasonsForTermination;
+    private Boolean autoRenew;
     private LocalDateTime createdAt;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;

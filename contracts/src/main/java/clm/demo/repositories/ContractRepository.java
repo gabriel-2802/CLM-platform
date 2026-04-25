@@ -22,6 +22,7 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
         UPDATE Contract c
         SET c.contractStatus = :archived
         WHERE c.contractStatus = :active
+        AND c.autoRenew = false
         AND c.contractEndDate < :today
     """)
     int archiveExpiredContracts(@Param("archived") ContractStatus archived,

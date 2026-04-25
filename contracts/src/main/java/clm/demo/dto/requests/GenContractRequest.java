@@ -21,6 +21,7 @@ public record GenContractRequest(@NotNull(message = "Template ID is required") L
                                  @NotNull(message = "Start date is required") LocalDate startDate,
                                  @NotNull(message = "End date is required") LocalDate endDate,
                                  @NotNull(message = "Field mappings map is required") Map<String, String> mappings,
+                                 @NotNull(message = "Auto-renewal flag is required") Boolean autoRenew,
                                  BigDecimal value, String notes) {
 
 }
