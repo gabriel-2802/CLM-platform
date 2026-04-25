@@ -1,0 +1,243 @@
+# ==============================================================================
+# PRODUCTION CONFIGURATION
+# ==============================================================================
+# Pre-flight checklist — verify ALL items before deploying:
+#   [ ] .env.production has no empty secret values
+#   [ ] JWT_SECRET is at least 64 random characters
+#   [ ] DB_PASSWORD is strong and unique (not reused from dev/test)
+#   [ ] ADMIN_REGISTER_CODE is changed from any testing value
+#   [ ] MAIL_HOST / MAIL_USERNAME / MAIL_PASSWORD point to a real SMTP provider
+#   [ ] FRONTEND_URL is set to your actual public domain (used for CORS + NextAuth)
+#   [ ] NEXT_PUBLIC_* URLs are reachable from end-user browsers
+#   [ ] NEXTAUTH_SECRET is at least 32 random characters
+#   [ ] next.config.ts has `output: 'standalone'` enabled for the client build
+#   [ ] A reverse proxy (Nginx/Caddy/Traefik) handles TLS termination in front of port 3000
+#   [ ] Run `docker compose -f docker-compose.production.yml config` to validate YAML
+#   [ ] Run `docker compose -p clm-prod -f docker-compose.production.yml --env-file .env.production up -d`
+#
+# SECURITY NOTE — credentials in environment variables:
+#   DATABASE_URL and SPRING_DATASOURCE_PASSWORD are visible via `docker inspect`
+#   and in any log that prints env vars. For high-security deployments use Docker
+#   secrets or a secrets manager (Vault, AWS Secrets Manager) and mount them as
+#   files, reading them at runtime. The current approach is acceptable for most
+#   deployments provided the host itself is hardened and Docker socket access
+#   (/var/run/docker.sock) is not granted to any container.
+#   [ ] Confirm no container mounts /var/run/docker.sock
+# ==============================================================================
+
+services:
+
+  postgres:
+    build:
+      context: .
+      dockerfile: db.Dockerfile
+    container_name: clm-postgres-prod
+    environment:
+      # --- Database ---
+      POSTGRES_USER:         ${DB_USER}
+      POSTGRES_PASSWORD:     ${DB_PASSWORD}
+      POSTGRES_DB:           ${DB_NAME}
+      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - postgres_data:/var/lib/postgresql/data
+    # no ports — internal only, never reachable from the host
+    networks:
+      - data-net  # isolated; contracts and client reach it here, dmz-net never touches it
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    mem_reservation: 256m  # soft guidance for scheduler before hard limit kicks in
+    cpus: "1.0"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  contracts:
+    build:
+      context: contracts
+      dockerfile: Dockerfile
+    container_name: clm-contracts-prod
+    read_only: true  # immutable filesystem reduces blast radius of any exploit
+    tmpfs:
+      - /tmp         # LibreOffice + Spring Boot write temp files here; discarded on restart
+    environment:
+      # --- Database ---
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME:           ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- JPA ---
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate  # fail fast on schema mismatch
+      SPRING_JPA_SHOW_SQL:                         "false"   # never log SQL in production
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
+      # --- Flyway ---
+      SPRING_FLYWAY_ENABLED:    "true"
+      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:    clm   # keep flyway_schema_history in clm, not public
+      # --- JWT ---
+      APP_JWT_SECRET:      ${JWT_SECRET}
+      APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
+      # --- Admin ---
+      APP_ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE}
+      # --- Mail ---
+      SPRING_MAIL_HOST:                                    ${MAIL_HOST}
+      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:  "true"
+      SPRING_MAIL_FROM:                                    ${MAIL_FROM}
+      APP_EMAIL_VERIFICATION_EXPIRATION:  ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
+      # --- URLs / CORS ---
+      APP_FRONTEND_URL:                 ${FRONTEND_URL}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS:  ${FRONTEND_URL}  # no localhost origins in production
+      # --- LibreOffice ---
+      LIBREOFFICE_PATH:  ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
+      HOME:              /tmp  # LibreOffice headless requires a writable home; tmpfs above
+      # --- Server ---
+      SERVER_PORT:  8081
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-prod}
+      # --- Logging ---
+      LOGGING_LEVEL_ROOT:                  WARN
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   WARN
+    # no ports — reachable only via dmz-net; client is the sole public ingress
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dmz-net
+      - data-net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    # 768m covers the JVM heap + LibreOffice for typical documents.
+    # Load-test before go-live — complex DOCX/PDF conversion can spike to 500m+ for LibreOffice alone.
+    mem_limit: 768m
+    mem_reservation: 384m
+    cpus: "1.0"  # raise if PDF conversion is throttling under load on a multi-core host
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8081"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  notifications:
+    build:
+      context: notifications
+      dockerfile: Dockerfile
+    container_name: clm-notifications-prod
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      # --- Mail ---
+      SPRING_MAIL_HOST:                                    ${MAIL_HOST}
+      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:  "true"  # was missing — prevented silent plaintext downgrade
+      SPRING_MAIL_FROM:                                    ${MAIL_FROM}
+      # --- Service URLs ---
+      CONTRACTS_SERVICE_URL:   ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      CONTRACTS_API_BASE_URL:  ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      # --- URLs / CORS ---
+      APP_FRONTEND_URL:                 ${FRONTEND_URL}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS:  ${FRONTEND_URL}
+      # --- Server ---
+      SERVER_PORT:  8082
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-prod}
+      # --- Logging ---
+      LOGGING_LEVEL_ROOT:                  WARN
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   WARN
+    # no ports — internal only
+    # depends_on postgres for startup ordering only — notifications has no direct DB access.
+    # It reads contract data via the contracts REST API over dmz-net, hence data-net is omitted.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dmz-net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8082"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  client:
+    build:
+      context: general
+      dockerfile: Dockerfile
+      target: runner  # production multi-stage target (standalone Next.js)
+    container_name: clm-client-prod
+    environment:
+      # --- Node ---
+      NODE_ENV:                 production
+      NEXT_TELEMETRY_DISABLED:  "1"
+      NEXT_TELEMETRY_DEBUG:     "0"
+      # --- Public API URLs (resolved in end-user browsers — must be externally reachable) ---
+      NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL}
+      NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL}
+      # --- Server-side URLs (resolved inside Docker network) ---
+      API_BASE_URL:               http://contracts:8081
+      CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
+      # --- Database (Prisma) ---
+      # ?schema=general isolates Prisma tables from public, where Flyway keeps its history.
+      # WARNING: credentials are visible via `docker inspect`. See security note at top of file.
+      DATABASE_URL:  postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=general
+      # --- NextAuth ---
+      NEXTAUTH_URL:     ${FRONTEND_URL}
+      NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET}
+    ports:
+      # Sole public ingress — must sit behind a reverse proxy (Nginx/Caddy/Traefik)
+      # that handles TLS termination, rate limiting, and request buffering.
+      - "${CLIENT_PORT:-3000}:3000"
+    depends_on:
+      contracts:
+        condition: service_healthy
+      notifications:
+        condition: service_healthy
+    networks:
+      - dmz-net   # reaches contracts and notifications services
+      - data-net  # Prisma connects directly to postgres
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.5"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+networks:
+  dmz-net:
+    driver: bridge  # application-layer traffic
+  data-net:
+    driver: bridge  # database-layer traffic — postgres is never on dmz-net
+
+volumes:
+  postgres_data:
+    driver: local

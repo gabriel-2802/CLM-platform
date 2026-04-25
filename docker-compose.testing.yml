@@ -1,0 +1,203 @@
+# ==============================================================================
+# TESTING / DEVELOPMENT CONFIGURATION — NOT FOR PRODUCTION USE
+# ==============================================================================
+# Every service is reachable from the host for debugging, API testing, and logs.
+# Run with:
+#   docker compose -p clm-test -f docker-compose.testing.yml --env-file .env.testing up -d --build
+#
+# First-run after a clean volume:
+#   make test-init   (pushes Prisma schema + seeds admin@example.com / Admin123!)
+# ==============================================================================
+
+services:
+
+  postgres:
+    build:
+      context: .
+      dockerfile: db.Dockerfile
+    container_name: clm-postgres-test
+    environment:
+      # --- Database ---
+      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:           ${DB_NAME:?DB_NAME is required — check .env.testing}
+      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+    volumes:
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro  # schema + role grants
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_EXPOSE_PORT:-5433}:5432"  # exposed so devs can use DBeaver / psql on the host
+    networks:
+      - data-net  # internal only — never placed on dmz-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_NAME:-clm_platform}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  contracts:
+    build:
+      context: contracts
+      dockerfile: Dockerfile
+    container_name: clm-contracts-test
+    environment:
+      # --- Database ---
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
+      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- JPA ---
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate  # Flyway owns schema; DDL auto must not mutate it
+      SPRING_JPA_SHOW_SQL:                         "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
+      # --- Flyway ---
+      SPRING_FLYWAY_ENABLED:    "true"
+      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:    clm   # keep flyway_schema_history in clm, not public
+      # --- JWT ---
+      APP_JWT_SECRET:      ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
+      # --- Admin ---
+      APP_ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      # --- Mail ---
+      SPRING_MAIL_HOST:                                    ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:  "false"
+      SPRING_MAIL_FROM:                                    ${MAIL_FROM:-noreply@dev.example.com}
+      APP_EMAIL_VERIFICATION_EXPIRATION:  ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
+      # --- URLs / CORS ---
+      APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000  # fixed for local dev
+      # --- LibreOffice ---
+      LIBREOFFICE_PATH:  ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
+      # --- Server ---
+      SERVER_PORT:  8081
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Logging — INFO at root, DEBUG only on app packages ---
+      LOGGING_LEVEL_ROOT:                  INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
+      LOGGING_LEVEL_CLM_DEMO:              DEBUG
+    ports:
+      - "${CONTRACTS_PORT:-8081}:8081"  # exposed for direct API testing (Postman, curl, etc.)
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - dmz-net   # serves REST API to other services and the client
+      - data-net  # connects to PostgreSQL
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8081"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  notifications:
+    build:
+      context: notifications
+      dockerfile: Dockerfile
+    container_name: clm-notifications-test
+    environment:
+      # --- Mail ---
+      SPRING_MAIL_HOST:                                    ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
+      SPRING_MAIL_FROM:                                    ${MAIL_FROM:-noreply@dev.example.com}
+      # --- Service URLs ---
+      CONTRACTS_SERVICE_URL:    ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      CONTRACTS_API_BASE_URL:   ${CONTRACTS_SERVICE_URL:-http://contracts:8081}  # app.property alias
+      # --- URLs / CORS ---
+      APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      # --- Server ---
+      SERVER_PORT:  8082
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Logging — INFO at root, DEBUG only on app packages ---
+      LOGGING_LEVEL_ROOT:                  INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
+      LOGGING_LEVEL_CLM_NOTIFICATIONS:     DEBUG
+    ports:
+      - "${NOTIFICATIONS_PORT:-8082}:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy  # startup order — notifications cron reads contract data
+    networks:
+      - dmz-net  # calls contracts API; no direct DB access
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8082"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  client:
+    build:
+      context: general
+      dockerfile: Dockerfile
+      target: development  # dev stage: hot-reload Next.js server
+    container_name: clm-client-test
+    environment:
+      # --- Node ---
+      NODE_ENV:                  development
+      NEXT_TELEMETRY_DISABLED:   "1"
+      # --- Public API URLs (resolved in the browser — must be host-accessible) ---
+      NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
+      NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}
+      # --- Server-side URLs (resolved inside Docker network) ---
+      API_BASE_URL:               http://contracts:8081
+      CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
+      # --- Database (Prisma — ?schema=general isolates from public where Flyway history lives) ---
+      DATABASE_URL:  postgresql://${DB_USER:-clm_user}:${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}@postgres:5432/${DB_NAME:-clm_platform}?schema=general
+      # --- NextAuth ---
+      NEXTAUTH_URL:     ${FRONTEND_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required — check .env.testing}
+    ports:
+      - "${CLIENT_PORT:-3000}:3000"
+    depends_on:
+      contracts:
+        condition: service_healthy
+      notifications:
+        condition: service_healthy
+    networks:
+      - dmz-net   # reaches contracts and notifications services
+      - data-net  # Prisma connects directly to postgres
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+networks:
+  dmz-net:
+    driver: bridge  # application-layer traffic between services and client
+  data-net:
+    driver: bridge  # database-layer traffic — postgres never touches dmz-net
+
+volumes:
+  postgres_data:
+    driver: local

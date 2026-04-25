@@ -154,6 +154,7 @@ public final class TestDataFactory {
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2027, 1, 1),
                 Map.of("Client Name", "Acme Corp"),
+                true,
                 BigDecimal.valueOf(10_000),
                 "test notes"
         );

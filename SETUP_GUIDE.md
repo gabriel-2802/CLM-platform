@@ -24,7 +24,7 @@ Verificare: `docker ps` → containerul `clm_postgres` trebuie să apară ca `he
 
 ```bash
 cd contracts
-JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64 apache-maven-3.9.6/bin/mvn spring-boot:run
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 apache-maven-3.9.6/bin/mvn spring-boot:run
 ```
 
 > **Prima pornire sau după schimbarea de branch:** adaugă `clean` înainte de `spring-boot:run`  
