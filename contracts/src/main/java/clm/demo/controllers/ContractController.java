@@ -131,6 +131,29 @@ public class ContractController {
     }
 
     // ------------------------------------------------------------------ //
+    //  Auto-Renewal Management                                             //
+    // ------------------------------------------------------------------ //
+
+    @Operation(
+        summary     = "Toggle auto-renewal status",
+        description = """
+            Toggles the auto-renewal flag for a contract. If `autoRenew` is `false`, it will be set to `true`
+            and vice versa. This can be applied to contracts in any status.
+            """
+    )
+    @ApiResponse(responseCode = "200", description = "Auto-renewal status toggled",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @PutMapping("/{contractId}/toggle-auto-renew")
+    public ResponseEntity<ContractResponseDTO> toggleAutoRenewal(
+            @Parameter(description = "Contract ID", required = true, example = "88")
+            @PathVariable Long contractId) {
+        log.info("Toggling auto-renewal status for contract {}", contractId);
+        ContractResponseDTO response = contractService.toggleAutoRenewal(contractId);
+        return ResponseEntity.ok(response);
+    }
+
+    // ------------------------------------------------------------------ //
     //  List / Search                                                       //
     // ------------------------------------------------------------------ //
 
@@ -224,4 +247,6 @@ public class ContractController {
                 .contentType(MediaType.parseMediaType(Utils.getContentType(documentFormat)))
                 .body(content);
     }
+
+
 }

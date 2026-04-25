@@ -470,7 +470,47 @@ Terminate an active contract. Only contracts with status `ACTIVE` can be termina
 
 ---
 
-### `GET /api/contracts`
+### `PUT /api/contracts/{contractId}/toggle-auto-renew`
+
+Toggle the auto-renewal flag for a contract. If `autoRenew` is `false`, it will be set to `true` and vice versa. This can be applied to contracts in any status.
+
+**Request**
+
+| Path Param | Required | Example |
+|------------|----------|---------|
+| `contractId` | YES | `88` |
+
+```
+PUT /api/contracts/88/toggle-auto-renew
+```
+
+**Response** — `200 OK`
+
+```json
+{
+  "id": 88,
+  "templateId": 7,
+  "clientId": 42,
+  "contractStatus": "ACTIVE",
+  "generatedBy": 1,
+  "generatedByMail": "staff@company.com",
+  "contractValue": 15000.00,
+  "contractStartDate": "2026-04-01",
+  "contractEndDate": "2027-03-31",
+  "autoRenew": true,
+  "createdAt": "2026-04-01T10:00:00"
+}
+```
+
+**Errors**
+
+| Status | Reason |
+|--------|--------|
+| `404` | Contract not found |
+
+---
+
+// ...existing code...
 
 List all contracts, ordered by `createdAt DESC`.
 

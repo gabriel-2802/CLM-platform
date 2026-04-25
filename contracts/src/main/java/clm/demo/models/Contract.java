@@ -45,8 +45,9 @@ public class Contract extends Document {
     @Column(name = "contract_value", precision = 12, scale = 2)
     private BigDecimal contractValue;
 
-    @Column(name = "auto_renew")
-    private boolean autoRenew;
+    @Column(name = "auto_renew", nullable = false)
+    @Builder.Default
+    private Boolean autoRenew = false;
 
     @Column(name = "contract_start_date")
     private LocalDate contractStartDate;

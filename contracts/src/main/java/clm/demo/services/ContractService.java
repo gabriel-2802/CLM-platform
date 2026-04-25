@@ -150,7 +150,27 @@ public class ContractService {
         contractRepository.save(contract);
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Toggles the auto-renewal flag for a contract.
+     * If autoRenew is false, it will be set to true and vice versa.
+     *
+     * @param contractId the ID of the contract to update
+     * @return ContractResponseDTO with updated auto-renewal status
+     * @throws ResourceNotFoundException if contract is not found
+     */
+    @Transactional
+    public ContractResponseDTO toggleAutoRenewal(Long contractId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+
+        contract.setAutoRenew(!contract.getAutoRenew());
+        contract = contractRepository.save(contract);
+        log.info("Auto-renewal toggled for contract {}: new state = {}", contractId, contract.getAutoRenew());
+
+        return contractMapper.toResponseDTO(contract);
+    }
+
+    // ...existing code...
     public Page<ContractResponseDTO> getAll(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return contractRepository.findAll(pageable)
