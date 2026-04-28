@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: user-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5434/clm_users}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:clm_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:clm_password_dev}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+    defer-datasource-initialization: false
+    properties:
+      hibernate:
+        default_schema: users
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: users
+    default-schema: users
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    out-of-order: false
+    fail-on-missing-locations: false
+    clean-disabled: true
+    encoding: UTF-8
+
+server:
+  port: ${SERVER_PORT:8083}
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    display-request-duration: true
+
+# JWT — REQUIRED in production: set JWT_SECRET to a cryptographically random string
+# of at least 32 characters. The fallback is for local development ONLY.
+jwt:
+  secret: ${JWT_SECRET:dev-shared-jwt-secret-used-by-both-nextauth-and-spring-change-before-deploy}
+  expiration: ${JWT_EXPIRATION:2592000000}
+
+app:
+  admin:
+    email: ${ADMIN_EMAIL:admin@example.com}
+    password: ${ADMIN_PASSWORD:Admin123!}
+    name: ${ADMIN_NAME:Admin}
+    register-code: ${ADMIN_REGISTER_CODE:devcode123}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
