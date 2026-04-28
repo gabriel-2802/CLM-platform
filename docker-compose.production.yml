@@ -59,7 +59,7 @@ services:
 
   contracts:
     build:
-      context: contracts
+      context: contract-service
       dockerfile: Dockerfile
     container_name: clm-contracts-prod
     read_only: true  # immutable filesystem reduces blast radius of any exploit
@@ -133,7 +133,7 @@ services:
 
   notifications:
     build:
-      context: notifications
+      context: notification-service
       dockerfile: Dockerfile
     container_name: clm-notifications-prod
     read_only: true
@@ -185,7 +185,7 @@ services:
 
   client:
     build:
-      context: general
+      context: main-service`
       dockerfile: Dockerfile
       target: runner  # production multi-stage target (standalone Next.js)
     container_name: clm-client-prod

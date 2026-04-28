@@ -41,7 +41,7 @@ services:
 
   contracts:
     build:
-      context: contracts
+      context: contract-service
       dockerfile: Dockerfile
     container_name: clm-contracts-test
     environment:
@@ -108,7 +108,7 @@ services:
 
   notifications:
     build:
-      context: notifications
+      context: notification-service
       dockerfile: Dockerfile
     container_name: clm-notifications-test
     environment:
@@ -153,7 +153,7 @@ services:
 
   client:
     build:
-      context: general
+      context: main-service
       dockerfile: Dockerfile
       target: development  # dev stage: hot-reload Next.js server
     container_name: clm-client-test
