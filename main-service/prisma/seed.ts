@@ -1,54 +1,8 @@
 import { PrismaClient, Frequency, ConditionOperator } from "@/lib/generated/prisma-client";
-import { hash } from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Seeding users...');
-
-  // ==== USERS ====
-  await prisma.user.createMany({
-    data: [
-      { email: 'alice@example.com', name: 'Alice' },
-      { email: 'bob@example.com', name: 'Bob' },
-      { email: 'charlie@example.com', name: 'Charlie' },
-      { email: 'diana@example.com', name: 'Diana' },
-      { email: 'edward@example.com', name: 'Edward' },
-    ],
-    skipDuplicates: true,
-  });
-
-  // Demo user
-  await prisma.user.upsert({
-    where: { email: 'demo@example.com' },
-    update: {},
-    create: {
-      email: 'demo@example.com',
-      name: 'Demo',
-      password: await hash('demo1234', 10),
-    },
-  });
-
-  // Admin user (configurable via env)
-  const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!';
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {
-      name: 'Admin',
-      rol: 'ADMIN',
-      password: await hash(adminPassword, 10),
-    },
-    create: {
-      email: adminEmail,
-      name: 'Admin',
-      rol: 'ADMIN',
-      password: await hash(adminPassword, 10),
-    },
-  });
-
-  console.log('✅ Users seeded');
-
   // ==== RULES ====
   console.log('🌱 Seeding rules...');
 
@@ -249,7 +203,7 @@ async function main() {
       dataExpSediuSocial: new Date('2026-12-31'),
       dataExpMandatAdmin: new Date('2026-06-30'),
       dataCertificatFiscal: new Date('2025-03-31'),
-  dataFisaPlatitor: new Date('2025-02-28'),
+      dataFisaPlatitor: new Date('2025-02-28'),
       dataVectFiscal: new Date('2025-12-31'),
     },
     create: {
@@ -271,14 +225,13 @@ async function main() {
       dataExpSediuSocial: new Date('2026-12-31'),
       dataExpMandatAdmin: new Date('2026-06-30'),
       dataCertificatFiscal: new Date('2025-03-31'),
-  dataFisaPlatitor: new Date('2025-02-28'),
+      dataFisaPlatitor: new Date('2025-02-28'),
       dataVectFiscal: new Date('2025-12-31'),
     },
   });
 
   console.log('✅ Client seeded with ID:', client.id);
 
-  // Create or update Detalii
   await prisma.detalii.upsert({
     where: { clientId: client.id },
     update: {
@@ -306,36 +259,19 @@ async function main() {
     },
   });
 
-  // Create or update Istoric (use manual upsert on composite [clientId, anul])
   const existingIstoric = await prisma.istoric.findFirst({ where: { clientId: client.id, anul: 2024 } });
   if (existingIstoric) {
     await prisma.istoric.update({
       where: { id: existingIstoric.id },
-      data: {
-        cifraAfaceri: 150000.0,
-        inventar: false,
-        bilantSemIun: 'NU',
-        bilantAnual: 'DA',
-      },
+      data: { cifraAfaceri: 150000.0, inventar: false, bilantSemIun: 'NU', bilantAnual: 'DA' },
     });
   } else {
     await prisma.istoric.create({
-      data: {
-        clientId: client.id,
-        anul: 2024,
-        cifraAfaceri: 150000.0,
-        inventar: false,
-        bilantSemIun: 'NU',
-        bilantAnual: 'DA',
-      },
+      data: { clientId: client.id, anul: 2024, cifraAfaceri: 150000.0, inventar: false, bilantSemIun: 'NU', bilantAnual: 'DA' },
     });
   }
 
-  // Delete existing puncte de lucru and create new ones
-  await prisma.punctDeLucru.deleteMany({
-    where: { clientId: client.id },
-  });
-
+  await prisma.punctDeLucru.deleteMany({ where: { clientId: client.id } });
   await prisma.punctDeLucru.createMany({
     data: [
       {

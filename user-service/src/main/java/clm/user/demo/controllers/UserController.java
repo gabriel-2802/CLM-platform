@@ -1,10 +1,13 @@
 package clm.user.demo.controllers;
 
+import clm.user.demo.dto.requests.ResetPasswordRequest;
+import clm.user.demo.dto.requests.UpdateUserRequest;
 import clm.user.demo.dto.responses.UserResponse;
 import clm.user.demo.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,6 +44,30 @@ public class UserController {
     @Operation(summary = "List all users (admin only)")
     public ResponseEntity<List<UserResponse>> getAll() {
         return ResponseEntity.ok(userService.getAll());
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Update a user's name, email, and role (admin only)")
+    public ResponseEntity<UserResponse> updateUser(@PathVariable Long id,
+                                                    @Valid @RequestBody UpdateUserRequest request) {
+        return ResponseEntity.ok(userService.updateUser(id, request));
+    }
+
+    @PatchMapping("/{id}/password")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Reset a user's password (admin only)")
+    public ResponseEntity<UserResponse> resetPassword(@PathVariable Long id,
+                                                       @Valid @RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(userService.resetPassword(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Delete a user (admin only)")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ResponseEntity.noContent().build();
     }
 
     @PutMapping("/{id}/roles/admin")

@@ -1,26 +1,38 @@
 "use server";
+import { prisma } from "@/lib/prisma";
 
-import { PrismaClient } from "@/lib/generated/prisma-client";
 import { revalidatePath, unstable_noStore as noStore } from "next/cache";
+import { getSession } from "@/lib/auth";
+import { getUsers } from "@/lib/user-service-client";
 
-const prisma = new PrismaClient();
 
 export type SimpleUser = { id: number; label: string };
 
 export async function getClientUserAssignments(clientId: number): Promise<{ assigned: SimpleUser[]; available: SimpleUser[] }> {
   noStore();
+  const session = await getSession();
+  const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
+
   const [allUsers, assignedLinks] = await Promise.all([
-    prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { email: "asc" } }),
-    prisma.userClient.findMany({ where: { clientId }, select: { user: { select: { id: true, name: true, email: true } } } }),
+    getUsers(token),
+    prisma.userClient.findMany({ where: { clientId }, select: { userId: true } }),
   ]);
-  const assignedIds = new Set(assignedLinks.map((l) => l.user.id));
+
+  const assignedIds = new Set(assignedLinks.map((l) => l.userId));
+
   const assigned: SimpleUser[] = assignedLinks
-    .map((l) => ({ id: l.user.id, label: l.user.name || l.user.email }))
+    .map((l) => {
+      const u = allUsers.find((u) => u.id === l.userId);
+      return u ? { id: u.id, label: u.name || u.email } : null;
+    })
+    .filter((x): x is SimpleUser => x !== null)
     .sort((a, b) => a.label.localeCompare(b.label));
+
   const available: SimpleUser[] = allUsers
     .filter((u) => !assignedIds.has(u.id))
     .map((u) => ({ id: u.id, label: u.name || u.email }))
     .sort((a, b) => a.label.localeCompare(b.label));
+
   return { assigned, available };
 }
 

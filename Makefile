@@ -122,7 +122,9 @@ test: check-docker
 	@echo "  $(YELLOW)Client        →$(NC)  http://localhost:3000"
 	@echo "  $(YELLOW)Contracts API →$(NC)  http://localhost:8081"
 	@echo "  $(YELLOW)Notifications →$(NC)  http://localhost:8082"
+	@echo "  $(YELLOW)User Service  →$(NC)  http://localhost:8083"
 	@echo "  $(YELLOW)PostgreSQL    →$(NC)  localhost:5433  (user: clm_user / db: clm_platform)"
+	@echo "  $(YELLOW)PostgreSQL    →$(NC)  localhost:5434  (user: clm_user / db: clm_users)"
 	@echo ""
 	@echo "  $(BLUE)Logs:    make test-logs$(NC)"
 	@echo "  $(BLUE)Status:  make test-ps$(NC)"
@@ -161,6 +163,9 @@ test-ps:
 # psql shell directly into the test database
 db-test:
 	@docker exec -it clm-postgres-test psql -U clm_user -d clm_platform
+
+db-users-test:
+	@docker exec -it clm-postgres-users-test psql -U clm_user -d clm_users
 
 # ─── Production Stack ─────────────────────────────────────────────────────────
 
@@ -244,6 +249,12 @@ db-prod:
 		-U "$$(grep -E '^DB_USER=' .env.production | cut -d= -f2 | tr -d '[:space:]')" \
 		-d "$$(grep -E '^DB_NAME=' .env.production | cut -d= -f2 | tr -d '[:space:]')"
 
+db-users-prod:
+	@echo "$(YELLOW)⚠ Connecting to PRODUCTION users database$(NC)"
+	@docker exec -it clm-postgres-users-prod psql \
+		-U "$$(grep -E '^DB_USER=' .env.production | cut -d= -f2 | tr -d '[:space:]')" \
+		-d "$$(grep -E '^DB_USERS_NAME=' .env.production | cut -d= -f2 | tr -d '[:space:]')"
+
 # ─── Local Dev (Next.js without Docker) ───────────────────────────────────────
 
 install:
@@ -292,7 +303,7 @@ nuke-test:
 	@printf "$(RED)Continue? [y/N]: $(NC)"; read r; \
 	[ "$$r" = "y" ] || [ "$$r" = "Y" ] || { echo "$(YELLOW)Cancelled$(NC)"; exit 0; }; \
 	$(COMPOSE_TEST) down -v --remove-orphans; \
-	docker rm -f clm-postgres-test clm-contracts-test clm-notifications-test clm-client-test 2>/dev/null || true; \
+	docker rm -f clm-postgres-test clm-postgres-users-test clm-user-service-test clm-contracts-test clm-notifications-test clm-client-test 2>/dev/null || true; \
 	echo "$(GREEN)✓ Testing stack and volumes removed$(NC)"
 
 # Stop production stack and delete its database volume — PRODUCTION DATA LOSS

@@ -11,24 +11,24 @@
 
 services:
 
+  # ── Main application database (clients, tasks, contracts) ──────────────────
   postgres:
     build:
       context: .
       dockerfile: db.Dockerfile
     container_name: clm-postgres-test
     environment:
-      # --- Database ---
       POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
       POSTGRES_DB:           ${DB_NAME:?DB_NAME is required — check .env.testing}
       POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
     volumes:
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro  # schema + role grants
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${DB_EXPOSE_PORT:-5433}:5432"  # exposed so devs can use DBeaver / psql on the host
+      - "${DB_EXPOSE_PORT:-5433}:5432"
     networks:
-      - data-net  # internal only — never placed on dmz-net
+      - data-net
     restart: on-failure:3
     security_opt:
       - no-new-privileges:true
@@ -38,6 +38,88 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ── User-service database (users schema — owned exclusively by user-service) ─
+  postgres-users:
+    image: postgres:16-alpine
+    container_name: clm-postgres-users-test
+    environment:
+      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:           ${DB_USERS_NAME:-clm_users}
+      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+    volumes:
+      - postgres_users_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_USERS_EXPOSE_PORT:-5434}:5432"
+    networks:
+      - data-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_USERS_NAME:-clm_users}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── User service (auth + user management) ──────────────────────────────────
+  user-service:
+    build:
+      context: user-service
+      dockerfile: Dockerfile
+    container_name: clm-user-service-test
+    environment:
+      # --- Database ---
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}
+      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- JPA ---
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: users
+      # --- Flyway ---
+      SPRING_FLYWAY_ENABLED:    "true"
+      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:    users
+      # --- JWT ---
+      JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      JWT_EXPIRATION:      ${JWT_EXPIRATION:-2592000000}
+      # --- Admin seed ---
+      APP_ADMIN_EMAIL:          ${ADMIN_EMAIL:-admin@example.com}
+      APP_ADMIN_PASSWORD:       ${ADMIN_PASSWORD:-Admin123!}
+      APP_ADMIN_NAME:           ${ADMIN_NAME:-Admin}
+      APP_ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      # --- CORS ---
+      CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      # --- Server ---
+      SERVER_PORT:  8083
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Logging ---
+      LOGGING_LEVEL_ROOT:                  INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
+      LOGGING_LEVEL_CLM_USER_DEMO:         DEBUG
+    ports:
+      - "${USER_SERVICE_PORT:-8083}:8083"
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+    networks:
+      - dmz-net
+      - data-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8083"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
   contracts:
     build:
@@ -51,14 +133,14 @@ services:
       SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
       # --- JPA ---
-      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate  # Flyway owns schema; DDL auto must not mutate it
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
       SPRING_JPA_SHOW_SQL:                         "true"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
       # --- Flyway ---
       SPRING_FLYWAY_ENABLED:    "true"
       SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
-      SPRING_FLYWAY_SCHEMAS:    clm   # keep flyway_schema_history in clm, not public
+      SPRING_FLYWAY_SCHEMAS:    clm
       # --- JWT ---
       JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
       APP_JWT_SECRET:      ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
@@ -77,25 +159,25 @@ services:
       APP_EMAIL_VERIFICATION_EXPIRATION:  ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
       # --- URLs / CORS ---
       APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
-      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000  # fixed for local dev
+      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000
       # --- LibreOffice ---
       LIBREOFFICE_PATH:  ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
       # --- Server ---
       SERVER_PORT:  8081
       # --- Spring profile ---
       SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
-      # --- Logging — INFO at root, DEBUG only on app packages ---
+      # --- Logging ---
       LOGGING_LEVEL_ROOT:                  INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
       LOGGING_LEVEL_CLM_DEMO:              DEBUG
     ports:
-      - "${CONTRACTS_PORT:-8081}:8081"  # exposed for direct API testing (Postman, curl, etc.)
+      - "${CONTRACTS_PORT:-8081}:8081"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
-      - dmz-net   # serves REST API to other services and the client
-      - data-net  # connects to PostgreSQL
+      - dmz-net
+      - data-net
     restart: on-failure:3
     security_opt:
       - no-new-privileges:true
@@ -122,7 +204,7 @@ services:
       SPRING_MAIL_FROM:                                    ${MAIL_FROM:-noreply@dev.example.com}
       # --- Service URLs ---
       CONTRACTS_SERVICE_URL:    ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
-      CONTRACTS_API_BASE_URL:   ${CONTRACTS_SERVICE_URL:-http://contracts:8081}  # app.property alias
+      CONTRACTS_API_BASE_URL:   ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       # --- URLs / CORS ---
       APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
       SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000
@@ -130,7 +212,7 @@ services:
       SERVER_PORT:  8082
       # --- Spring profile ---
       SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
-      # --- Logging — INFO at root, DEBUG only on app packages ---
+      # --- Logging ---
       LOGGING_LEVEL_ROOT:                  INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
       LOGGING_LEVEL_CLM_NOTIFICATIONS:     DEBUG
@@ -138,9 +220,9 @@ services:
       - "${NOTIFICATIONS_PORT:-8082}:8082"
     depends_on:
       postgres:
-        condition: service_healthy  # startup order — notifications cron reads contract data
+        condition: service_healthy
     networks:
-      - dmz-net  # calls contracts API; no direct DB access
+      - dmz-net
     restart: on-failure:3
     security_opt:
       - no-new-privileges:true
@@ -155,20 +237,24 @@ services:
     build:
       context: main-service
       dockerfile: Dockerfile
-      target: development  # dev stage: hot-reload Next.js server
+      target: development
     container_name: clm-client-test
     environment:
       # --- Node ---
       NODE_ENV:                  development
       NEXT_TELEMETRY_DISABLED:   "1"
-      # --- Public API URLs (resolved in the browser — must be host-accessible) ---
+      # --- Public API URLs (resolved in the browser) ---
       NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
       NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}
+      NEXT_PUBLIC_USER_SERVICE_URL:       ${NEXT_PUBLIC_USER_SERVICE_URL:-http://localhost:8083}
       # --- Server-side URLs (resolved inside Docker network) ---
       API_BASE_URL:               http://contracts:8081
       CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
-      # --- Database (Prisma — ?schema=general isolates from public where Flyway history lives) ---
+      USER_SERVICE_URL:           http://user-service:8083
+      # --- Admin credentials (used by user-service for initial seed) ---
+      ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      # --- Database (Prisma — general schema for clients/tasks/contracts) ---
       DATABASE_URL:  postgresql://${DB_USER:-clm_user}:${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}@postgres:5432/${DB_NAME:-clm_platform}?schema=general
       # --- NextAuth ---
       NEXTAUTH_URL:     ${FRONTEND_URL:-http://localhost:3000}
@@ -180,9 +266,11 @@ services:
         condition: service_healthy
       notifications:
         condition: service_healthy
+      user-service:
+        condition: service_healthy
     networks:
-      - dmz-net   # reaches contracts and notifications services
-      - data-net  # Prisma connects directly to postgres
+      - dmz-net
+      - data-net
     restart: on-failure:3
     security_opt:
       - no-new-privileges:true
@@ -195,10 +283,12 @@ services:
 
 networks:
   dmz-net:
-    driver: bridge  # application-layer traffic between services and client
+    driver: bridge
   data-net:
-    driver: bridge  # database-layer traffic — postgres never touches dmz-net
+    driver: bridge
 
 volumes:
   postgres_data:
+    driver: local
+  postgres_users_data:
     driver: local

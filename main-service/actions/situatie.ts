@@ -1,11 +1,11 @@
 "use server";
+import { prisma } from "@/lib/prisma";
 
-import { PrismaClient } from "@/lib/generated/prisma-client";
 import type { Prisma } from "@/lib/generated/prisma-client";
 import { getSession } from "@/lib/auth";
 import { unstable_noStore as noStore } from "next/cache";
+import { getUsers } from "@/lib/user-service-client";
 
-const prisma = new PrismaClient();
 
 export type SituatieRow = {
   clientId: number;
@@ -77,8 +77,8 @@ export async function getSituatieRows(): Promise<SituatieRow[]> {
   const session = await getSession();
   const role = (session?.user as unknown as { role?: string })?.role;
   const currentUserId = (session?.user as unknown as { id?: string })?.id;
+  const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
 
-  // Build task-level permission where (consistent with tasks list)
   const taskPermission: Prisma.TaskWhereInput =
     role === "ADMIN" || role === "MANAGER"
       ? {}
@@ -86,26 +86,31 @@ export async function getSituatieRows(): Promise<SituatieRow[]> {
       ? { userId: Number(currentUserId) }
       : { id: -1 };
 
-  // Fetch all tasks (permission-filtered), across all dates
-  const tasks = await prisma.task.findMany({
-    where: {
-      ...taskPermission,
-    },
-    include: { client: { select: { id: true, denumire: true, tip: true } }, user: { select: { name: true, email: true } } },
-    orderBy: [{ clientId: "asc" }, { date: "asc" }],
-  });
+  const [tasks, allUsers] = await Promise.all([
+    prisma.task.findMany({
+      where: { ...taskPermission },
+      include: { client: { select: { id: true, denumire: true, tip: true } } },
+      orderBy: [{ clientId: "asc" }, { date: "asc" }],
+    }),
+    getUsers(token),
+  ]);
 
-  // Group by (clientId, year, month)
+  const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
   type Key = string; // `${clientId}-${yyyy}-${mm}`
   const byClientMonth = new Map<Key, SituatieRow>();
   for (const t of tasks) {
     if (!t.date) continue;
     const d = new Date(t.date);
     const yyyy = d.getFullYear();
-    const mm = d.getMonth(); // 0-based
+    const mm = d.getMonth();
     const monthStart = new Date(yyyy, mm, 1, 0, 0, 0, 0);
     const key = `${t.clientId}-${yyyy}-${mm}`;
     const existing = byClientMonth.get(key);
+
+    const taskUser = userMap.get(t.userId);
+    const label = taskUser ? (taskUser.name || taskUser.email) : undefined;
+
     const base: SituatieRow =
       existing ?? {
         clientId: t.clientId,
@@ -148,9 +153,8 @@ export async function getSituatieRows(): Promise<SituatieRow[]> {
     if (!existing) byClientMonth.set(key, base);
 
     if (t.title) {
-      const label = t.user?.name || t.user?.email || undefined;
       if (!base.user && label) {
-        base.user = label; // capture first user encountered for this month
+        base.user = label;
       }
       const stages = matchStage(t.title);
       for (const s of stages) {
@@ -195,7 +199,6 @@ export async function getSituatieRows(): Promise<SituatieRow[]> {
     }
   }
 
-  // Sort by firma then date descending
   return Array.from(byClientMonth.values()).sort((a, b) => {
     const nf = a.firma.localeCompare(b.firma, "ro");
     if (nf !== 0) return nf;

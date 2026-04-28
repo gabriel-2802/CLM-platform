@@ -1,30 +1,39 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { User, Role } from '../../lib/generated/prisma-client';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type AppRole = 'USER' | 'ADMIN' | 'MANAGER';
+
+interface AppUser {
+  id: number;
+  email: string;
+  name: string | null;
+  enabled: boolean;
+  rol: AppRole;
+}
+
 interface UserFormData {
   email: string;
   name: string;
-  rol: Role;
+  rol: AppRole;
   password?: string;
 }
 
 const UserManagement: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [formData, setFormData] = useState<UserFormData>({
     email: '',
     name: '',
-    rol: 'USER' as Role,
+    rol: 'USER',
     password: ''
   });
   const [showReset, setShowReset] = useState<null | number>(null);
@@ -56,14 +65,11 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Fetch users
   const fetchUsers = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/users');
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
+      if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       setUsers(data);
     } catch (err) {
@@ -73,7 +79,6 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Create or update user
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -83,17 +88,13 @@ const UserManagement: React.FC = () => {
       setSaving(true);
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
       const method = editingUser ? 'PUT' : 'POST';
-      
-  const payload: UserFormData = { ...formData };
-      if (editingUser) {
-        // For edit, if password is empty string, don't send it
-        if (!payload.password) delete payload.password;
-      }
+
+      const payload: UserFormData = { ...formData };
+      if (editingUser && !payload.password) delete payload.password;
+
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
@@ -113,22 +114,15 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Delete user
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const response = await fetch(`/api/users/${id}`, {
-        method: 'DELETE',
-      });
-
+      const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete user');
       }
-
       await fetchUsers();
       setSuccess('User deleted successfully');
     } catch (err) {
@@ -137,25 +131,14 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  // Edit user
-  const handleEdit = (user: User) => {
+  const handleEdit = (user: AppUser) => {
     setEditingUser(user);
-    setFormData({
-      email: user.email,
-      name: user.name || '',
-      rol: user.rol
-    });
+    setFormData({ email: user.email, name: user.name || '', rol: user.rol });
     setShowForm(true);
   };
 
-  // Reset form
   const resetForm = () => {
-    setFormData({
-      email: '',
-      name: '',
-      rol: 'USER' as Role,
-      password: ''
-    });
+    setFormData({ email: '', name: '', rol: 'USER', password: '' });
     setEditingUser(null);
     setShowForm(false);
     setError(null);
@@ -169,23 +152,16 @@ const UserManagement: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <Button onClick={() => setShowForm(true)}>
-          Add User
-        </Button>
+        <Button onClick={() => setShowForm(true)}>Add User</Button>
       </div>
 
       {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-          {error}
-        </div>
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
       )}
       {success && (
-        <div className="bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded mb-4">
-          {success}
-        </div>
+        <div className="bg-green-100 border border-green-400 text-green-800 px-4 py-3 rounded mb-4">{success}</div>
       )}
 
-      {/* User Form Modal */}
       {showForm && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -193,19 +169,12 @@ const UserManagement: React.FC = () => {
         >
           <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold">
-                {editingUser ? 'Edit User' : 'Add New User'}
-              </h2>
-              <Button type="button" variant="ghost" aria-label="Close" onClick={resetForm} className="text-gray-500 hover:text-gray-700">
-                ✕
-              </Button>
+              <h2 className="text-xl font-bold">{editingUser ? 'Edit User' : 'Add New User'}</h2>
+              <Button type="button" variant="ghost" aria-label="Close" onClick={resetForm} className="text-gray-500 hover:text-gray-700">✕</Button>
             </div>
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {error}
-              </div>
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
             )}
-            
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <Label htmlFor="email" className="mb-1">Email *</Label>
@@ -217,7 +186,6 @@ const UserManagement: React.FC = () => {
                   required
                 />
               </div>
-
               <div>
                 <Label htmlFor="name" className="mb-1">Name</Label>
                 <Input
@@ -227,9 +195,10 @@ const UserManagement: React.FC = () => {
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 />
               </div>
-
               <div>
-                <Label htmlFor="password" className="mb-1">Password {editingUser ? '(leave blank to keep current)' : '*'}</Label>
+                <Label htmlFor="password" className="mb-1">
+                  Password {editingUser ? '(leave blank to keep current)' : '*'}
+                </Label>
                 <Input
                   type="password"
                   id="password"
@@ -239,10 +208,9 @@ const UserManagement: React.FC = () => {
                   required={!editingUser}
                 />
               </div>
-
               <div>
                 <Label htmlFor="rol" className="mb-1">Role *</Label>
-                <Select value={formData.rol} onValueChange={(v: string) => setFormData({ ...formData, rol: v as Role })}>
+                <Select value={formData.rol} onValueChange={(v: string) => setFormData({ ...formData, rol: v as AppRole })}>
                   <SelectTrigger id="rol" aria-label="Select role">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
@@ -253,21 +221,17 @@ const UserManagement: React.FC = () => {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="flex gap-3 pt-4">
                 <Button type="submit" disabled={saving} className="flex-1">
                   {saving ? 'Saving…' : editingUser ? 'Update' : 'Create'} User
                 </Button>
-                <Button type="button" variant="outline" onClick={resetForm} className="flex-1">
-                  Cancel
-                </Button>
+                <Button type="button" variant="outline" onClick={resetForm} className="flex-1">Cancel</Button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Users Table */}
       {loading ? (
         <div className="p-8 text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
@@ -296,28 +260,20 @@ const UserManagement: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.email}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{user.name || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.rol === 'ADMIN'
-                          ? 'bg-red-100 text-red-800'
-                          : user.rol === 'MANAGER'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-green-100 text-green-800'
-                      }`}
-                    >
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      user.rol === 'ADMIN'
+                        ? 'bg-red-100 text-red-800'
+                        : user.rol === 'MANAGER'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-green-100 text-green-800'
+                    }`}>
                       {user.rol}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                    <button onClick={() => handleEdit(user)} className="text-blue-600 hover:text-blue-900">
-                      Edit
-                    </button>
-                    <button onClick={() => handleDelete(user.id)} className="text-red-600 hover:text-red-900">
-                      Delete
-                    </button>
-                    <button onClick={() => setShowReset(user.id)} className="text-yellow-700 hover:text-yellow-900">
-                      Reset Password
-                    </button>
+                    <button onClick={() => handleEdit(user)} className="text-blue-600 hover:text-blue-900">Edit</button>
+                    <button onClick={() => handleDelete(user.id)} className="text-red-600 hover:text-red-900">Delete</button>
+                    <button onClick={() => setShowReset(user.id)} className="text-yellow-700 hover:text-yellow-900">Reset Password</button>
                   </td>
                 </tr>
               ))}
@@ -326,7 +282,6 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Reset Password Modal */}
       {showReset && (
         <div
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -335,14 +290,10 @@ const UserManagement: React.FC = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold">Reset Password</h2>
-              <Button type="button" variant="ghost" aria-label="Close" onClick={() => { setShowReset(null); setResetPassword(""); setError(null); }} className="text-gray-500 hover:text-gray-700">
-                ✕
-              </Button>
+              <Button type="button" variant="ghost" aria-label="Close" onClick={() => { setShowReset(null); setResetPassword(""); setError(null); }} className="text-gray-500 hover:text-gray-700">✕</Button>
             </div>
             {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
-                {error}
-              </div>
+              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">{error}</div>
             )}
             <div>
               <Label className="mb-1">New Password</Label>
@@ -358,9 +309,7 @@ const UserManagement: React.FC = () => {
               <Button onClick={handleResetPassword} disabled={resetLoading} className="flex-1">
                 {resetLoading ? 'Updating...' : 'Update Password'}
               </Button>
-              <Button onClick={() => { setShowReset(null); setResetPassword(''); }} variant="outline" className="flex-1">
-                Cancel
-              </Button>
+              <Button onClick={() => { setShowReset(null); setResetPassword(''); }} variant="outline" className="flex-1">Cancel</Button>
             </div>
           </div>
         </div>

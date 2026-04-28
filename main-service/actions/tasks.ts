@@ -1,11 +1,11 @@
 "use server";
+import { prisma } from "@/lib/prisma";
 
-import { PrismaClient } from "@/lib/generated/prisma-client";
 import type { Prisma } from "@/lib/generated/prisma-client";
 import { getSession } from "@/lib/auth";
 import { unstable_noStore as noStore, revalidatePath } from "next/cache";
+import { getUsers } from "@/lib/user-service-client";
 
-const prisma = new PrismaClient();
 
 export type TaskRow = {
 	id: number;
@@ -33,6 +33,7 @@ export async function getTaskRows(): Promise<TaskRow[]> {
 	const session = await getSession();
 	const role = (session?.user as unknown as { role?: string })?.role;
 	const currentUserId = (session?.user as unknown as { id?: string })?.id;
+	const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
 
 	const where: Prisma.TaskWhereInput | undefined =
 		role === "ADMIN" || role === "MANAGER"
@@ -41,23 +42,32 @@ export async function getTaskRows(): Promise<TaskRow[]> {
 			? { userId: Number(currentUserId) }
 			: { id: -1 }; // no session: return empty
 
-	const tasks = await prisma.task.findMany({
-		where,
-			orderBy: { date: "desc" },
-		include: { user: true, client: true },
+	const [tasks, allUsers] = await Promise.all([
+		prisma.task.findMany({
+			where,
+				orderBy: { date: "desc" },
+			include: { client: true },
+		}),
+		getUsers(token),
+	]);
+
+	const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+	return tasks.map((t) => {
+		const u = userMap.get(t.userId);
+		return {
+			id: t.id,
+			title: t.title,
+				date: toDMY(t.date),
+				dateTs: t.date ? new Date(t.date).getTime() : undefined,
+			done: t.done,
+			user: u ? (u.name || u.email) : undefined,
+				userId: t.userId,
+			client: t.client?.denumire || undefined,
+			objective: t.objective || undefined,
+			blocked: t.blocked || undefined,
+		};
 	});
-	return tasks.map((t) => ({
-		id: t.id,
-		title: t.title,
-			date: toDMY(t.date),
-			dateTs: t.date ? new Date(t.date).getTime() : undefined,
-		done: t.done,
-		user: t.user?.name || t.user?.email || undefined,
-			userId: t.userId,
-		client: t.client?.denumire || undefined,
-		objective: t.objective || undefined,
-		blocked: t.blocked || undefined,
-	}));
 }
 
 export type TaskDetails = {
@@ -134,7 +144,7 @@ export async function createTask(formData: FormData) {
 			notes,
 			blocked,
 			objective,
-			user: { connect: { id: userId } },
+			userId,
 			client: { connect: { id: clientId } },
 		},
 		select: { id: true },
@@ -159,7 +169,7 @@ export async function updateTask(id: number, formData: FormData) {
 	if (notes !== undefined) data.notes = notes;
 	if (blocked !== undefined) data.blocked = blocked;
 	if (objective !== undefined) data.objective = objective;
-	if (userId !== null) data.user = { connect: { id: userId } };
+	if (userId !== null) data.userId = userId;
 	if (clientId !== null) data.client = { connect: { id: clientId } };
 	const updated = await prisma.task.update({
 		where: { id },
@@ -199,8 +209,11 @@ export async function deleteTask(id: number) {
 
 export async function getTaskFormOptions() {
 	noStore();
+	const session = await getSession();
+	const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
+
 	const [users, clients] = await Promise.all([
-		prisma.user.findMany({ select: { id: true, email: true, name: true }, orderBy: { email: "asc" } }),
+		getUsers(token),
 		prisma.client.findMany({ select: { id: true, denumire: true }, orderBy: { denumire: "asc" } }),
 	]);
 	return {

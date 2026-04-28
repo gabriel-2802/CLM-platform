@@ -1,10 +1,10 @@
-"use server"
+"use server";
+import { prisma } from "@/lib/prisma";
 
 import { Prisma, PrismaClient } from "@/lib/generated/prisma-client";
 import type { $Enums } from "@/lib/generated/prisma-client";
 import { unstable_noStore as noStore, revalidatePath } from "next/cache";
 
-const prisma = new PrismaClient();
 
 export type IstoricValues = {
   id?: number;

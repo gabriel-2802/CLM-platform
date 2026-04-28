@@ -8,22 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  ADMIN
-  USER
-  MANAGER
-}
-
-model User {
-  id       Int            @id @default(autoincrement())
-  email    String         @unique
-  name     String?
-  password String?
-  rol      Role           @default(USER)
-  tasks    Task[]
-  clients  UserClient[]   // Many-to-many relationship with Client
-}
-
 // ====================== ENUMS ======================
 
 enum Tip {
@@ -310,7 +294,7 @@ model Client {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  users UserClient[] // Many-to-many relationship with User
+  users UserClient[]
 }
 
 // ====================== DETALII ======================
@@ -370,14 +354,14 @@ model Task {
   id        Int      @id @default(autoincrement())
   done      Boolean  @default(false)
   title     String
-  notes     String?  // optional
-  blocked   String?  // optional
-  objective String?  // optional
+  notes     String?
+  blocked   String?
+  objective String?
   date      DateTime
 
-  userId   Int    
-  user     User   @relation(fields: [userId], references: [id])
-  clientId Int    
+  // userId references user-service — no FK constraint in this schema
+  userId   Int
+  clientId Int
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 }
 
@@ -385,11 +369,11 @@ model Task {
 
 model Rule {
   id          Int       @id @default(autoincrement())
-  name        String    @unique // e.g. "Declaratii 300 si 394"
-  description String?   // human-readable description or notes
-  frequency   Frequency // MONTHLY, QUARTERLY, YEARLY, etc.
-  taskTitle   String    // title for generated task
-  taskNotes   String?   // optional text for generated task
+  name        String    @unique
+  description String?
+  frequency   Frequency
+  taskTitle   String
+  taskNotes   String?
   active      Boolean   @default(true)
 
   conditions  RuleCondition[]
@@ -399,9 +383,9 @@ model Rule {
 
 model RuleCondition {
   id        Int       @id @default(autoincrement())
-  field     String    // name of the Customer field, e.g. "DaLunarTrim"
+  field     String
   operator  ConditionOperator @default(EQUALS)
-  value     String    // stored as text; interpret based on the field
+  value     String
   ruleId    Int
   rule      Rule      @relation(fields: [ruleId], references: [id], onDelete: Cascade)
 }
@@ -421,14 +405,14 @@ enum Frequency {
   CONDITIONAL
 }
 
+// userId references user-service — no FK constraint in this schema
 model UserClient {
   id       Int    @id @default(autoincrement())
   userId   Int
   clientId Int
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, clientId]) // Ensure unique user-client pairs
+  @@unique([userId, clientId])
 }
 
 // ====================== CONTRACT TEMPLATES ======================

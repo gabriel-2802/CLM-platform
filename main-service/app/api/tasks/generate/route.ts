@@ -1,110 +1,81 @@
-import { PrismaClient, Frequency, Client, RuleCondition } from '@/lib/generated/prisma-client';
+import { prisma } from "@/lib/prisma";
 import { NextResponse } from 'next/server';
-import bcrypt from 'bcryptjs';
+import { loginUser, getUsers, primaryRole, ServiceUser } from '@/lib/user-service-client';
 
-const prisma = new PrismaClient();
 
-async function checkBasicAuth(request: Request): Promise<boolean> {
+async function checkBasicAuth(request: Request): Promise<{ ok: boolean; token?: string }> {
   const authHeader = request.headers.get('authorization');
-  
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return false;
-  }
+  if (!authHeader?.startsWith('Basic ')) return { ok: false };
 
-  const base64Credentials = authHeader.slice(6);
-  const credentials = Buffer.from(base64Credentials, 'base64').toString('utf-8');
-  const [email, password] = credentials.split(':');
+  const [email, password] = Buffer.from(authHeader.slice(6), 'base64').toString('utf-8').split(':');
+  const result = await loginUser(email, password);
+  if (!result) return { ok: false };
 
-  // Find user by email with ADMIN role
-  const user = await prisma.user.findUnique({
-    where: { email },
-  });
+  const isAdmin = result.user.roles.includes('ROLE_ADMIN');
+  return isAdmin ? { ok: true, token: result.token } : { ok: false };
+}
 
-  if (!user || user.rol !== 'ADMIN' || !user.password) {
-    return false;
-  }
-
-  // Verify password
-  const isValidPassword = await bcrypt.compare(password, user.password);
-  return isValidPassword;
+function findAssignedUser(userIds: number[], allUsers: ServiceUser[]): ServiceUser | undefined {
+  const assigned = allUsers.filter(u => userIds.includes(u.id));
+  return (
+    assigned.find(u => primaryRole(u) === 'USER') ??
+    assigned.find(u => primaryRole(u) === 'MANAGER')
+  );
 }
 
 export async function POST(request: Request) {
   try {
-    // Check Basic Auth
-    const isAuthenticated = await checkBasicAuth(request);
-    
-    if (!isAuthenticated) {
+    const auth = await checkBasicAuth(request);
+    if (!auth.ok) {
       return NextResponse.json(
         { error: 'Unauthorized - Admin credentials required' },
-        { 
-          status: 401,
-          headers: { 'WWW-Authenticate': 'Basic realm="Task Generation API"' }
-        }
+        { status: 401, headers: { 'WWW-Authenticate': 'Basic realm="Task Generation API"' } }
       );
     }
 
-    // Parse and validate month and year from URL query parameters
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month');
     const year = searchParams.get('year');
-    
+
     if (!month || !year) {
       return NextResponse.json({ error: 'Missing month or year parameter' }, { status: 400 });
     }
-    
+
     const monthNum = parseInt(month);
     const yearNum = parseInt(year);
-    
+
     if (isNaN(monthNum) || monthNum < 1 || monthNum > 12) {
       return NextResponse.json({ error: 'Invalid month. Must be between 1 and 12' }, { status: 400 });
     }
-    
     if (isNaN(yearNum) || yearNum < 1900 || yearNum > 2100) {
       return NextResponse.json({ error: 'Invalid year' }, { status: 400 });
     }
-    
-    // Create date for the first day of the specified month and year (in UTC)
+
     const taskDate = new Date(Date.UTC(yearNum, monthNum - 1, 1));
-    
-    // Fetch all clients
-    const clients = await prisma.client.findMany();
+
+    const [clients, allUsers] = await Promise.all([
+      prisma.client.findMany(),
+      getUsers(auth.token!),
+    ]);
+
     const tasks = [];
 
     for (const client of clients) {
-      // Get all users assigned to this client through UserClient table
-      const userClients = await prisma.userClient.findMany({
-        where: {
-          clientId: client.id,
-        },
-        include: {
-          user: true,
-        },
+      const userClientLinks = await prisma.userClient.findMany({
+        where: { clientId: client.id },
+        select: { userId: true },
       });
 
-      // Find a USER role user first, if not found, then find a MANAGER role user
-      let assignedUser = userClients.find(uc => uc.user.rol === 'USER')?.user;
-      
-      if (!assignedUser) {
-        assignedUser = userClients.find(uc => uc.user.rol === 'MANAGER')?.user;
-      }
+      const userIds = userClientLinks.map(uc => uc.userId);
+      const assignedUser = findAssignedUser(userIds, allUsers);
+      if (!assignedUser) continue;
 
-      // Only create tasks if a user was found
-      if (assignedUser) {
-        const taskTitles = ['Avem acte', 'Introdus acte', 'Verificat acte', 'Luna printata'];
-        
-        for (const title of taskTitles) {
-          const task = await prisma.task.create({
-            data: {
-              title,
-              notes: null,
-              date: taskDate,
-              clientId: client.id,
-              userId: assignedUser.id,
-            },
-          });
-          tasks.push(task);
-        }
+      const taskTitles = ['Avem acte', 'Introdus acte', 'Verificat acte', 'Luna printata'];
+      for (const title of taskTitles) {
+        const task = await prisma.task.create({
+          data: { title, notes: null, date: taskDate, clientId: client.id, userId: assignedUser.id },
+        });
+        tasks.push(task);
       }
     }
 

@@ -1,8 +1,10 @@
 "use server"
 
-import { PrismaClient } from "@/lib/generated/prisma-client"
+import { prisma } from "@/lib/prisma";
 import type { $Enums, Prisma } from "@/lib/generated/prisma-client"
 import { unstable_noStore as noStore, revalidatePath } from "next/cache"
+import { getSession } from "@/lib/auth"
+import { getUsers } from "@/lib/user-service-client"
 
 export type Row = {
   id: number
@@ -22,20 +24,27 @@ export type Row = {
   probleme?: string[]
 }
 
-const prisma = new PrismaClient()
 
 const toISODate = (d?: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : undefined)
 
 export async function getClientRows(): Promise<Row[]> {
   noStore();
-  const clients = await prisma.client.findMany({
-    orderBy: { denumire: "asc" },
-    include: {
-      detalii: true,
-      puncteDeLucru: { select: { deLa: true, panaLa: true } },
-      users: { select: { user: { select: { id: true, name: true, email: true } } } },
-    },
-  })
+  const session = await getSession();
+  const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
+
+  const [clients, allUsers] = await Promise.all([
+    prisma.client.findMany({
+      orderBy: { denumire: "asc" },
+      include: {
+        detalii: true,
+        puncteDeLucru: { select: { deLa: true, panaLa: true } },
+        users: { select: { userId: true } },
+      },
+    }),
+    getUsers(token),
+  ]);
+
+  const userMap = new Map(allUsers.map((u) => [u.id, u]));
 
   const latestContracts: any[] = await prisma.$queryRaw`
     SELECT d.id, c.client_id, d.created_at
@@ -85,7 +94,7 @@ export async function getClientRows(): Promise<Row[]> {
       panaLa: toISODate(latestPanaLa ?? null),
       users: c.users
         ? c.users
-          .map((uc) => uc.user.name || uc.user.email)
+          .map((uc) => { const u = userMap.get(uc.userId); return u ? (u.name || u.email) : null; })
           .filter((s): s is string => !!s)
           .sort((a, b) => a.localeCompare(b))
         : undefined,

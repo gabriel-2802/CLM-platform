@@ -1,14 +1,8 @@
-import { PrismaClient } from "@/lib/generated/prisma-client";
 import type { NextAuthOptions, User as NextAuthUser, Session } from "next-auth";
 import { type JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { compare } from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
-
-// Ensure single instance in development
-const globalForPrisma = global as unknown as { prisma: PrismaClient };
-const prisma = globalForPrisma.prisma || new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+import { loginUser, primaryRole } from "@/lib/user-service-client";
 
 const toKey = (s: string) => new TextEncoder().encode(s);
 
@@ -49,48 +43,56 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials: Record<string, string> | undefined) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-        if (!user || !user.password) return null;
+        const result = await loginUser(credentials.email, credentials.password);
+        if (!result) return null;
 
-        const ok = await compare(credentials.password, user.password);
-        if (!ok) return null;
+        const role = primaryRole(result.user);
 
-        type AppUser = NextAuthUser & { role: string };
-        const result: AppUser = {
-          id: String(user.id),
-          email: user.email,
-          name: user.name ?? undefined,
-          role: user.rol,
-        };
-        return result as AppUser;
+        type AppUser = NextAuthUser & { role: string; serviceToken: string };
+        return {
+          id: String(result.user.id),
+          email: result.user.email,
+          name: result.user.name ?? undefined,
+          role,
+          serviceToken: result.token,
+        } as AppUser;
       },
     }),
   ],
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
       if (url.startsWith("/")) return `${baseUrl}${url}`;
-      // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url;
       return baseUrl;
     },
     async jwt({ token, user }: { token: JWT; user?: NextAuthUser }) {
       if (user) {
-        const u = user as NextAuthUser & { role?: string };
-        return { ...token, id: u.id, role: u.role } as typeof token & { id: string; role?: string };
+        const u = user as NextAuthUser & { role?: string; serviceToken?: string };
+        return {
+          ...token,
+          id: u.id,
+          role: u.role,
+          serviceToken: u.serviceToken,
+        } as typeof token & { id: string; role?: string; serviceToken?: string };
       }
-      return token as typeof token & { id?: string; role?: string };
+      return token as typeof token & { id?: string; role?: string; serviceToken?: string };
     },
-    async session({ session, token }: { session: Session; token: JWT & { id?: string; role?: string } }) {
-      const s = session as Session & { user: Session["user"] & { id?: string; role?: string } };
+    async session({
+      session,
+      token,
+    }: {
+      session: Session;
+      token: JWT & { id?: string; role?: string; serviceToken?: string };
+    }) {
+      const s = session as Session & {
+        user: Session["user"] & { id?: string; role?: string; serviceToken?: string };
+      };
       if (s.user) {
         s.user.id = token.id;
         s.user.role = token.role;
+        s.user.serviceToken = token.serviceToken;
       }
       return s;
     },
   },
 };
-

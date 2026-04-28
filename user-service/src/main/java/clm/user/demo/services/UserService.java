@@ -1,11 +1,15 @@
 package clm.user.demo.services;
 
+import clm.user.demo.dto.requests.ResetPasswordRequest;
+import clm.user.demo.dto.requests.UpdateUserRequest;
 import clm.user.demo.dto.responses.UserResponse;
+import clm.user.demo.exceptions.DuplicateEmailException;
 import clm.user.demo.exceptions.ResourceNotFoundException;
 import clm.user.demo.models.User;
 import clm.user.demo.repositories.RoleRepository;
 import clm.user.demo.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,6 +21,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional(readOnly = true)
     public UserResponse getByEmail(String email) {
@@ -37,6 +42,47 @@ public class UserService {
         return userRepository.findAll().stream()
                 .map(UserResponse::from)
                 .toList();
+    }
+
+    @Transactional
+    public UserResponse updateUser(Long id, UpdateUserRequest request) {
+        User user = findOrThrow(id);
+
+        if (!user.getEmail().equals(request.email()) && userRepository.existsByEmail(request.email())) {
+            throw new DuplicateEmailException(request.email());
+        }
+
+        user.setEmail(request.email());
+        user.setName(request.name());
+
+        if (request.role() != null) {
+            var userRole = roleRepository.findByName("ROLE_USER")
+                    .orElseThrow(() -> new IllegalStateException("ROLE_USER missing"));
+            user.getRoles().clear();
+            user.getRoles().add(userRole);
+
+            switch (request.role()) {
+                case "ADMIN" -> roleRepository.findByName("ROLE_ADMIN").ifPresent(user.getRoles()::add);
+                case "MANAGER" -> roleRepository.findByName("ROLE_MANAGER").ifPresent(user.getRoles()::add);
+            }
+        }
+
+        return UserResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse resetPassword(Long id, ResetPasswordRequest request) {
+        User user = findOrThrow(id);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        return UserResponse.from(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new ResourceNotFoundException("User not found: " + id);
+        }
+        userRepository.deleteById(id);
     }
 
     @Transactional

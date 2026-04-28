@@ -10,7 +10,7 @@ const API_BASE_URL = process.env.API_BASE_URL || "http://contracts:8081";
  * forwarded as a Bearer token to the contracts service.
  */
 async function getContractsToken(): Promise<string | null> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   // next-auth/jwt's getToken accepts a req-like object with a cookies map
   return getToken({
     req: {
