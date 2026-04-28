@@ -209,9 +209,8 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
                   window.open(
-                    `${baseUrl}/api/contracts/download/${row.original.contractId}/unsigned/pdf`,
+                    `/api/contracts/download/${row.original.contractId}?type=unsigned`,
                     "_blank"
                   );
                 }}

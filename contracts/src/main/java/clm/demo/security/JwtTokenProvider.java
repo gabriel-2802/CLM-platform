@@ -4,13 +4,16 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import lombok.RequiredArgsConstructor;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * JWT Token Provider for validating and extracting claims from JWT tokens.
@@ -18,88 +21,76 @@ import java.nio.charset.StandardCharsets;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtTokenProvider {
 
-    @Value("${jwt.secret:your-secret-key-change-this-in-properties}")
-    private String jwtSecret;
+    private final String jwtSecret;
+    private SecretKey signingKey;   // computed once, reused
+
+    public JwtTokenProvider(
+            @Value("${jwt.secret}") String jwtSecret) {
+        this.jwtSecret = Objects.requireNonNull(jwtSecret, "jwt.secret must not be null");
+    }
+
+    @PostConstruct
+    void init() {
+        byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
+        if (keyBytes.length < 32) {
+            throw new IllegalStateException(
+                    "jwt.secret must be at least 32 characters (256 bits) for HMAC-SHA256. " +
+                    "Set the JWT_SECRET environment variable to a strong random value.");
+        }
+        this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+    }
 
     /**
-     * Validate JWT token
-     *
-     * @param token JWT token string
-     * @return true if token is valid, false otherwise
+     * Returns {@code true} when the token signature and structure are valid.
      */
     public boolean validateToken(String token) {
-        try {
-            if (token == null || token.isEmpty()) {
-                return false;
-            }
+        return parseClaims(token).isPresent();
+    }
 
-            Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
-                    .build()
-                    .parseClaimsJws(token);
+    /**
+     * Returns the full {@link Claims} payload, or {@link Optional#empty()} if
+     * the token is absent, blank, or fails validation.
+     */
+    public Optional<Claims> getClaims(String token) {
+        return parseClaims(token);
+    }
 
-            return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            log.debug("JWT validation failed: {}", e.getMessage());
-            return false;
-        } catch (Exception e) {
-            log.error("Unexpected error during JWT validation", e);
-            return false;
+    /**
+     * Returns the {@code sub} claim, or {@link Optional#empty()} on failure.
+     */
+    public Optional<String> getSubject(String token) {
+        return parseClaims(token).map(Claims::getSubject);
+    }
+
+    /**
+     * Returns the value of the named claim, or {@link Optional#empty()} on failure.
+     *
+     * @param claimName name of the claim to retrieve
+     */
+    public Optional<Object> getClaim(String token, String claimName) {
+        Objects.requireNonNull(claimName, "claimName must not be null");
+        return parseClaims(token).map(c -> c.get(claimName));
+    }
+
+    /**
+     * Single parse point — avoids duplicating the parse/verify cycle.
+     */
+    private Optional<Claims> parseClaims(String token) {
+        if (!StringUtils.hasText(token)) {
+            return Optional.empty();
         }
-    }
-
-    /**
-     * Get claims from JWT token
-     *
-     * @param token JWT token string
-     * @return Claims if token is valid, null otherwise
-     */
-    public Claims getClaims(String token) {
         try {
-            return Jwts.parserBuilder()
-                    .setSigningKey(getSigningKey())
+            Claims payload = Jwts.parser()           // non-deprecated API (JJWT ≥ 0.12)
+                    .verifyWith(signingKey)
                     .build()
-                    .parseClaimsJws(token)
-                    .getBody();
+                    .parseSignedClaims(token)
+                    .getPayload();
+            return Optional.of(payload);
         } catch (JwtException | IllegalArgumentException e) {
-            log.debug("Failed to extract claims from token: {}", e.getMessage());
-            return null;
+            log.debug("JWT parsing failed: {}", e.getMessage());
+            return Optional.empty();
         }
-    }
-
-    /**
-     * Extract subject (username/userId) from token
-     *
-     * @param token JWT token string
-     * @return subject if valid, null otherwise
-     */
-    public String getSubject(String token) {
-        Claims claims = getClaims(token);
-        return claims != null ? claims.getSubject() : null;
-    }
-
-    /**
-     * Extract a specific claim from token
-     *
-     * @param token JWT token string
-     * @param claimName name of the claim
-     * @return claim value if valid, null otherwise
-     */
-    public Object getClaim(String token, String claimName) {
-        Claims claims = getClaims(token);
-        return claims != null ? claims.get(claimName) : null;
-    }
-
-    /**
-     * Get signing key from secret
-     *
-     * @return SecretKey for JWT signing/verification
-     */
-    private SecretKey getSigningKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 }
-

@@ -71,7 +71,8 @@ class ContractControllerTest {
                   "clientId": 42,
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
-                  "mappings": { "Client Name": "Acme Corp" }
+                  "mappings": { "Client Name": "Acme Corp" },
+                  "autoRenew": true
                 }
                 """;
 
@@ -106,7 +107,8 @@ class ContractControllerTest {
                   "clientId": 42,
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
-                  "mappings": { "Client Name": "Acme Corp" }
+                  "mappings": { "Client Name": "Acme Corp" },
+                  "autoRenew": true
                 }
                 """;
 
@@ -129,7 +131,8 @@ class ContractControllerTest {
                   "clientId": 42,
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
-                  "mappings": { "Client Name": "Acme Corp" }
+                  "mappings": { "Client Name": "Acme Corp" },
+                  "autoRenew": true
                 }
                 """;
 
@@ -153,7 +156,8 @@ class ContractControllerTest {
                   "clientId": 42,
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
-                  "mappings": {}
+                  "mappings": {},
+                  "autoRenew": true
                 }
                 """;
 

@@ -1,8 +1,12 @@
 package clm.demo.config;
 
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.tags.Tag;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,13 +21,28 @@ import java.util.List;
  *   <li>Swagger UI  — {@code /swagger-ui.html}</li>
  *   <li>Raw spec    — {@code /v3/api-docs}</li>
  * </ul>
+ *
+ * <p>The {@code bearerAuth} security scheme wires the Swagger UI "Authorize"
+ * button to send {@code Authorization: Bearer <token>} on every try-it-out
+ * request, matching what {@link clm.demo.security.JwtAuthenticationFilter}
+ * expects.
  */
 @Configuration
+@SecurityScheme(
+        name        = "bearerAuth",
+        type        = SecuritySchemeType.HTTP,
+        scheme      = "bearer",
+        bearerFormat = "JWT",
+        in          = SecuritySchemeIn.HEADER,
+        description = "Paste the JWT issued by the auth service (without the 'Bearer ' prefix)."
+)
 public class OpenApiConfig {
 
     @Bean
     public OpenAPI clmOpenAPI() {
         return new OpenAPI()
+                // apply the bearerAuth scheme to every endpoint globally
+                .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .info(new Info()
                         .title("CLM Platform API")
                         .description("""

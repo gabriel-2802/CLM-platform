@@ -3,11 +3,14 @@ import type { NextAuthOptions, User as NextAuthUser, Session } from "next-auth";
 import { type JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcryptjs";
+import { SignJWT, jwtVerify } from "jose";
 
 // Ensure single instance in development
 const globalForPrisma = global as unknown as { prisma: PrismaClient };
 const prisma = globalForPrisma.prisma || new PrismaClient();
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+const toKey = (s: string) => new TextEncoder().encode(s);
 
 export const authOptions: NextAuthOptions = {
   pages: {
@@ -15,6 +18,27 @@ export const authOptions: NextAuthOptions = {
     error: "/auth/error",
   },
   session: { strategy: "jwt" },
+  // Override NextAuth's default JWE (encrypted) tokens with plain HS256 JWS tokens.
+  // This lets Spring validate the same token using the shared JWT_SECRET / NEXTAUTH_SECRET.
+  jwt: {
+    encode: async ({ token, secret, maxAge }) => {
+      const { exp: _exp, iat: _iat, jti: _jti, ...payload } = token as Record<string, unknown>;
+      return new SignJWT(payload)
+        .setProtectedHeader({ alg: "HS256" })
+        .setIssuedAt()
+        .setExpirationTime(Math.floor(Date.now() / 1000) + (maxAge ?? 30 * 24 * 60 * 60))
+        .sign(toKey(secret as string));
+    },
+    decode: async ({ token, secret }) => {
+      if (!token) return null;
+      try {
+        const { payload } = await jwtVerify(token, toKey(secret as string));
+        return payload as JWT;
+      } catch {
+        return null;
+      }
+    },
+  },
   providers: [
     CredentialsProvider({
       name: "Credentials",

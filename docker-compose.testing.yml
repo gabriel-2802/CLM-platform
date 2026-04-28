@@ -27,7 +27,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${DB_EXPOSE_PORT:-5433}:5432"  # exposed so devs can use DBeaver / psql on the host
-    networks:`
+    networks:
       - data-net  # internal only — never placed on dmz-net
     restart: on-failure:3
     security_opt:
@@ -60,6 +60,7 @@ services:
       SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
       SPRING_FLYWAY_SCHEMAS:    clm   # keep flyway_schema_history in clm, not public
       # --- JWT ---
+      JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
       APP_JWT_SECRET:      ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
       APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
       # --- Admin ---

@@ -1,8 +1,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8080";
+import { contractsFetch } from "@/lib/auth/contracts-fetch";
 
 export async function uploadTemplate(formData: FormData) {
   const file = formData.get("file") as File
@@ -16,7 +15,7 @@ export async function uploadTemplate(formData: FormData) {
   backendFormData.append("file", file);
   backendFormData.append("templateName", name);
 
-  const res = await fetch(`${API_BASE_URL}/api/templates/upload`, {
+  const res = await contractsFetch("/api/templates/upload", {
     method: "POST",
     body: backendFormData,
   });
@@ -30,7 +29,7 @@ export async function uploadTemplate(formData: FormData) {
 }
 
 export async function deleteTemplate(id: number) {
-  const res = await fetch(`${API_BASE_URL}/api/templates/${id}`, {
+  const res = await contractsFetch(`/api/templates/${id}`, {
     method: "DELETE"
   });
 
@@ -42,7 +41,7 @@ export async function deleteTemplate(id: number) {
 }
 
 export async function getTemplates() {
-  const res = await fetch(`${API_BASE_URL}/api/templates?page=0&size=50`, {
+  const res = await contractsFetch("/api/templates?page=0&size=50", {
     cache: "no-store",
   });
 
@@ -66,7 +65,7 @@ export async function getTemplates() {
 }
 
 export async function getTemplateById(id: number) {
-  const res = await fetch(`${API_BASE_URL}/api/templates/${id}`, {
+  const res = await contractsFetch(`/api/templates/${id}`, {
     cache: "no-store",
   });
 
@@ -90,7 +89,7 @@ export async function updateTemplateMappings(templateId: number, mappings: { fie
     }))
   };
 
-  const res = await fetch(`${API_BASE_URL}/api/templates/${templateId}/labels`, {
+  const res = await contractsFetch(`/api/templates/${templateId}/labels`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

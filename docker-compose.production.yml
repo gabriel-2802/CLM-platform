@@ -81,6 +81,7 @@ services:
       SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
       SPRING_FLYWAY_SCHEMAS:    clm   # keep flyway_schema_history in clm, not public
       # --- JWT ---
+      JWT_SECRET:          ${JWT_SECRET}
       APP_JWT_SECRET:      ${JWT_SECRET}
       APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
       # --- Admin ---

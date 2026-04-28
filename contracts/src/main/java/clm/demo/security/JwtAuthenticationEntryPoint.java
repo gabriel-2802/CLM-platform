@@ -1,9 +1,9 @@
 package clm.demo.security;
 
-import jakarta.servlet.ServletException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.AuthenticationException;
@@ -11,48 +11,38 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
+import java.time.Instant;
 import java.util.Map;
 
 /**
- * Custom authentication entry point that returns JSON error responses
- * when authentication fails (missing or invalid JWT token).
+ * Returns a structured JSON 401 response when a request reaches a secured
+ * endpoint without a valid Bearer token.
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    @Override
-    public void commence(HttpServletRequest request, HttpServletResponse response,
-                         AuthenticationException authException) throws IOException, ServletException {
+    private static final ObjectMapper MAPPER =
+            new ObjectMapper().registerModule(new JavaTimeModule());
 
-        log.error("Unauthorized access attempt: {}", authException.getMessage());
+    @Override
+    public void commence(HttpServletRequest request,
+                         HttpServletResponse response,
+                         AuthenticationException authException) throws IOException {
+
+        log.warn("Unauthorized access to '{}': {}", request.getRequestURI(), authException.getMessage());
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        
+        var body = Map.of(
+                "timestamp", Instant.now().toString(),
+                "status",    HttpServletResponse.SC_UNAUTHORIZED,
+                "error",     "Unauthorized",
+                "message",   authException.getMessage(),
+                "path",      request.getRequestURI()
+        );
 
-        Map<String, Object> errorDetails = new LinkedHashMap<>();
-        errorDetails.put("timestamp", LocalDateTime.now().toString());
-        errorDetails.put("status", HttpServletResponse.SC_UNAUTHORIZED);
-        errorDetails.put("error", "Unauthorized");
-        errorDetails.put("message", authException.getMessage());
-        errorDetails.put("path", request.getRequestURI());
-
-        response.getWriter().write(convertToJson(errorDetails));
-    }
-
-    private String convertToJson(Map<String, Object> data) {
-        StringBuilder json = new StringBuilder("{");
-        boolean first = true;
-        for (Map.Entry<String, Object> entry : data.entrySet()) {
-            if (!first) json.append(",");
-            json.append("\"").append(entry.getKey()).append("\":\"").append(entry.getValue()).append("\"");
-            first = false;
-        }
-        json.append("}");
-        return json.toString();
+        MAPPER.writeValue(response.getOutputStream(), body);
     }
 }
-

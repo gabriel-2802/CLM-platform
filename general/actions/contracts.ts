@@ -1,12 +1,11 @@
 "use server"
 
 import { revalidatePath } from "next/cache";
-
-const API_BASE_URL = process.env.API_BASE_URL || "http://localhost:8080";
+import { contractsFetch } from "@/lib/auth/contracts-fetch";
 
 export async function generateContract(payload: any) {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/contracts/generate`, {
+    const res = await contractsFetch("/api/contracts/generate", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
