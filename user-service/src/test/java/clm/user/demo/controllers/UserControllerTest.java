@@ -29,20 +29,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class UserControllerTest {
 
-    @Mock    UserService     userService;
-    @InjectMocks UserController controller;
+    @Mock
+    UserService userService;
+
+    @InjectMocks
+    UserController controller;
 
     MockMvc mockMvc;
 
-    private static final UserResponse USER_RESPONSE = UserResponse.builder()
-            .id(1L).email("user@test.com").name("Test User")
-            .enabled(true).roles(Set.of("ROLE_USER")).createdAt(Instant.EPOCH)
-            .build();
+    private static final UserResponse USER_RESPONSE = new UserResponse(
+            1L,
+            "user@test.com",
+            "Test User",
+            true,
+            Set.of("ROLE_USER"),
+            Instant.EPOCH
+    );
 
-    private static final UserResponse ADMIN_RESPONSE = UserResponse.builder()
-            .id(1L).email("user@test.com").name("Test User")
-            .enabled(true).roles(Set.of("ROLE_USER", "ROLE_ADMIN")).createdAt(Instant.EPOCH)
-            .build();
+    private static final UserResponse ADMIN_RESPONSE = new UserResponse(
+            1L,
+            "user@test.com",
+            "Test User",
+            true,
+            Set.of("ROLE_USER", "ROLE_ADMIN"),
+            Instant.EPOCH
+    );
 
     @BeforeEach
     void setUp() {
@@ -142,10 +153,15 @@ class UserControllerTest {
 
     @Test
     void setEnabled_false_returns200WithDisabledUser() throws Exception {
-        var disabled = UserResponse.builder()
-                .id(1L).email("user@test.com").name("Test User")
-                .enabled(false).roles(Set.of("ROLE_USER")).createdAt(Instant.EPOCH)
-                .build();
+        var disabled = new UserResponse(
+                1L,
+                "user@test.com",
+                "Test User",
+                false,
+                Set.of("ROLE_USER"),
+                Instant.EPOCH
+        );
+
         given(userService.setEnabled(1L, false)).willReturn(disabled);
 
         mockMvc.perform(patch("/api/users/1/enabled").param("enabled", "false"))

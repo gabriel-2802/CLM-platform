@@ -3,22 +3,10 @@ package clm.user.demo.dto.requests;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Data;
 
-@Data
-public class RegisterRequest {
-
-    @NotBlank
-    @Email
-    private String email;
-
-    @NotBlank
-    @Size(min = 8, max = 128)
-    private String password;
-
-    @NotBlank
-    @Size(max = 255)
-    private String name;
-
-    private String adminCode;
-}
+public record RegisterRequest(
+        @NotBlank @Email String email,
+        @NotBlank @Size(min = 8, max = 128) String password,
+        @NotBlank @Size(max = 255) String name,
+        String adminCode
+) {}

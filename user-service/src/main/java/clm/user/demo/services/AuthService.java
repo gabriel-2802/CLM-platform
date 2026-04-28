@@ -17,12 +17,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,7 +36,6 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
-    private final UserDetailsService userDetailsService;
 
     @Value("${app.admin.register-code:devcode123}")
     private String adminRegisterCode;
@@ -44,48 +45,57 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new DuplicateEmailException(request.getEmail());
+        if (userRepository.existsByEmail(request.email())) {
+            throw new DuplicateEmailException(request.email());
         }
 
         User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setName(request.getName());
+        user.setEmail(request.email());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setName(request.name());
 
         Role userRole = roleRepository.findByName("ROLE_USER")
                 .orElseThrow(() -> new IllegalStateException("ROLE_USER not found — check DB migrations"));
         user.getRoles().add(userRole);
 
-        if (StringUtils.hasText(request.getAdminCode())
-                && request.getAdminCode().equals(adminRegisterCode)) {
+        if (StringUtils.hasText(request.adminCode())
+                && request.adminCode().equals(adminRegisterCode)) {
             roleRepository.findByName("ROLE_ADMIN").ifPresent(user.getRoles()::add);
-            log.info("Granted ROLE_ADMIN to '{}'", request.getEmail());
+            log.info("Granted ROLE_ADMIN to '{}'", request.email());
         }
 
         userRepository.save(user);
-        log.info("Registered new user '{}'", request.getEmail());
+        log.info("Registered new user '{}'", request.email());
 
-        UserDetails userDetails = userDetailsService.loadUserByUsername(user.getEmail());
+        var authorities = user.getRoles().stream()
+                .map(r -> new SimpleGrantedAuthority(r.getName()))
+                .collect(Collectors.toSet());
+        UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
+                .username(user.getEmail())
+                .password(user.getPassword())
+                .authorities(authorities)
+                .build();
+
         String token = tokenProvider.generateToken(userDetails);
         return AuthResponse.of(token, jwtExpirationMs, UserResponse.from(user));
     }
 
     @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
+        UserDetails userDetails;
         try {
-            authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+            var authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.email(), request.password()));
+            userDetails = (UserDetails) authentication.getPrincipal();
         } catch (BadCredentialsException e) {
             throw new InvalidCredentialsException();
         }
-
-        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getEmail());
-        User user = userRepository.findByEmail(request.getEmail())
+        
+        User user = userRepository.findByEmail(request.email())
                 .orElseThrow(InvalidCredentialsException::new);
 
         String token = tokenProvider.generateToken(userDetails);
-        log.debug("Issued token for '{}'", request.getEmail());
+        log.debug("Issued token for '{}'", request.email());
         return AuthResponse.of(token, jwtExpirationMs, UserResponse.from(user));
     }
 }

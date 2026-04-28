@@ -35,20 +35,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        extractBearer(request).ifPresent(token ->
-                tokenProvider.getSubject(token).ifPresent(email -> {
-                    if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                        if (tokenProvider.validateToken(token)) {
-                            var auth = new UsernamePasswordAuthenticationToken(
-                                    userDetails, null, userDetails.getAuthorities());
-                            auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                            SecurityContextHolder.getContext().setAuthentication(auth);
-                            log.debug("Authenticated '{}' via JWT", email);
-                        }
-                    }
-                })
-        );
+        extractBearer(request).flatMap(tokenProvider::getClaims).ifPresent(claims -> {
+            String email = claims.getSubject();
+            if (SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+                var auth = new UsernamePasswordAuthenticationToken(
+                        userDetails, null, userDetails.getAuthorities());
+                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(auth);
+                log.debug("Authenticated '{}' via JWT", email);
+            }
+        });
 
         filterChain.doFilter(request, response);
     }

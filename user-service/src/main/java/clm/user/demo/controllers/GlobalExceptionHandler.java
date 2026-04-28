@@ -14,7 +14,9 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.net.URI;
 import java.time.Instant;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @RestControllerAdvice
@@ -42,11 +44,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException ex) {
-        String details = ex.getBindingResult().getFieldErrors().stream()
-                .map(fe -> fe.getField() + ": " + fe.getDefaultMessage())
-                .collect(Collectors.joining(", "));
+        List<Map<String, String>> errors = ex.getBindingResult().getFieldErrors().stream()
+                .map(fe -> Map.of(
+                        "field",   fe.getField(),
+                        "message", Objects.requireNonNullElse(fe.getDefaultMessage(), "invalid")
+                ))
+                .toList();
         ProblemDetail pd = problem(HttpStatus.BAD_REQUEST, "Validation failed");
-        pd.setProperty("errors", details);
+        pd.setProperty("errors", errors);
         return pd;
     }
 

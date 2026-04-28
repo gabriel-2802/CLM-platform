@@ -20,13 +20,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.List;
+import java.util.Arrays;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -42,7 +40,6 @@ class AuthServiceTest {
     @Mock PasswordEncoder       passwordEncoder;
     @Mock AuthenticationManager authenticationManager;
     @Mock JwtTokenProvider      tokenProvider;
-    @Mock UserDetailsService    userDetailsService;
 
     @InjectMocks AuthService authService;
 
@@ -66,16 +63,13 @@ class AuthServiceTest {
         given(roleRepository.findByName("ROLE_USER")).willReturn(Optional.of(userRole));
         given(passwordEncoder.encode("Password1!")).willReturn("encoded");
         given(userRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
-
-        UserDetails details = stubDetails("ROLE_USER");
-        given(userDetailsService.loadUserByUsername("new@test.com")).willReturn(details);
-        given(tokenProvider.generateToken(details)).willReturn("jwt.token");
+        given(tokenProvider.generateToken(any())).willReturn("jwt.token");
 
         AuthResponse resp = authService.register(registerRequest("new@test.com", "Password1!", null));
 
-        assertThat(resp.getToken()).isEqualTo("jwt.token");
-        assertThat(resp.getTokenType()).isEqualTo("Bearer");
-        assertThat(resp.getUser().getEmail()).isEqualTo("new@test.com");
+        assertThat(resp.token()).isEqualTo("jwt.token");
+        assertThat(resp.tokenType()).isEqualTo("Bearer");
+        assertThat(resp.user().email()).isEqualTo("new@test.com");
     }
 
     @Test
@@ -92,13 +86,10 @@ class AuthServiceTest {
         given(roleRepository.findByName("ROLE_USER")).willReturn(Optional.of(userRole));
         given(roleRepository.findByName("ROLE_ADMIN")).willReturn(Optional.of(adminRole));
         given(passwordEncoder.encode(any())).willReturn("encoded");
+        given(tokenProvider.generateToken(any())).willReturn("jwt.admin");
 
         var captor = ArgumentCaptor.forClass(User.class);
         given(userRepository.save(captor.capture())).willAnswer(inv -> inv.getArgument(0));
-
-        UserDetails details = stubDetails("ROLE_USER", "ROLE_ADMIN");
-        given(userDetailsService.loadUserByUsername(any())).willReturn(details);
-        given(tokenProvider.generateToken(any())).willReturn("jwt.admin");
 
         authService.register(registerRequest("adm@test.com", "Password1!", "devcode123"));
 
@@ -112,13 +103,10 @@ class AuthServiceTest {
         given(userRepository.existsByEmail(any())).willReturn(false);
         given(roleRepository.findByName("ROLE_USER")).willReturn(Optional.of(userRole));
         given(passwordEncoder.encode(any())).willReturn("encoded");
+        given(tokenProvider.generateToken(any())).willReturn("jwt");
 
         var captor = ArgumentCaptor.forClass(User.class);
         given(userRepository.save(captor.capture())).willAnswer(inv -> inv.getArgument(0));
-
-        UserDetails details = stubDetails("ROLE_USER");
-        given(userDetailsService.loadUserByUsername(any())).willReturn(details);
-        given(tokenProvider.generateToken(any())).willReturn("jwt");
 
         authService.register(registerRequest("usr@test.com", "Password1!", "wrongcode"));
 
@@ -131,19 +119,19 @@ class AuthServiceTest {
 
     @Test
     void login_validCredentials_returnsTokenAndUser() {
-        given(authenticationManager.authenticate(any())).willReturn(mock(Authentication.class));
-
+        Authentication authentication = mock(Authentication.class);
         UserDetails details = stubDetails("ROLE_USER");
-        given(userDetailsService.loadUserByUsername("usr@test.com")).willReturn(details);
+        given(authentication.getPrincipal()).willReturn(details);
+        given(authenticationManager.authenticate(any())).willReturn(authentication);
 
         User user = user("usr@test.com");
         given(userRepository.findByEmail("usr@test.com")).willReturn(Optional.of(user));
-        given(tokenProvider.generateToken(details)).willReturn("jwt.login");
+        given(tokenProvider.generateToken(any())).willReturn("jwt.login");
 
         AuthResponse resp = authService.login(loginRequest("usr@test.com", "Password1!"));
 
-        assertThat(resp.getToken()).isEqualTo("jwt.login");
-        assertThat(resp.getUser().getEmail()).isEqualTo("usr@test.com");
+        assertThat(resp.token()).isEqualTo("jwt.login");
+        assertThat(resp.user().email()).isEqualTo("usr@test.com");
     }
 
     @Test
@@ -158,25 +146,21 @@ class AuthServiceTest {
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static RegisterRequest registerRequest(String email, String password, String adminCode) {
-        var r = new RegisterRequest();
-        r.setEmail(email);
-        r.setPassword(password);
-        r.setName("Test User");
-        r.setAdminCode(adminCode);
-        return r;
+        return new RegisterRequest(email, password, "Test User", adminCode);
     }
 
     private static LoginRequest loginRequest(String email, String password) {
-        var r = new LoginRequest();
-        r.setEmail(email);
-        r.setPassword(password);
-        return r;
+        return new LoginRequest(email, password);
     }
 
     private static UserDetails stubDetails(String... roles) {
-        // getAuthorities() is never called directly — tokenProvider is mocked,
-        // so JwtTokenProvider.generateToken never runs and doesn't need the stub
-        return mock(UserDetails.class);
+        return org.springframework.security.core.userdetails.User.builder()
+                .username("stub@test.com")
+                .password("x")
+                .authorities(Arrays.stream(roles)
+                        .map(org.springframework.security.core.authority.SimpleGrantedAuthority::new)
+                        .toList())
+                .build();
     }
 
     private static Role role(int id, String name) {

@@ -8,6 +8,7 @@ import clm.user.demo.exceptions.DuplicateEmailException;
 import clm.user.demo.exceptions.InvalidCredentialsException;
 import clm.user.demo.services.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,16 +31,25 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ExtendWith(MockitoExtension.class)
 class AuthControllerTest {
 
-    @Mock    AuthService     authService;
-    @InjectMocks AuthController controller;
+    @Mock
+    AuthService authService;
 
-    MockMvc        mockMvc;
-    ObjectMapper   objectMapper = new ObjectMapper();
+    @InjectMocks
+    AuthController controller;
 
-    private static final UserResponse USER_RESPONSE = UserResponse.builder()
-            .id(1L).email("user@test.com").name("Test User")
-            .enabled(true).roles(Set.of("ROLE_USER")).createdAt(Instant.EPOCH)
-            .build();
+    MockMvc mockMvc;
+
+    // Added JavaTimeModule to handle Java 8 dates (Instant)
+    ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
+
+    private static final UserResponse USER_RESPONSE = new UserResponse(
+            1L,
+            "user@test.com",
+            "Test User",
+            true,
+            Set.of("ROLE_USER"),
+            Instant.EPOCH
+    );
 
     private static final AuthResponse AUTH_RESPONSE =
             AuthResponse.of("jwt.test.token", 3_600_000L, USER_RESPONSE);
@@ -136,19 +146,12 @@ class AuthControllerTest {
 
     // ─── helpers ──────────────────────────────────────────────────────────────
 
+    // Updated to use the record constructors instead of setters
     private static RegisterRequest registerBody(String email, String password, String name, String adminCode) {
-        var r = new RegisterRequest();
-        r.setEmail(email);
-        r.setPassword(password);
-        r.setName(name);
-        r.setAdminCode(adminCode);
-        return r;
+        return new RegisterRequest(email, password, name, adminCode);
     }
 
     private static LoginRequest loginBody(String email, String password) {
-        var r = new LoginRequest();
-        r.setEmail(email);
-        r.setPassword(password);
-        return r;
+        return new LoginRequest(email, password);
     }
 }

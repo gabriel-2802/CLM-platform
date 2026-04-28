@@ -53,8 +53,8 @@ class UserServiceTest {
 
         UserResponse resp = userService.getByEmail("user@test.com");
 
-        assertThat(resp.getEmail()).isEqualTo("user@test.com");
-        assertThat(resp.getRoles()).containsExactly("ROLE_USER");
+        assertThat(resp.email()).isEqualTo("user@test.com");
+        assertThat(resp.roles()).containsExactly("ROLE_USER");
     }
 
     @Test
@@ -71,7 +71,7 @@ class UserServiceTest {
 
         UserResponse resp = userService.getById(1L);
 
-        assertThat(resp.getId()).isEqualTo(1L);
+        assertThat(resp.id()).isEqualTo(1L);
     }
 
     @Test
@@ -89,7 +89,7 @@ class UserServiceTest {
         var all = userService.getAll();
 
         assertThat(all).hasSize(1);
-        assertThat(all.get(0).getEmail()).isEqualTo("user@test.com");
+        assertThat(all.get(0).email()).isEqualTo("user@test.com");
     }
 
     // ─── role management ──────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ class UserServiceTest {
 
         UserResponse resp = userService.grantAdmin(1L);
 
-        assertThat(resp.getRoles()).containsExactlyInAnyOrder("ROLE_USER", "ROLE_ADMIN");
+        assertThat(resp.roles()).containsExactlyInAnyOrder("ROLE_USER", "ROLE_ADMIN");
     }
 
     @Test
@@ -115,7 +115,7 @@ class UserServiceTest {
         UserResponse resp = userService.grantAdmin(1L);
 
         // Set semantics — still has ROLE_ADMIN exactly once
-        assertThat(resp.getRoles()).containsExactlyInAnyOrder("ROLE_USER", "ROLE_ADMIN");
+        assertThat(resp.roles()).containsExactlyInAnyOrder("ROLE_USER", "ROLE_ADMIN");
     }
 
     @Test
@@ -126,8 +126,8 @@ class UserServiceTest {
 
         UserResponse resp = userService.revokeAdmin(1L);
 
-        assertThat(resp.getRoles()).containsExactly("ROLE_USER");
-        assertThat(resp.getRoles()).doesNotContain("ROLE_ADMIN");
+        assertThat(resp.roles()).containsExactly("ROLE_USER");
+        assertThat(resp.roles()).doesNotContain("ROLE_ADMIN");
     }
 
     @Test
@@ -147,7 +147,7 @@ class UserServiceTest {
 
         UserResponse resp = userService.setEnabled(1L, false);
 
-        assertThat(resp.isEnabled()).isFalse();
+        assertThat(resp.enabled()).isFalse();
     }
 
     @Test
@@ -158,7 +158,7 @@ class UserServiceTest {
 
         UserResponse resp = userService.setEnabled(1L, true);
 
-        assertThat(resp.isEnabled()).isTrue();
+        assertThat(resp.enabled()).isTrue();
     }
 
     @Test
