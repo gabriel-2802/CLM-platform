@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,11 +48,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    @SuppressWarnings("unchecked")
     private List<SimpleGrantedAuthority> authoritiesFromClaims(Claims claims) {
         Object rolesClaim = claims.get("roles");
-        if (!(rolesClaim instanceof List<?> rawList)) return Collections.emptyList();
-        return ((List<String>) rawList).stream()
+        if (!(rolesClaim instanceof List<?> rawList)) return List.of();
+        return rawList.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
                 .map(SimpleGrantedAuthority::new)
                 .toList();
     }

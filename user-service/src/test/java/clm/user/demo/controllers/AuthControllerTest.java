@@ -101,7 +101,7 @@ class AuthControllerTest {
 
     @Test
     void register_duplicateEmail_returns409() throws Exception {
-        given(authService.register(any())).willThrow(new DuplicateEmailException("user@test.com"));
+        given(authService.register(any())).willThrow(new DuplicateEmailException());
 
         mockMvc.perform(post("/api/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)

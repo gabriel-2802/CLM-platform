@@ -4,27 +4,23 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.validation.constraints.NotNull;
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
-/**
- * Validates the Bearer JWT on every request and populates the
- * SecurityContext so downstream filters and controllers can rely on
- * {@code SecurityContextHolder.getContext().getAuthentication()}.
- *
- * Role-based authorisation is intentionally absent — this service
- * only needs to verify identity, not permissions.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -36,34 +32,55 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider tokenProvider;
 
     @Override
-    protected void doFilterInternal(@NotNull HttpServletRequest request,
-                                    @NotNull HttpServletResponse response,
-                                    FilterChain filterChain)
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
         extractBearer(request)
-                .flatMap(tokenProvider::getSubject)
+                .flatMap(tokenProvider::getClaims)
                 .ifPresentOrElse(
-                        subject -> {
-                            var auth = new UsernamePasswordAuthenticationToken(
-                                    subject, null, List.of());
-                            SecurityContextHolder.getContext().setAuthentication(auth);
-                            log.debug("Authenticated request for subject '{}'", subject);
-                        },
+                        this::authenticate,
                         () -> log.debug("No valid Bearer token — request proceeds unauthenticated")
                 );
 
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * Pulls the raw JWT out of the Authorization header, returning
-     * {@link Optional#empty()} when the header is absent or
-     * not a Bearer token.
-     */
     private Optional<String> extractBearer(HttpServletRequest request) {
         return Optional.ofNullable(request.getHeader(AUTHORIZATION_HEADER))
                 .filter(h -> h.startsWith(BEARER_PREFIX))
                 .map(h -> h.substring(BEARER_PREFIX.length()));
+    }
+
+    private void authenticate(Claims claims) {
+        var subject = claims.getSubject();
+        if (!StringUtils.hasText(subject)) {
+            log.debug("JWT subject missing — skipping authentication");
+            return;
+        }
+
+        var authorities = extractAuthorities(claims);
+        var auth = new UsernamePasswordAuthenticationToken(subject, null, authorities);
+        SecurityContextHolder.getContext().setAuthentication(auth);
+        log.debug("Authenticated request for subject '{}' with roles {}", subject, authorities);
+    }
+
+    private List<SimpleGrantedAuthority> extractAuthorities(Claims claims) {
+        var rolesClaim = claims.get("roles");
+        List<String> roles = switch (rolesClaim) {
+            case String rolesString -> List.of(rolesString.split(","));
+            case Collection<?> collection -> collection.stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .toList();
+            default -> List.of();
+        };
+
+        return roles.stream()
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .map(SimpleGrantedAuthority::new)
+                .toList();
     }
 }

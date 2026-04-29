@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(
         name = "istorice",
@@ -30,7 +32,7 @@ public class ClientHistory {
     private int year;
 
     @Column(name = "cifra_afaceri", nullable = false)
-    private double turnover;
+        private BigDecimal turnover;
 
     @Column(name = "inventar", nullable = false)
     private boolean inventory;

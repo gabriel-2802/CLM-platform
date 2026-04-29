@@ -1,23 +1,24 @@
 package clm.client.demo.dtos.response;
 
-import clm.client.demo.models.enums.Administratie;
-import clm.client.demo.models.enums.DaLunarTrim;
-import clm.client.demo.models.enums.Impozit;
-import clm.client.demo.models.enums.Tip;
+import clm.client.demo.models.Client;
+import clm.client.demo.models.enums.Administration;
+import clm.client.demo.models.enums.CompanyType;
+import clm.client.demo.models.enums.TaxFrequency;
+import clm.client.demo.models.enums.TaxType;
 
 import java.time.LocalDateTime;
 
 public record ClientResponse(
     Long id,
     String denumire,
-    Tip tip,
+    CompanyType tip,
     String cui,
     Boolean activa,
     LocalDateTime dataVerificarii,
     String adresa,
-    Administratie administratie,
-    Impozit impozit,
-    DaLunarTrim platitorTVA,
+    Administration administratie,
+    TaxType impozit,
+    TaxFrequency platitorTVA,
     Boolean tvaLaIncasare,
     Boolean areCodTVAUE,
     String codTVAUE,
@@ -33,5 +34,32 @@ public record ClientResponse(
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {
+    public static ClientResponse from(Client client) {
+        return new ClientResponse(
+                client.getId(),
+                client.getName(),
+                client.getType(),
+                client.getTaxId(),
+                client.isActive(),
+                client.getVerificationDate(),
+                client.getAddress(),
+                client.getAdministration(),
+                client.getTaxType(),
+                client.getVatPayer(),
+                client.getVatOnCollection(),
+                client.getHasEuVatCode(),
+                client.getEuVatCode(),
+                client.getEuOperation(),
+                client.getDividends(),
+                client.getEmployees(),
+                client.getCashRegister(),
+                client.getHqExpirationDate(),
+                client.getAdminMandateExpiration(),
+                client.getFiscalCertificateDate(),
+                client.getPayerSheetDate(),
+                client.getFiscalVectorDate(),
+                client.getCreatedAt(),
+                client.getUpdatedAt()
+        );
+    }
 }
-

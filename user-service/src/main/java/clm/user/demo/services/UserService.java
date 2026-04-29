@@ -5,6 +5,7 @@ import clm.user.demo.dto.requests.UpdateUserRequest;
 import clm.user.demo.dto.responses.UserResponse;
 import clm.user.demo.exceptions.DuplicateEmailException;
 import clm.user.demo.exceptions.ResourceNotFoundException;
+import clm.user.demo.models.RoleName;
 import clm.user.demo.models.User;
 import clm.user.demo.repositories.RoleRepository;
 import clm.user.demo.repositories.UserRepository;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -49,21 +51,23 @@ public class UserService {
         User user = findOrThrow(id);
 
         if (!user.getEmail().equals(request.email()) && userRepository.existsByEmail(request.email())) {
-            throw new DuplicateEmailException(request.email());
+            throw new DuplicateEmailException();
         }
 
         user.setEmail(request.email());
         user.setName(request.name());
 
-        if (request.role() != null) {
-            var userRole = roleRepository.findByName("ROLE_USER")
+        if (Objects.nonNull(request.role())) {
+            var userRole = roleRepository.findByName(RoleName.USER)
                     .orElseThrow(() -> new IllegalStateException("ROLE_USER missing"));
             user.getRoles().clear();
             user.getRoles().add(userRole);
 
             switch (request.role()) {
-                case "ADMIN" -> roleRepository.findByName("ROLE_ADMIN").ifPresent(user.getRoles()::add);
-                case "MANAGER" -> roleRepository.findByName("ROLE_MANAGER").ifPresent(user.getRoles()::add);
+                case "ADMIN"   -> roleRepository.findByName(RoleName.ADMIN).ifPresent(user.getRoles()::add);
+                case "MANAGER" -> roleRepository.findByName(RoleName.MANAGER).ifPresent(user.getRoles()::add);
+                case "USER"    -> { /* ROLE_USER already added above */ }
+                default        -> throw new IllegalArgumentException("Unknown role: " + request.role());
             }
         }
 
@@ -79,16 +83,14 @@ public class UserService {
 
     @Transactional
     public void deleteUser(Long id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found: " + id);
-        }
-        userRepository.deleteById(id);
+        User user = findOrThrow(id);
+        userRepository.delete(user);
     }
 
     @Transactional
     public UserResponse grantAdmin(Long id) {
         User user = findOrThrow(id);
-        var adminRole = roleRepository.findByName("ROLE_ADMIN")
+        var adminRole = roleRepository.findByName(RoleName.ADMIN)
                 .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN missing"));
         user.getRoles().add(adminRole);
         return UserResponse.from(userRepository.save(user));
@@ -97,7 +99,7 @@ public class UserService {
     @Transactional
     public UserResponse revokeAdmin(Long id) {
         User user = findOrThrow(id);
-        user.getRoles().removeIf(r -> r.getName().equals("ROLE_ADMIN"));
+        user.getRoles().removeIf(r -> r.getName().equals(RoleName.ADMIN));
         return UserResponse.from(userRepository.save(user));
     }
 

@@ -1,5 +1,6 @@
 package clm.client.demo.security;
 
+import clm.client.demo.exceptions.ErrorResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,7 +13,6 @@ import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Map;
 
 /**
  * Returns a structured JSON 401 response when a request reaches a secured
@@ -35,12 +35,12 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         
-        var body = Map.of(
-                "timestamp", Instant.now().toString(),
-                "status",    HttpServletResponse.SC_UNAUTHORIZED,
-                "error",     "Unauthorized",
-                "message",   authException.getMessage(),
-                "path",      request.getRequestURI()
+        var body = new ErrorResponse(
+                Instant.now(),
+                HttpServletResponse.SC_UNAUTHORIZED,
+                "Unauthorized",
+                authException.getMessage(),
+                request.getRequestURI()
         );
 
         MAPPER.writeValue(response.getOutputStream(), body);

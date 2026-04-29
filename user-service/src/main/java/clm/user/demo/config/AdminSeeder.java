@@ -1,10 +1,9 @@
 package clm.user.demo.config;
 
-import clm.user.demo.models.Role;
+import clm.user.demo.models.RoleName;
 import clm.user.demo.models.User;
 import clm.user.demo.repositories.RoleRepository;
 import clm.user.demo.repositories.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -15,21 +14,28 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class AdminSeeder implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final String adminEmail;
+    private final String adminPassword;
+    private final String adminName;
 
-    @Value("${app.admin.email:admin@example.com}")
-    private String adminEmail;
-
-    @Value("${app.admin.password:Admin123!}")
-    private String adminPassword;
-
-    @Value("${app.admin.name:Admin}")
-    private String adminName;
+    public AdminSeeder(UserRepository userRepository,
+                       RoleRepository roleRepository,
+                       PasswordEncoder passwordEncoder,
+                       @Value("${app.admin.email:admin@example.com}") String adminEmail,
+                       @Value("${app.admin.password:Admin123!}") String adminPassword,
+                       @Value("${app.admin.name:Admin}") String adminName) {
+        this.userRepository  = userRepository;
+        this.roleRepository  = roleRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.adminEmail      = adminEmail;
+        this.adminPassword   = adminPassword;
+        this.adminName       = adminName;
+    }
 
     @Override
     @Transactional
@@ -38,12 +44,12 @@ public class AdminSeeder implements ApplicationRunner {
             return;
         }
 
-        Role userRole  = roleRepository.findByName("ROLE_USER")
+        var userRole  = roleRepository.findByName(RoleName.USER)
                 .orElseThrow(() -> new IllegalStateException("ROLE_USER missing — check migrations"));
-        Role adminRole = roleRepository.findByName("ROLE_ADMIN")
+        var adminRole = roleRepository.findByName(RoleName.ADMIN)
                 .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN missing — check migrations"));
 
-        User admin = new User();
+        var admin = new User();
         admin.setEmail(adminEmail);
         admin.setPassword(passwordEncoder.encode(adminPassword));
         admin.setName(adminName);

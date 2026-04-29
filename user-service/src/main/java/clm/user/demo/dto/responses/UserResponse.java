@@ -1,5 +1,6 @@
 package clm.user.demo.dto.responses;
 
+import clm.user.demo.models.Role;
 import clm.user.demo.models.User;
 
 import java.time.Instant;
@@ -21,7 +22,7 @@ public record UserResponse(
                 user.getName(),
                 user.isEnabled(),
                 user.getRoles().stream()
-                        .map(clm.user.demo.models.Role::getName)
+                        .map(Role::getName)
                         .collect(Collectors.toUnmodifiableSet()),
                 user.getCreatedAt()
         );

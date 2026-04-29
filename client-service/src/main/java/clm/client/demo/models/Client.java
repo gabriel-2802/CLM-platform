@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Entity
-@Table(name = "clienti")
+@Table(name = "clients")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,7 +36,7 @@ public class Client {
     private String taxId;
 
     @Column(name = "activa", nullable = false)
-    private boolean isActive;
+    private boolean active;
 
     @Column(name = "data_verificarii")
     private LocalDateTime verificationDate;
@@ -71,9 +71,8 @@ public class Client {
     @Column(name = "dividende")
     private Boolean dividends;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "salariati")
-    private TaxFrequency employees;
+    private String employees;
 
     @Column(name = "casa_de_marcat")
     private Boolean cashRegister;

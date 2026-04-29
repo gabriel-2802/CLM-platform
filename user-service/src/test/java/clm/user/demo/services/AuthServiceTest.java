@@ -41,15 +41,23 @@ class AuthServiceTest {
     @Mock AuthenticationManager authenticationManager;
     @Mock JwtTokenProvider      tokenProvider;
 
-    @InjectMocks AuthService authService;
+    AuthService authService;
 
     private Role userRole;
     private Role adminRole;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(authService, "adminRegisterCode", "devcode123");
-        ReflectionTestUtils.setField(authService, "jwtExpirationMs",   3_600_000L);
+        // construct AuthService manually because it requires primitive/config values
+        authService = new AuthService(
+                userRepository,
+                roleRepository,
+                passwordEncoder,
+                authenticationManager,
+                tokenProvider,
+                "devcode123",
+                3_600_000L
+        );
 
         userRole = role(1, "ROLE_USER");
         adminRole = role(2, "ROLE_ADMIN");
