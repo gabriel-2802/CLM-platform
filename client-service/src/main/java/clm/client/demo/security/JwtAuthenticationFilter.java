@@ -1,4 +1,4 @@
-package clm.demo.security;
+package clm.client.demo.security;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
