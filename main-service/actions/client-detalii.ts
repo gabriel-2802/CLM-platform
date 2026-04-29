@@ -1,104 +1,75 @@
 "use server";
-import { prisma } from "@/lib/prisma";
 
-import { PrismaClient } from "@/lib/generated/prisma-client"
-import type { $Enums } from "@/lib/generated/prisma-client"
-import { unstable_noStore as noStore, revalidatePath } from "next/cache"
-
+import { clientServiceFetch } from "@/lib/client-service-fetch";
 
 export type DetaliiValues = {
   registruUC: boolean
-  registruEvFiscala: $Enums.DaNuNuECazul
+  registruEvFiscala: string
   ofSpalareBani: boolean
   regulamentOrdineInterioara: boolean
   manualPoliticiContabile: boolean
   adresaRevisal: boolean
   parolaITM?: string
   depunereDeclaratiiOnline: boolean
-  accesDosarFiscal: $Enums.DaNuNuECazul
-}
-
-function bool(v: FormDataEntryValue | null): boolean {
-  return v === "on" || v === "true" || v === "1";
-}
-
-function str(v: FormDataEntryValue | null | undefined): string | undefined {
-  return typeof v === "string" && v.trim() !== "" ? v : undefined;
+  accesDosarFiscal: string
 }
 
 export async function getClientDetalii(clientId: number): Promise<DetaliiValues | null> {
-  // Ensure fresh data on every render (avoid RSC cache returning stale values after mutations)
-  noStore();
-  const d = await prisma.detalii.findUnique({ where: { clientId } });
-  if (!d) return null;
+  const res = await clientServiceFetch(`/api/clients/${clientId}/detalii`, { cache: "no-store" })
+  if (!res.ok) return null
+  const d = await res.json()
   return {
-    registruUC: d.registruUC,
-    registruEvFiscala: d.registruEvFiscala,
-    ofSpalareBani: d.ofSpalareBani,
-    regulamentOrdineInterioara: d.regulamentOrdineInterioara,
-    manualPoliticiContabile: d.manualPoliticiContabile,
-    adresaRevisal: d.adresaRevisal,
+    registruUC: !!d.registruUC,
+    registruEvFiscala: d.registruEvFiscala ?? "NU_E_CAZUL",
+    ofSpalareBani: !!d.ofSpalareBani,
+    regulamentOrdineInterioara: !!d.regulamentOrdineInterioara,
+    manualPoliticiContabile: !!d.manualPoliticiContabile,
+    adresaRevisal: !!d.adresaRevisal,
     parolaITM: d.parolaITM ?? undefined,
-    depunereDeclaratiiOnline: d.depunereDeclaratiiOnline,
-    accesDosarFiscal: d.accesDosarFiscal,
+    depunereDeclaratiiOnline: !!d.depunereDeclaratiiOnline,
+    accesDosarFiscal: d.accesDosarFiscal ?? "NU_E_CAZUL",
   }
 }
 
 export async function upsertClientDetalii(clientId: number, formData: FormData): Promise<DetaliiValues> {
   "use server";
-  const registruUC = bool(formData.get("registruUC"));
-  const registruEvFiscala = formData.get("registruEvFiscala") as $Enums.DaNuNuECazul | null;
-  const ofSpalareBani = bool(formData.get("ofSpalareBani"));
-  const regulamentOrdineInterioara = bool(formData.get("regulamentOrdineInterioara"));
-  const manualPoliticiContabile = bool(formData.get("manualPoliticiContabile"));
-  const adresaRevisal = bool(formData.get("adresaRevisal"));
-  const parolaITM = str(formData.get("parolaITM"));
-  const depunereDeclaratiiOnline = bool(formData.get("depunereDeclaratiiOnline"));
-  const accesDosarFiscal = formData.get("accesDosarFiscal") as $Enums.DaNuNuECazul | null;
+  const bool = (v: FormDataEntryValue | null) => v === "on" || v === "true" || v === "1"
+  const str = (v: FormDataEntryValue | null) =>
+    typeof v === "string" && v.trim() !== "" ? v : undefined
 
-  // Provide sane defaults for required enum fields if missing
-  const regEv = registruEvFiscala ?? "NU_E_CAZUL";
-  const acces = accesDosarFiscal ?? "NU_E_CAZUL";
+  const body = {
+    registruUC: bool(formData.get("registruUC")),
+    registruEvFiscala: formData.get("registruEvFiscala") ?? "NU_E_CAZUL",
+    ofSpalareBani: bool(formData.get("ofSpalareBani")),
+    regulamentOrdineInterioara: bool(formData.get("regulamentOrdineInterioara")),
+    manualPoliticiContabile: bool(formData.get("manualPoliticiContabile")),
+    adresaRevisal: bool(formData.get("adresaRevisal")),
+    parolaITM: str(formData.get("parolaITM")) ?? null,
+    depunereDeclaratiiOnline: bool(formData.get("depunereDeclaratiiOnline")),
+    accesDosarFiscal: formData.get("accesDosarFiscal") ?? "NU_E_CAZUL",
+  }
 
-  const saved = await prisma.detalii.upsert({
-    where: { clientId },
-    create: {
-      clientId,
-      registruUC,
-      registruEvFiscala: regEv,
-      ofSpalareBani,
-      regulamentOrdineInterioara,
-      manualPoliticiContabile,
-      adresaRevisal,
-      parolaITM,
-      depunereDeclaratiiOnline,
-      accesDosarFiscal: acces,
-    },
-    update: {
-      registruUC,
-      registruEvFiscala: regEv,
-      ofSpalareBani,
-      regulamentOrdineInterioara,
-      manualPoliticiContabile,
-      adresaRevisal,
-      parolaITM,
-      depunereDeclaratiiOnline,
-      accesDosarFiscal: acces,
-    },
+  const res = await clientServiceFetch(`/api/clients/${clientId}/detalii`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   })
 
-  // Ensure the edit page re-fetches fresh data if it remounts after this action
-  revalidatePath(`/clients/edit/${clientId}`)
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to save detalii: ${err}`)
+  }
 
+  const d = await res.json()
   return {
-    registruUC: saved.registruUC,
-    registruEvFiscala: saved.registruEvFiscala,
-    ofSpalareBani: saved.ofSpalareBani,
-    regulamentOrdineInterioara: saved.regulamentOrdineInterioara,
-    manualPoliticiContabile: saved.manualPoliticiContabile,
-    adresaRevisal: saved.adresaRevisal,
-    parolaITM: saved.parolaITM ?? undefined,
-    depunereDeclaratiiOnline: saved.depunereDeclaratiiOnline,
-    accesDosarFiscal: saved.accesDosarFiscal,
+    registruUC: !!d.registruUC,
+    registruEvFiscala: d.registruEvFiscala ?? "NU_E_CAZUL",
+    ofSpalareBani: !!d.ofSpalareBani,
+    regulamentOrdineInterioara: !!d.regulamentOrdineInterioara,
+    manualPoliticiContabile: !!d.manualPoliticiContabile,
+    adresaRevisal: !!d.adresaRevisal,
+    parolaITM: d.parolaITM ?? undefined,
+    depunereDeclaratiiOnline: !!d.depunereDeclaratiiOnline,
+    accesDosarFiscal: d.accesDosarFiscal ?? "NU_E_CAZUL",
   }
 }

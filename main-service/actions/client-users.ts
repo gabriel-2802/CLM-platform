@@ -1,53 +1,55 @@
 "use server";
-import { prisma } from "@/lib/prisma";
 
-import { revalidatePath, unstable_noStore as noStore } from "next/cache";
+import { clientServiceFetch } from "@/lib/client-service-fetch";
 import { getSession } from "@/lib/auth";
 import { getUsers } from "@/lib/user-service-client";
-
 
 export type SimpleUser = { id: number; label: string };
 
 export async function getClientUserAssignments(clientId: number): Promise<{ assigned: SimpleUser[]; available: SimpleUser[] }> {
-  noStore();
-  const session = await getSession();
-  const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
+  const session = await getSession()
+  const token = (session?.user as any)?.serviceToken ?? ""
 
-  const [allUsers, assignedLinks] = await Promise.all([
+  const [allUsers, assignedRes] = await Promise.all([
     getUsers(token),
-    prisma.userClient.findMany({ where: { clientId }, select: { userId: true } }),
-  ]);
+    clientServiceFetch(`/api/clients/${clientId}/users`, { cache: "no-store" }),
+  ])
 
-  const assignedIds = new Set(assignedLinks.map((l) => l.userId));
+  if (!assignedRes.ok) return { assigned: [], available: allUsers.map((u: any) => ({ id: u.id, label: u.name || u.email })) }
 
-  const assigned: SimpleUser[] = assignedLinks
-    .map((l) => {
-      const u = allUsers.find((u) => u.id === l.userId);
-      return u ? { id: u.id, label: u.name || u.email } : null;
-    })
-    .filter((x): x is SimpleUser => x !== null)
-    .sort((a, b) => a.label.localeCompare(b.label));
+  const assignedList = await assignedRes.json()
+  const assignedIds = new Set<number>(assignedList?.userIds ?? [])
+
+  const assigned: SimpleUser[] = allUsers
+    .filter((u: any) => assignedIds.has(u.id))
+    .map((u: any) => ({ id: u.id, label: u.name || u.email }))
+    .sort((a: SimpleUser, b: SimpleUser) => a.label.localeCompare(b.label))
 
   const available: SimpleUser[] = allUsers
-    .filter((u) => !assignedIds.has(u.id))
-    .map((u) => ({ id: u.id, label: u.name || u.email }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .filter((u: any) => !assignedIds.has(u.id))
+    .map((u: any) => ({ id: u.id, label: u.name || u.email }))
+    .sort((a: SimpleUser, b: SimpleUser) => a.label.localeCompare(b.label))
 
-  return { assigned, available };
+  return { assigned, available }
 }
 
 export async function addUserToClient(clientId: number, userId: number) {
-  await prisma.userClient.upsert({
-    where: { userId_clientId: { userId, clientId } },
-    update: {},
-    create: { clientId, userId },
-  });
-  revalidatePath(`/clients/edit/${clientId}`);
-  return { clientId, userId };
+  const res = await clientServiceFetch(`/api/clients/${clientId}/users/${userId}`, {
+    method: "POST",
+  })
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to assign user: ${err}`)
+  }
+  return { clientId, userId }
 }
 
 export async function removeUserFromClient(clientId: number, userId: number) {
-  await prisma.userClient.delete({ where: { userId_clientId: { userId, clientId } } });
-  revalidatePath(`/clients/edit/${clientId}`);
-  return { clientId, userId };
+  const res = await clientServiceFetch(`/api/clients/${clientId}/users/${userId}`, {
+    method: "DELETE",
+  })
+  if (!res.ok && res.status !== 404) {
+    throw new Error("Failed to remove user from client")
+  }
+  return { clientId, userId }
 }

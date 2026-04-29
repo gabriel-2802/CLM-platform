@@ -1,10 +1,9 @@
 "use server"
 
-import { prisma } from "@/lib/prisma";
-import type { $Enums, Prisma } from "@/lib/generated/prisma-client"
-import { unstable_noStore as noStore, revalidatePath } from "next/cache"
+import { clientServiceFetch } from "@/lib/client-service-fetch"
 import { getSession } from "@/lib/auth"
 import { getUsers } from "@/lib/user-service-client"
+import { getContractByClientId } from "@/actions/contracts"
 
 export type Row = {
   id: number
@@ -21,115 +20,35 @@ export type Row = {
   contractGen?: string
   contractSemnat?: string
   contractId?: number
+  contractStatus?: string
+  contractStartDate?: string
+  contractEndDate?: string
+  contractValue?: number
+  autoRenew?: boolean
   probleme?: string[]
-}
-
-
-const toISODate = (d?: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : undefined)
-
-export async function getClientRows(): Promise<Row[]> {
-  noStore();
-  const session = await getSession();
-  const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
-
-  const [clients, allUsers] = await Promise.all([
-    prisma.client.findMany({
-      orderBy: { denumire: "asc" },
-      include: {
-        detalii: true,
-        puncteDeLucru: { select: { deLa: true, panaLa: true } },
-        users: { select: { userId: true } },
-      },
-    }),
-    getUsers(token),
-  ]);
-
-  const userMap = new Map(allUsers.map((u) => [u.id, u]));
-
-  const latestContracts: any[] = await prisma.$queryRaw`
-    SELECT d.id, c.client_id, d.created_at
-    FROM clm.contract c
-    JOIN clm.document d ON d.id = c.document_id
-    WHERE d.id IN (
-      SELECT MAX(c2.document_id)
-      FROM clm.contract c2
-      GROUP BY c2.client_id
-    )
-  `;
-
-  const contractMap = new Map<number, any>(
-    latestContracts.map((c) => [c.client_id, c])
-  );
-
-  return clients.map((c) => {
-    const earliestDeLa = c.puncteDeLucru
-      .map((p) => p.deLa)
-      .filter(Boolean)
-      .sort((a, b) => (a && b ? a.getTime() - b.getTime() : 0))[0]
-
-    const latestPanaLa = c.puncteDeLucru
-      .map((p) => p.panaLa)
-      .filter((d): d is Date => Boolean(d))
-      .sort((a, b) => a.getTime() - b.getTime())
-      .at(-1)
-
-    const problems: string[] = []
-    if (c.detalii) {
-      if (!c.detalii.manualPoliticiContabile) problems.push("Manual pol. contabile")
-      if (!c.detalii.regulamentOrdineInterioara) problems.push("Regulament OI")
-      if (!c.detalii.ofSpalareBani) problems.push("Of spalare bani")
-      if (!c.detalii.registruUC) problems.push("Registru UC")
-    }
-
-    const latestContract = contractMap.get(c.id);
-
-    return {
-      id: c.id,
-      name: c.denumire,
-      tip: c.tip,
-      cui: c.cui,
-      adresa: c.adresa ?? undefined,
-      administratie: c.administratie,
-      deLa: toISODate(earliestDeLa ?? c.dataVerificarii),
-      panaLa: toISODate(latestPanaLa ?? null),
-      users: c.users
-        ? c.users
-          .map((uc) => { const u = userMap.get(uc.userId); return u ? (u.name || u.email) : null; })
-          .filter((s): s is string => !!s)
-          .sort((a, b) => a.localeCompare(b))
-        : undefined,
-      tarifConta: undefined,
-      tarifBilant: undefined,
-      contractGen: latestContract ? `Gen. la ${toISODate(latestContract.created_at)}` : undefined,
-      contractSemnat: undefined,
-      contractId: latestContract ? latestContract.id : undefined,
-      probleme: problems.length ? problems : undefined,
-    }
-  })
 }
 
 export type ClientDetails = {
   id: number
   name: string
-  tip: $Enums.Tip
+  tip: string
   deLa?: string
   panaLa?: string
   probleme?: string[]
-  // Editable fields for form
   denumire: string
   cui: string
   activa: boolean
   dataVerificarii?: string
   adresa?: string
-  administratie: $Enums.Administratie
-  impozit: $Enums.Impozit | null
-  platitorTVA: $Enums.DaLunarTrim
+  administratie: string
+  impozit: string | null
+  platitorTVA: string
   tvaLaIncasare: boolean | null
   areCodTVAUE: boolean | null
   codTVAUE?: string
   operatiuneUE: boolean | null
   dividende: boolean | null
-  salariati: $Enums.DaLunarTrim | null
+  salariati: string | null
   casaDeMarcat: boolean | null
   dataExpSediuSocial?: string
   dataExpMandatAdmin?: string
@@ -144,253 +63,272 @@ export type ClientDetails = {
   }
 }
 
-export async function getClient(id: number): Promise<ClientDetails | null> {
-  noStore();
-  const c = await prisma.client.findUnique({
-    where: { id },
-    include: {
-      detalii: true,
-      puncteDeLucru: { select: { deLa: true, panaLa: true } },
-    },
+function toISODate(d?: string | null): string | undefined {
+  if (!d) return undefined
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return undefined
+  return dt.toISOString().slice(0, 10)
+}
+
+async function fetchAllClients() {
+  const res = await clientServiceFetch("/api/clients?size=1000&page=0", { cache: "no-store" })
+  if (!res.ok) throw new Error("Failed to fetch clients")
+  const data = await res.json()
+  return data.content ?? data ?? []
+}
+
+export async function getClientRows(): Promise<Row[]> {
+  const session = await getSession()
+  const token = (session?.user as any)?.serviceToken ?? ""
+
+  const [clients, allUsers] = await Promise.all([
+    fetchAllClients(),
+    getUsers(token),
+  ])
+
+  const contractEntries = await Promise.all(
+    clients.map(async (c: any) => ({
+      clientId: c.id,
+      contract: await getContractByClientId(c.id),
+    }))
+  )
+  const contractMap = new Map(
+    contractEntries
+      .filter((entry) => entry.contract)
+      .map((entry) => [entry.clientId, entry.contract!])
+  )
+
+  const userMap = new Map(allUsers.map((u: any) => [u.id, u]))
+
+  return clients.map((c: any) => {
+    const workPoints: any[] = c.workPoints ?? []
+
+    const earliestDeLa = workPoints
+      .map((p: any) => p.deLa)
+      .filter(Boolean)
+      .sort()[0]
+
+    const latestPanaLa = workPoints
+      .map((p: any) => p.panaLa)
+      .filter(Boolean)
+      .sort()
+      .at(-1)
+
+    const details = c.details ?? {}
+    const problems: string[] = []
+    if (!details.manualPoliticiContabile) problems.push("Manual pol. contabile")
+    if (!details.regulamentOrdineInterioara) problems.push("Regulament OI")
+    if (!details.ofSpalareBani) problems.push("Of spalare bani")
+    if (!details.registruUC) problems.push("Registru UC")
+
+    const userIds: number[] = (c.userClients ?? []).map((uc: any) => uc.userId)
+
+    const contract = contractMap.get(c.id)
+    const contractId = contract?.id ?? c.contractId ?? c.contract?.id ?? c.currentContract?.id
+    const contractStatus =
+      contract?.contractStatus ?? c.contractStatus ?? c.contract?.contractStatus ?? c.currentContract?.contractStatus
+    const contractSemnat =
+      c.contractSemnat ?? c.contract?.signedFileName ?? c.contract?.signedDocumentName ?? c.signedContractName
+    const contractStartDate = toISODate(contract?.contractStartDate ?? null)
+    const contractEndDate = toISODate(contract?.contractEndDate ?? null)
+    const contractValue = contract?.contractValue ?? null
+    const autoRenew = contract?.autoRenew ?? null
+
+    return {
+      id: c.id,
+      name: c.denumire ?? c.name,
+      tip: c.tip ?? c.type,
+      cui: c.cui ?? c.taxId,
+      adresa: c.adresa ?? c.address,
+      administratie: c.administratie ?? c.administration,
+      deLa: toISODate(earliestDeLa ?? c.dataVerificarii ?? c.verificationDate),
+      panaLa: toISODate(latestPanaLa),
+      users: userIds
+        .map((id) => {
+          const u = userMap.get(id) as any
+          return u ? (u.name || u.email) : null
+        })
+        .filter((s): s is string => !!s)
+        .sort((a, b) => a.localeCompare(b)),
+      contractId: contractId ? Number(contractId) : undefined,
+      contractStatus: contractStatus ?? undefined,
+      contractSemnat: contractSemnat ?? undefined,
+      contractStartDate: contractStartDate ?? undefined,
+      contractEndDate: contractEndDate ?? undefined,
+      contractValue: contractValue != null ? Number(contractValue) : undefined,
+      autoRenew: autoRenew != null ? Boolean(autoRenew) : undefined,
+      probleme: problems.length ? problems : undefined,
+    }
   })
-  if (!c) return null
+}
 
-  const earliestDeLa = c.puncteDeLucru
-    .map((p) => p.deLa)
-    .filter(Boolean)
-    .sort((a, b) => (a && b ? a.getTime() - b.getTime() : 0))[0]
+export async function getClient(id: number): Promise<ClientDetails | null> {
+  const res = await clientServiceFetch(`/api/clients/${id}`, { cache: "no-store" })
+  if (!res.ok) return null
+  const c = await res.json()
 
-  const latestPanaLa = c.puncteDeLucru
-    .map((p) => p.panaLa)
-    .filter((d): d is Date => Boolean(d))
-    .sort((a, b) => a.getTime() - b.getTime())
-    .at(-1)
+  const workPoints: any[] = c.workPoints ?? []
+  const earliestDeLa = workPoints.map((p: any) => p.deLa).filter(Boolean).sort()[0]
+  const latestPanaLa = workPoints.map((p: any) => p.panaLa).filter(Boolean).sort().at(-1)
 
+  const details = c.details ?? {}
   const problems: string[] = []
-  if (c.detalii) {
-    if (!c.detalii.manualPoliticiContabile) problems.push("Manual pol. contabile")
-    if (!c.detalii.regulamentOrdineInterioara) problems.push("Regulament OI")
-    if (!c.detalii.ofSpalareBani) problems.push("Of spalare bani")
-    if (!c.detalii.registruUC) problems.push("Registru UC")
-  }
+  if (!details.manualPoliticiContabile) problems.push("Manual pol. contabile")
+  if (!details.regulamentOrdineInterioara) problems.push("Regulament OI")
+  if (!details.ofSpalareBani) problems.push("Of spalare bani")
+  if (!details.registruUC) problems.push("Registru UC")
 
   return {
     id: c.id,
-    name: c.denumire,
-    tip: c.tip,
-    deLa: toISODate(earliestDeLa ?? c.dataVerificarii),
-    panaLa: toISODate(latestPanaLa ?? null),
-    denumire: c.denumire,
-    cui: c.cui,
-    activa: c.activa,
-    dataVerificarii: toISODate(c.dataVerificarii ?? null),
-    adresa: c.adresa ?? undefined,
-    administratie: c.administratie,
-    impozit: c.impozit,
-    platitorTVA: c.platitorTVA,
-    tvaLaIncasare: c.tvaLaIncasare,
-    areCodTVAUE: c.areCodTVAUE,
-    codTVAUE: c.codTVAUE ?? undefined,
-    operatiuneUE: c.operatiuneUE,
-    dividende: c.dividende,
-    salariati: c.salariati,
-    casaDeMarcat: c.casaDeMarcat,
-    dataExpSediuSocial: toISODate(c.dataExpSediuSocial ?? null),
-    dataExpMandatAdmin: toISODate(c.dataExpMandatAdmin ?? null),
-    dataCertificatFiscal: toISODate(c.dataCertificatFiscal ?? null),
-    dataFisaPlatitor: toISODate(c.dataFisaPlatitor ?? null),
-    dataVectFiscal: toISODate(c.dataVectFiscal ?? null),
+    name: c.denumire ?? c.name,
+    tip: c.tip ?? c.type,
+    deLa: toISODate(earliestDeLa ?? c.dataVerificarii ?? c.verificationDate),
+    panaLa: toISODate(latestPanaLa),
+    denumire: c.denumire ?? c.name,
+    cui: c.cui ?? c.taxId,
+    activa: c.activa ?? c.active ?? true,
+    dataVerificarii: toISODate(c.dataVerificarii ?? c.verificationDate),
+    adresa: c.adresa ?? c.address,
+    administratie: c.administratie ?? c.administration,
+    impozit: c.impozit ?? c.taxType ?? null,
+    platitorTVA: c.platitorTVA ?? c.vatPayer,
+    tvaLaIncasare: c.tvaLaIncasare ?? c.vatOnCollection ?? null,
+    areCodTVAUE: c.areCodTVAUE ?? c.hasEuVatCode ?? null,
+    codTVAUE: c.codTVAUE ?? c.euVatCode ?? undefined,
+    operatiuneUE: c.operatiuneUE ?? c.euOperation ?? null,
+    dividende: c.dividende ?? c.dividends ?? null,
+    salariati: c.salariati ?? c.employees ?? null,
+    casaDeMarcat: c.casaDeMarcat ?? c.cashRegister ?? null,
+    dataExpSediuSocial: toISODate(c.dataExpSediuSocial ?? c.hqExpirationDate),
+    dataExpMandatAdmin: toISODate(c.dataExpMandatAdmin ?? c.adminMandateExpiration),
+    dataCertificatFiscal: toISODate(c.dataCertificatFiscal ?? c.fiscalCertificateDate),
+    dataFisaPlatitor: toISODate(c.dataFisaPlatitor ?? c.payerSheetDate),
+    dataVectFiscal: toISODate(c.dataVectFiscal ?? c.fiscalVectorDate),
     probleme: problems.length ? problems : undefined,
-    detalii: c.detalii
+    detalii: details.id
       ? {
-        manualPoliticiContabile: !!c.detalii.manualPoliticiContabile,
-        regulamentOrdineInterioara: !!c.detalii.regulamentOrdineInterioara,
-        ofSpalareBani: !!c.detalii.ofSpalareBani,
-        registruUC: !!c.detalii.registruUC,
-      }
+          manualPoliticiContabile: !!details.manualPoliticiContabile,
+          regulamentOrdineInterioara: !!details.regulamentOrdineInterioara,
+          ofSpalareBani: !!details.ofSpalareBani,
+          registruUC: !!details.registruUC,
+        }
       : undefined,
   }
 }
 
-// =============== Mutations ===============
-
-function bool(v: FormDataEntryValue | null): boolean {
-  return v === "on" || v === "true" || v === "1";
-}
-
-function str(v: FormDataEntryValue | null | undefined): string | undefined {
-  return typeof v === "string" && v.trim() !== "" ? v : undefined;
-}
-
-function dateStr(v: FormDataEntryValue | null): Date | null {
-  if (typeof v !== "string" || !v) return null;
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
+export async function getClientTemplateSource(id: number): Promise<Record<string, unknown> | null> {
+  const res = await clientServiceFetch(`/api/clients/${id}`, { cache: "no-store" })
+  if (!res.ok) return null
+  return (await res.json()) as Record<string, unknown>
 }
 
 export async function createClient(formData: FormData) {
-  "use server";
-  const denumire = formData.get("denumire") as string;
-  const tip = formData.get("tip") as $Enums.Tip;
-  const cui = formData.get("cui") as string;
-  const activa = bool(formData.get("activa"));
-  const dataVerificarii = dateStr(formData.get("dataVerificarii"));
-  const adresa = str(formData.get("adresa"));
-  const administratie = formData.get("administratie") as $Enums.Administratie;
-
-  const impozit = formData.get("impozit") as $Enums.Impozit;
-  const platitorTVA = formData.get("platitorTVA") as $Enums.DaLunarTrim;
-  const tvaLaIncasare = bool(formData.get("tvaLaIncasare"));
-  const areCodTVAUE = bool(formData.get("areCodTVAUE"));
-  const codTVAUE = str(formData.get("codTVAUE"));
-  const operatiuneUE = bool(formData.get("operatiuneUE"));
-  const dividende = bool(formData.get("dividende"));
-  const salariati = formData.get("salariati") as $Enums.DaLunarTrim;
-  const casaDeMarcat = bool(formData.get("casaDeMarcat"));
-
-  const dataExpSediuSocial = dateStr(formData.get("dataExpSediuSocial"));
-  const dataExpMandatAdmin = dateStr(formData.get("dataExpMandatAdmin"));
-  const dataCertificatFiscal = dateStr(formData.get("dataCertificatFiscal"));
-  const dataFisaPlatitor = dateStr(formData.get("dataFisaPlatitor"));
-  const dataVectFiscal = dateStr(formData.get("dataVectFiscal"));
-
-  if (!denumire || !tip || !cui || !administratie || !impozit || !platitorTVA || !salariati) {
-    throw new Error("Missing required fields");
+  "use server"
+  const body = {
+    denumire: formData.get("denumire"),
+    tip: formData.get("tip"),
+    cui: formData.get("cui"),
+    activa: formData.get("activa") === "on" || formData.get("activa") === "true",
+    dataVerificarii: formData.get("dataVerificarii") || null,
+    adresa: formData.get("adresa") || null,
+    administratie: formData.get("administratie"),
+    impozit: formData.get("impozit") || null,
+    platitorTVA: formData.get("platitorTVA"),
+    tvaLaIncasare: formData.get("tvaLaIncasare") === "on" || formData.get("tvaLaIncasare") === "true",
+    areCodTVAUE: formData.get("areCodTVAUE") === "on" || formData.get("areCodTVAUE") === "true",
+    codTVAUE: formData.get("codTVAUE") || null,
+    operatiuneUE: formData.get("operatiuneUE") === "on" || formData.get("operatiuneUE") === "true",
+    dividende: formData.get("dividende") === "on" || formData.get("dividende") === "true",
+    salariati: formData.get("salariati") || null,
+    casaDeMarcat: formData.get("casaDeMarcat") === "on" || formData.get("casaDeMarcat") === "true",
+    dataExpSediuSocial: formData.get("dataExpSediuSocial") || null,
+    dataExpMandatAdmin: formData.get("dataExpMandatAdmin") || null,
+    dataCertificatFiscal: formData.get("dataCertificatFiscal") || null,
+    dataFisaPlatitor: formData.get("dataFisaPlatitor") || null,
+    dataVectFiscal: formData.get("dataVectFiscal") || null,
   }
 
-  const created = await prisma.client.create({
-    data: {
-      denumire,
-      tip,
-      cui,
-      activa,
-      dataVerificarii: dataVerificarii ?? undefined,
-      adresa,
-      administratie,
-      impozit,
-      platitorTVA,
-      tvaLaIncasare,
-      areCodTVAUE,
-      codTVAUE,
-      operatiuneUE,
-      dividende,
-      salariati,
-      casaDeMarcat,
-      dataExpSediuSocial: dataExpSediuSocial ?? undefined,
-      dataExpMandatAdmin: dataExpMandatAdmin ?? undefined,
-      dataCertificatFiscal: dataCertificatFiscal ?? undefined,
-      dataFisaPlatitor: dataFisaPlatitor ?? undefined,
-      dataVectFiscal: dataVectFiscal ?? undefined,
-    },
-    select: { id: true },
-  });
+  const res = await clientServiceFetch("/api/clients", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
 
-  return { id: created.id };
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to create client: ${err}`)
+  }
+
+  const created = await res.json()
+  return { id: created.id }
 }
 
 export async function updateClient(id: number, formData: FormData) {
-  "use server";
-  const denumire = str(formData.get("denumire"));
-  const tip = str(formData.get("tip")) as $Enums.Tip | undefined;
-  const cui = str(formData.get("cui"));
-  const activaMaybe = formData.get("activa");
-  const dataVerificarii = dateStr(formData.get("dataVerificarii"));
-  const adresa = str(formData.get("adresa"));
-  const administratie = str(formData.get("administratie")) as $Enums.Administratie | undefined;
+  "use server"
+  const body: Record<string, any> = {}
 
-  const impozit = str(formData.get("impozit")) as $Enums.Impozit | undefined;
-  const platitorTVA = str(formData.get("platitorTVA")) as $Enums.DaLunarTrim | undefined;
-  const tvaLaIncasareMaybe = formData.get("tvaLaIncasare");
-  const areCodTVAUEMaybe = formData.get("areCodTVAUE");
-  const codTVAUE = str(formData.get("codTVAUE"));
-  const operatiuneUEMaybe = formData.get("operatiuneUE");
-  const dividendeMaybe = formData.get("dividende");
-  const salariati = str(formData.get("salariati")) as $Enums.DaLunarTrim | undefined;
-  const casaDeMarcatMaybe = formData.get("casaDeMarcat");
+  const fields: Array<[string, string]> = [
+    ["denumire", "denumire"],
+    ["tip", "tip"],
+    ["cui", "cui"],
+    ["adresa", "adresa"],
+    ["administratie", "administratie"],
+    ["impozit", "impozit"],
+    ["platitorTVA", "platitorTVA"],
+    ["codTVAUE", "codTVAUE"],
+    ["salariati", "salariati"],
+    ["dataVerificarii", "dataVerificarii"],
+    ["dataExpSediuSocial", "dataExpSediuSocial"],
+    ["dataExpMandatAdmin", "dataExpMandatAdmin"],
+    ["dataCertificatFiscal", "dataCertificatFiscal"],
+    ["dataFisaPlatitor", "dataFisaPlatitor"],
+    ["dataVectFiscal", "dataVectFiscal"],
+  ]
+  for (const [key, field] of fields) {
+    const v = formData.get(key)
+    if (v !== null) body[field] = v === "" ? null : v
+  }
 
-  const dataExpSediuSocial = dateStr(formData.get("dataExpSediuSocial"));
-  const dataExpMandatAdmin = dateStr(formData.get("dataExpMandatAdmin"));
-  const dataCertificatFiscal = dateStr(formData.get("dataCertificatFiscal"));
-  const dataFisaPlatitor = dateStr(formData.get("dataFisaPlatitor"));
-  const dataVectFiscal = dateStr(formData.get("dataVectFiscal"));
+  const boolFields = ["activa", "tvaLaIncasare", "areCodTVAUE", "operatiuneUE", "dividende", "casaDeMarcat"]
+  for (const key of boolFields) {
+    const v = formData.get(key)
+    if (v !== null) body[key] = v === "on" || v === "true" || v === "1"
+  }
 
-  const data: Partial<Prisma.ClientUpdateInput> = {};
-  if (denumire !== undefined) data.denumire = denumire;
-  if (tip !== undefined) data.tip = tip;
-  if (cui !== undefined) data.cui = cui;
-  if (activaMaybe !== null) data.activa = bool(activaMaybe);
-  if (dataVerificarii !== null) data.dataVerificarii = dataVerificarii ?? undefined;
-  if (adresa !== undefined) data.adresa = adresa;
-  if (administratie !== undefined) data.administratie = administratie;
-  if (impozit !== undefined) data.impozit = impozit;
-  if (platitorTVA !== undefined) data.platitorTVA = platitorTVA;
-  if (tvaLaIncasareMaybe !== null) data.tvaLaIncasare = bool(tvaLaIncasareMaybe);
-  if (areCodTVAUEMaybe !== null) data.areCodTVAUE = bool(areCodTVAUEMaybe);
-  if (codTVAUE !== undefined) data.codTVAUE = codTVAUE;
-  if (operatiuneUEMaybe !== null) data.operatiuneUE = bool(operatiuneUEMaybe);
-  if (dividendeMaybe !== null) data.dividende = bool(dividendeMaybe);
-  if (salariati !== undefined) data.salariati = salariati;
-  if (casaDeMarcatMaybe !== null) data.casaDeMarcat = bool(casaDeMarcatMaybe);
-  if (dataExpSediuSocial !== null) data.dataExpSediuSocial = dataExpSediuSocial ?? undefined;
-  if (dataExpMandatAdmin !== null) data.dataExpMandatAdmin = dataExpMandatAdmin ?? undefined;
-  if (dataCertificatFiscal !== null) data.dataCertificatFiscal = dataCertificatFiscal ?? undefined;
-  if (dataFisaPlatitor !== null) data.dataFisaPlatitor = dataFisaPlatitor ?? undefined;
-  if (dataVectFiscal !== null) data.dataVectFiscal = dataVectFiscal ?? undefined;
+  const res = await clientServiceFetch(`/api/clients/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
 
-  const updated = await prisma.client.update({
-    where: { id },
-    data,
-    select: {
-      id: true,
-      denumire: true,
-      tip: true,
-      cui: true,
-      activa: true,
-      dataVerificarii: true,
-      adresa: true,
-      administratie: true,
-      impozit: true,
-      platitorTVA: true,
-      tvaLaIncasare: true,
-      areCodTVAUE: true,
-      codTVAUE: true,
-      operatiuneUE: true,
-      dividende: true,
-      salariati: true,
-      casaDeMarcat: true,
-      dataExpSediuSocial: true,
-      dataExpMandatAdmin: true,
-      dataCertificatFiscal: true,
-      dataFisaPlatitor: true,
-      dataVectFiscal: true,
-    },
-  });
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to update client: ${err}`)
+  }
 
-  // Ensure fresh data if the page remounts after this action
-  revalidatePath(`/clients/edit/${id}`)
-
+  const updated = await res.json()
   return {
     id: updated.id,
-    denumire: updated.denumire,
-    tip: updated.tip,
-    cui: updated.cui,
-    activa: updated.activa,
-    dataVerificarii: toISODate(updated.dataVerificarii ?? null),
-    adresa: updated.adresa ?? undefined,
-    administratie: updated.administratie,
-    impozit: updated.impozit,
-    platitorTVA: updated.platitorTVA,
-    tvaLaIncasare: updated.tvaLaIncasare,
-    areCodTVAUE: updated.areCodTVAUE,
-    codTVAUE: updated.codTVAUE ?? undefined,
-    operatiuneUE: updated.operatiuneUE,
-    dividende: updated.dividende,
-    salariati: updated.salariati,
-    casaDeMarcat: updated.casaDeMarcat,
-    dataExpSediuSocial: toISODate(updated.dataExpSediuSocial ?? null),
-    dataExpMandatAdmin: toISODate(updated.dataExpMandatAdmin ?? null),
-    dataCertificatFiscal: toISODate(updated.dataCertificatFiscal ?? null),
-    dataFisaPlatitor: toISODate(updated.dataFisaPlatitor ?? null),
-    dataVectFiscal: toISODate(updated.dataVectFiscal ?? null),
-  };
+    denumire: updated.denumire ?? updated.name,
+    tip: updated.tip ?? updated.type,
+    cui: updated.cui ?? updated.taxId,
+    activa: updated.activa ?? updated.active,
+    dataVerificarii: toISODate(updated.dataVerificarii ?? updated.verificationDate),
+    adresa: updated.adresa ?? updated.address,
+    administratie: updated.administratie ?? updated.administration,
+    impozit: updated.impozit ?? updated.taxType ?? null,
+    platitorTVA: updated.platitorTVA ?? updated.vatPayer,
+    tvaLaIncasare: updated.tvaLaIncasare ?? updated.vatOnCollection ?? null,
+    areCodTVAUE: updated.areCodTVAUE ?? updated.hasEuVatCode ?? null,
+    codTVAUE: updated.codTVAUE ?? updated.euVatCode ?? undefined,
+    operatiuneUE: updated.operatiuneUE ?? updated.euOperation ?? null,
+    dividende: updated.dividende ?? updated.dividends ?? null,
+    salariati: updated.salariati ?? updated.employees ?? null,
+    casaDeMarcat: updated.casaDeMarcat ?? updated.cashRegister ?? null,
+    dataExpSediuSocial: toISODate(updated.dataExpSediuSocial ?? updated.hqExpirationDate),
+    dataExpMandatAdmin: toISODate(updated.dataExpMandatAdmin ?? updated.adminMandateExpiration),
+    dataCertificatFiscal: toISODate(updated.dataCertificatFiscal ?? updated.fiscalCertificateDate),
+    dataFisaPlatitor: toISODate(updated.dataFisaPlatitor ?? updated.payerSheetDate),
+    dataVectFiscal: toISODate(updated.dataVectFiscal ?? updated.fiscalVectorDate),
+  }
 }

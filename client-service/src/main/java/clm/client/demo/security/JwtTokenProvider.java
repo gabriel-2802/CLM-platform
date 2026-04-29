@@ -29,11 +29,13 @@ public class JwtTokenProvider {
     @PostConstruct
     void init() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException("""
-                    jwt.secret must be at least 32 characters (256 bits) for HMAC-SHA256.
-                    Set the JWT_SECRET environment variable to a strong random value.""".strip());
+        // HS512 requires at least 64 bytes (512 bits)
+        if (keyBytes.length < 64) {
+            log.warn("""
+                    jwt.secret should be at least 64 characters (512 bits) for HS512.
+                    Current length: {} bytes. Token verification may fail.""".formatted(keyBytes.length));
         }
+        // Create a key suitable for HS512
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
 
@@ -66,7 +68,7 @@ public class JwtTokenProvider {
                     .getPayload();
             return Optional.of(payload);
         } catch (JwtException | IllegalArgumentException e) {
-            log.debug("JWT parsing failed: {}", e.getMessage());
+            log.warn("JWT parsing failed for token: {}", e.getMessage());
             return Optional.empty();
         }
     }

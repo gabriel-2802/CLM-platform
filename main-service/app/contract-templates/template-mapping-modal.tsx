@@ -5,23 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
-import { getTemplateById, updateTemplateMappings } from "@/actions/contract-templates"
+import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
 import { toast } from "sonner"
 import parse, { Element, HTMLReactParserOptions } from "html-react-parser"
 
-// Available mapping options
-const MAPPING_OPTIONS = [
-  { label: "Manual (Input utilizator)", value: "MANUAL" },
-  { label: "Nume / Denumire Client", value: "CLIENT_NAME" },
-  { label: "CUI Client", value: "CLIENT_CUI" },
-  { label: "Adresa Sediu Social", value: "CLIENT_ADDRESS" },
-  { label: "Tip Firma (SRL/PFA/etc)", value: "CLIENT_TYPE" },
-  { label: "Administrator", value: "CLIENT_ADMIN" },
-  { label: "Data Inceput Contract", value: "CONTRACT_START_DATE" },
-  { label: "Data Sfarsit Contract", value: "CONTRACT_END_DATE" },
-  { label: "Valoare Contract", value: "CONTRACT_VALUE" },
-  { label: "Notițe", value: "CONTRACT_NOTES" },
-]
+const MANUAL_MAPPING_OPTION = { label: "Manual (Input utilizator)", value: "MANUAL" }
 
 // Regex to match placeholder patterns: 4+ dots, Unicode ellipsis, or long underscores
 const PLACEHOLDER_REGEX = /\.{4,}|…+|_{5,}/g
@@ -36,7 +24,8 @@ export function TemplateMappingModal({
   fullyMapped?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const [fields, setFields] = useState<any[]>([])
+  const [fields, setFields] = useState<TemplateField[]>([])
+  const [mappingOptions, setMappingOptions] = useState<TemplateMappingOption[]>([MANUAL_MAPPING_OPTION])
   const [htmlContent, setHtmlContent] = useState<string>("")
   const [mappings, setMappings] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
@@ -55,15 +44,20 @@ export function TemplateMappingModal({
 
     const fetchData = async () => {
       try {
-        // 1. Fetch template metadata (field IDs + current labels)
-        const templateData = await getTemplateById(templateId)
+        // 1. Fetch template metadata and the dynamic client fields exposed by client-service.
+        const [templateData, clientFields] = await Promise.all([
+          getTemplateById(templateId),
+          getClientTemplateFields(),
+        ])
+        setMappingOptions([MANUAL_MAPPING_OPTION, ...clientFields])
+
         if (templateData?.fields) {
-          const sorted = templateData.fields.sort(
-            (a: any, b: any) => (a.fieldPosition || 0) - (b.fieldPosition || 0)
+          const sorted = [...templateData.fields].sort(
+            (a, b) => (a.fieldPosition || 0) - (b.fieldPosition || 0)
           )
           setFields(sorted)
           const initial: Record<number, string> = {}
-          sorted.forEach((f: any) => {
+          sorted.forEach((f) => {
             initial[f.id] = f.fieldLabel || "MANUAL"
           })
           setMappings(initial)
@@ -92,9 +86,9 @@ export function TemplateMappingModal({
         }
 
         setHtmlContent(result.value)
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error("[TemplateMappingModal] error:", err)
-        setDocError(err?.message || "Eroare necunoscută la încărcarea documentului.")
+        setDocError(err instanceof Error ? err.message : "Eroare necunoscută la încărcarea documentului.")
         toast.error("Eroare la încărcarea template-ului.")
       } finally {
         setLoading(false)
@@ -182,8 +176,8 @@ export function TemplateMappingModal({
               <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-amber-50 border-amber-400 px-2 focus:ring-1 focus:ring-amber-500 font-medium">
                 <SelectValue placeholder="Selectează câmp..." />
               </SelectTrigger>
-              <SelectContent>
-                {MAPPING_OPTIONS.map((opt) => (
+              <SelectContent className="max-h-72 overflow-y-auto">
+                {mappingOptions.map((opt) => (
                   <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
                     {opt.label}
                   </SelectItem>
@@ -232,7 +226,7 @@ export function TemplateMappingModal({
           <div>
             {hasRealContent ? (
               <p>
-                Documentul Word este afișat mai jos. Fiecare câmp marcat cu <strong>„...."</strong>{" "}
+                Documentul Word este afișat mai jos. Fiecare câmp marcat cu <strong>„....&quot;</strong>{" "}
                 a fost înlocuit cu un dropdown. Alege ce informație trebuie să apară în acel loc.
               </p>
             ) : (
@@ -318,8 +312,8 @@ export function TemplateMappingModal({
                       <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500">
                         <SelectValue placeholder="Selectează date pentru acest câmp..." />
                       </SelectTrigger>
-                      <SelectContent>
-                        {MAPPING_OPTIONS.map((opt) => (
+                      <SelectContent className="max-h-72 overflow-y-auto">
+                        {mappingOptions.map((opt) => (
                           <SelectItem key={opt.value} value={opt.value} className="text-sm">
                             {opt.label}
                           </SelectItem>

@@ -8,15 +8,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
-import type { $Enums } from "@/lib/generated/prisma-client";
+import { useEnums } from "@/hooks/use-enums";
 
 export type IstoricFormValues = {
   id?: number;
   anul: number;
   cifraAfaceri: number;
   inventar: boolean;
-  bilantSemIun: $Enums.DaNuNuECazul;
-  bilantAnual: $Enums.DaNuNuECazul;
+  bilantSemIun: string;
+  bilantAnual: string;
 };
 
 type Props = {
@@ -27,21 +27,22 @@ type Props = {
 };
 
 export default function ClientIstoricForm({ initial, onSubmit, submitLabel = "Save", onDelete }: Props) {
+  const enums = useEnums();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [anul, setAnul] = useState<number>(initial?.anul ?? new Date().getFullYear());
   const [cifraAfaceri, setCifraAfaceri] = useState<number>(initial?.cifraAfaceri ?? 0);
   const [inventar, setInventar] = useState<boolean>(initial?.inventar ?? false);
-  const [bilantSemIun, setBilantSemIun] = useState<$Enums.DaNuNuECazul>(initial?.bilantSemIun ?? "NU_E_CAZUL");
-  const [bilantAnual, setBilantAnual] = useState<$Enums.DaNuNuECazul>(initial?.bilantAnual ?? "NU_E_CAZUL");
+  const [bilantSemIun, setBilantSemIun] = useState<string>(initial?.bilantSemIun ?? "NU_E_CAZUL");
+  const [bilantAnual, setBilantAnual] = useState<string>(initial?.bilantAnual ?? "NU_E_CAZUL");
 
   // Resync from server-provided fresh props on any remount
   useEffect(() => {
     setAnul(initial?.anul ?? new Date().getFullYear());
     setCifraAfaceri(initial?.cifraAfaceri ?? 0);
     setInventar(initial?.inventar ?? false);
-    setBilantSemIun((initial?.bilantSemIun as $Enums.DaNuNuECazul) ?? "NU_E_CAZUL");
-    setBilantAnual((initial?.bilantAnual as $Enums.DaNuNuECazul) ?? "NU_E_CAZUL");
+    setBilantSemIun(initial?.bilantSemIun ?? "NU_E_CAZUL");
+    setBilantAnual(initial?.bilantAnual ?? "NU_E_CAZUL");
   }, [initial]);
 
   async function handleAction(fd: FormData) {
@@ -83,12 +84,10 @@ export default function ClientIstoricForm({ initial, onSubmit, submitLabel = "Sa
       <div>
         <Label className="mb-2 text-purple-800">Bilant semestrial iunie</Label>
         <input type="hidden" name="bilantSemIun" value={bilantSemIun} />
-        <Select value={bilantSemIun} onValueChange={(v: $Enums.DaNuNuECazul) => setBilantSemIun(v)}>
+        <Select value={bilantSemIun} onValueChange={setBilantSemIun}>
           <SelectTrigger><SelectValue placeholder="Alege" /></SelectTrigger>
           <SelectContent>
-            {(["DA","NU","NU_E_CAZUL"] as $Enums.DaNuNuECazul[]).map(v => (
-              <SelectItem key={v} value={v}>{v}</SelectItem>
-            ))}
+            {enums.yesNoNa.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -96,12 +95,10 @@ export default function ClientIstoricForm({ initial, onSubmit, submitLabel = "Sa
       <div>
         <Label className="mb-2 text-purple-800">Bilant anual</Label>
         <input type="hidden" name="bilantAnual" value={bilantAnual} />
-        <Select value={bilantAnual} onValueChange={(v: $Enums.DaNuNuECazul) => setBilantAnual(v)}>
+        <Select value={bilantAnual} onValueChange={setBilantAnual}>
           <SelectTrigger><SelectValue placeholder="Alege" /></SelectTrigger>
           <SelectContent>
-            {(["DA","NU","NU_E_CAZUL"] as $Enums.DaNuNuECazul[]).map(v => (
-              <SelectItem key={v} value={v}>{v}</SelectItem>
-            ))}
+            {enums.yesNoNa.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

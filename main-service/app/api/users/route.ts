@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { getUsers, normalizeUser, registerUser } from "@/lib/user-service-client";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -10,7 +13,9 @@ export async function GET() {
 
   const token = session.user.serviceToken!;
   const users = await getUsers(token);
-  return NextResponse.json(users.map(normalizeUser));
+  return NextResponse.json(users.map(normalizeUser), {
+    headers: { "Cache-Control": "no-store" },
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -53,6 +58,11 @@ export async function POST(request: NextRequest) {
       const { updateUser } = await import("@/lib/user-service-client");
       await updateUser(user.id, { email: user.email, name: user.name, role: "MANAGER" }, token);
     }
+
+    revalidatePath("/users");
+    revalidatePath("/taskuri");
+    revalidatePath("/taskuri/edit/new");
+    revalidatePath("/taskuri/edit/nou");
 
     return NextResponse.json({ id: user.id, email: user.email, name: user.name, rol: rol ?? "USER" }, { status: 201 });
   }

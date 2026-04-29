@@ -8,14 +8,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Trash2 } from "lucide-react";
-import type { $Enums } from "@/lib/generated/prisma-client";
+import { useEnums } from "@/hooks/use-enums";
 
 export type PunctFormValues = {
   id?: number;
   denumire: string;
   deLa: string; // YYYY-MM-DD
   panaLa?: string;
-  administratie: $Enums.Administratie;
+  administratie: string;
   registruUC: boolean;
   salariati: number;
   cui?: string;
@@ -30,11 +30,11 @@ type Props = {
 };
 
 export default function ClientPunctForm({ initial, onSubmit, submitLabel = "Save", onDelete }: Props) {
+  const enums = useEnums();
   const [busy, setBusy] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // Controlled state for all fields
   const [denumire, setDenumire] = useState(initial?.denumire ?? "");
-  const [administratie, setAdministratie] = useState<$Enums.Administratie>(initial?.administratie ?? "SECTOR_1");
+  const [administratie, setAdministratie] = useState<string>(initial?.administratie ?? "SECTOR_1");
   const [deLa, setDeLa] = useState(initial?.deLa ?? "");
   const [panaLa, setPanaLa] = useState(initial?.panaLa ?? "");
   const [cui, setCui] = useState(initial?.cui ?? "");
@@ -104,12 +104,10 @@ export default function ClientPunctForm({ initial, onSubmit, submitLabel = "Save
       <div>
         <Label className="mb-2 text-purple-800">Administratie</Label>
         <input type="hidden" name="administratie" value={administratie} />
-        <Select value={administratie} onValueChange={(v: $Enums.Administratie) => setAdministratie(v)}>
+        <Select value={administratie} onValueChange={setAdministratie}>
           <SelectTrigger><SelectValue placeholder="Alege" /></SelectTrigger>
           <SelectContent>
-            {(["SECTOR_1","SECTOR_2","SECTOR_3","SECTOR_4","SECTOR_5","SECTOR_6","ILFOV","BUFTEA","BRAGADIRU","VRANCEA"] as $Enums.Administratie[]).map(v => (
-              <SelectItem key={v} value={v}>{v}</SelectItem>
-            ))}
+            {enums.administrations.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

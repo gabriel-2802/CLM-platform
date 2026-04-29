@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { $Enums } from "@/lib/generated/prisma-client";
+import { useEnums } from "@/hooks/use-enums";
 import type { PunctDeLucruValues } from "@/actions/client-punct";
 
 type RowProps = {
@@ -16,8 +16,9 @@ type RowProps = {
 };
 
 function PunctRow({ initial, onSubmit, onDelete }: RowProps) {
+  const enums = useEnums();
   const [busy, setBusy] = useState(false);
-  const [administratie, setAdministratie] = useState<$Enums.Administratie>(initial.administratie);
+  const [administratie, setAdministratie] = useState<string>(initial.administratie);
 
   async function handleAction(fd: FormData) {
     setBusy(true);
@@ -41,12 +42,10 @@ function PunctRow({ initial, onSubmit, onDelete }: RowProps) {
           <div>
             <Label className="mb-1 text-purple-800">Administratie</Label>
             <input type="hidden" name="administratie" value={administratie} />
-            <Select value={administratie} onValueChange={(v: $Enums.Administratie) => setAdministratie(v)}>
+            <Select value={administratie} onValueChange={setAdministratie}>
               <SelectTrigger><SelectValue placeholder="Alege" /></SelectTrigger>
               <SelectContent>
-                {["SECTOR_1","SECTOR_2","SECTOR_3","SECTOR_4","SECTOR_5","SECTOR_6","ILFOV","BUFTEA","BRAGADIRU","VRANCEA"].map((v) => (
-                  <SelectItem key={v} value={v}>{v}</SelectItem>
-                ))}
+                {enums.administrations.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -123,8 +122,9 @@ export default function ClientPunctTable({ rows, onSubmitRow, onCreateRow, onDel
 }
 
 function AddNewRow({ onCreate }: { onCreate: (fd: FormData) => Promise<void> }) {
+  const enums = useEnums();
   const [busy, setBusy] = useState(false);
-  const [administratie, setAdministratie] = useState<$Enums.Administratie>("SECTOR_1");
+  const [administratie, setAdministratie] = useState<string>("SECTOR_1");
 
   async function handleAction(fd: FormData) {
     setBusy(true);
@@ -145,12 +145,10 @@ function AddNewRow({ onCreate }: { onCreate: (fd: FormData) => Promise<void> }) 
       <div>
         <Label className="mb-1 text-purple-800">Administratie</Label>
         <input type="hidden" name="administratie" value={administratie} />
-        <Select value={administratie} onValueChange={(v: $Enums.Administratie) => setAdministratie(v)}>
+        <Select value={administratie} onValueChange={setAdministratie}>
           <SelectTrigger><SelectValue placeholder="Alege" /></SelectTrigger>
           <SelectContent>
-            {["SECTOR_1","SECTOR_2","SECTOR_3","SECTOR_4","SECTOR_5","SECTOR_6","ILFOV","BUFTEA","BRAGADIRU","VRANCEA"].map((v) => (
-              <SelectItem key={v} value={v}>{v}</SelectItem>
-            ))}
+            {enums.administrations.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>

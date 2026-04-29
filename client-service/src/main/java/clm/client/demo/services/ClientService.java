@@ -10,15 +10,21 @@ import clm.client.demo.repositories.UserClientRepository;
 import clm.client.demo.security.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.persistence.criteria.JoinType;
+
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 @Service
@@ -30,6 +36,17 @@ public class ClientService {
 
     private final ClientRepository clientRepository;
     private final UserClientRepository userClientRepository;
+    private final JdbcTemplate jdbcTemplate;
+
+    @Value("${spring.jpa.properties.hibernate.default_schema:}")
+    private String defaultSchema;
+
+    @Transactional(readOnly = true)
+    public List<String> listTemplateFields() {
+        return Arrays.stream(ClientResponse.class.getDeclaredFields())
+                .map(Field::getName)
+                .toList();
+    }
 
     @Transactional(readOnly = true)
     public Page<ClientResponse> listClients(ClientListRequest request) {

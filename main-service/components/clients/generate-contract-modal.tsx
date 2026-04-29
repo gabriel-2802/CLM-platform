@@ -4,33 +4,34 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { getTemplates, getTemplateById } from "@/actions/contract-templates"
+import { getClientTemplateFields, getTemplates, getTemplateById, type TemplateField, type TemplateMappingOption, type TemplateSummary } from "@/actions/contract-templates"
+import { getClientTemplateSource } from "@/actions/clients"
 import { generateContract } from "@/actions/contracts"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
-// Labels auto-populated from the client record — not shown to the user
-const AUTO_LABELS = new Set([
-  "CLIENT_NAME",
-  "CLIENT_CUI",
-  "CLIENT_ADDRESS",
-  "CLIENT_TYPE",
-  "CLIENT_ADMIN",
-  "CONTRACT_START_DATE",
-  "CONTRACT_END_DATE",
-  "CONTRACT_VALUE",
-  "CONTRACT_NOTES",
-  "TARIF_CONTA",
-  "TARIF_BILANT",
-])
+const EXTRA_MAPPING_FIELDS = ["deLa", "panaLa", "tarifConta", "tarifBilant"]
 
-export function GenerateContractModal({ client }: { client: any }) {
+type ClientForContract = Record<string, unknown> & {
+  id: number;
+  name?: string;
+  deLa?: string;
+  panaLa?: string;
+  tarifConta?: number;
+  tarifBilant?: number;
+};
+
+export function GenerateContractModal({ client }: { client: ClientForContract }) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
-  const [templates, setTemplates] = useState<any[]>([])
+  const [templates, setTemplates] = useState<TemplateSummary[]>([])
+  const [clientFields, setClientFields] = useState<TemplateMappingOption[]>([])
+  const [clientTemplateSource, setClientTemplateSource] = useState<Record<string, unknown> | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<string>("")
-  const [templateFields, setTemplateFields] = useState<any[]>([])
+  const [templateFields, setTemplateFields] = useState<TemplateField[]>([])
   const [loadingFields, setLoadingFields] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [manualValues, setManualValues] = useState<Record<number, string>>({})
@@ -39,13 +40,17 @@ export function GenerateContractModal({ client }: { client: any }) {
   // Load templates on open
   useEffect(() => {
     if (!open) return
-    getTemplates().then((all) => {
-      setTemplates(all.filter((t: any) => t.fullyMapped))
-      setSelectedTemplate("")
-      setTemplateFields([])
-      setManualValues({})
-    })
-  }, [open])
+    Promise.all([getTemplates(), getClientTemplateFields(), getClientTemplateSource(client.id)]).then(
+      ([allTemplates, fields, freshClient]) => {
+        setTemplates(allTemplates.filter((t) => t.fullyMapped))
+        setClientFields(fields)
+        setClientTemplateSource(freshClient)
+        setSelectedTemplate("")
+        setTemplateFields([])
+        setManualValues({})
+      }
+    )
+  }, [client.id, open])
 
   // Load fields when template changes
   useEffect(() => {
@@ -59,11 +64,11 @@ export function GenerateContractModal({ client }: { client: any }) {
     getTemplateById(Number(selectedTemplate))
       .then((res) => {
         if (res?.fields) {
-          const fields = res.fields.filter((f: any) => f.fieldLabel)
+          const fields = res.fields.filter((f) => f.fieldLabel)
           setTemplateFields(fields)
           const initial: Record<number, string> = {}
-          fields.forEach((f: any) => {
-            if (!AUTO_LABELS.has(f.fieldLabel)) {
+          fields.forEach((f) => {
+            if (!clientFields.some((field) => field.value === f.fieldLabel)) {
               initial[f.id] = ""
             }
           })
@@ -77,48 +82,77 @@ export function GenerateContractModal({ client }: { client: any }) {
       .finally(() => setLoadingFields(false))
 
     setNotes("")
-  }, [selectedTemplate])
+  }, [clientFields, selectedTemplate])
 
-  const manualFields = templateFields.filter((f) => !AUTO_LABELS.has(f.fieldLabel))
-  const needsNotes = templateFields.some((f) => f.fieldLabel === "CONTRACT_NOTES")
+  const dynamicClientFieldValues = new Set(clientFields.map((field) => field.value))
+  const clientSource = { ...(clientTemplateSource ?? {}), ...client }
+  const manualFields = templateFields.filter((f) => !dynamicClientFieldValues.has(f.fieldLabel))
 
   const isFormValid =
     selectedTemplate !== "" &&
+    !loadingFields &&
+    Boolean(clientSource.deLa) &&
+    Boolean(clientSource.panaLa) &&
     manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
 
   const fmt = (val: number | undefined | null) =>
     val != null ? String(parseFloat(String(val)).toFixed(2)) : ""
 
+  const formatMappingValue = (value: unknown) => {
+    if (value == null) return ""
+    if (typeof value === "boolean") return value ? "Da" : "Nu"
+    if (typeof value === "number") return fmt(value)
+    return String(value)
+  }
+
+  const toNumberOrNull = (value: unknown) => {
+    if (typeof value === "number") return Number.isFinite(value) ? value : null
+    if (typeof value !== "string" || !value.trim()) return null
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+
+  const getClientFieldValue = (fieldName: string) => {
+    if (fieldName in clientSource) return clientSource[fieldName]
+
+    const normalizedFieldName = fieldName.replace(/_/g, "").toLowerCase()
+    const sourceKey = Object.keys(clientSource).find(
+      (key) => key.replace(/_/g, "").toLowerCase() === normalizedFieldName
+    )
+
+    return sourceKey ? clientSource[sourceKey] : undefined
+  }
+
+  const buildMappings = () => {
+    const mappings: Record<string, string> = {}
+
+    clientFields.forEach((field) => {
+      mappings[field.value] = formatMappingValue(getClientFieldValue(field.value))
+    })
+
+    EXTRA_MAPPING_FIELDS.forEach((field) => {
+      mappings[field] = formatMappingValue(clientSource[field])
+    })
+
+    manualFields.forEach((field) => {
+      if (!field.fieldLabel) return
+      mappings[field.fieldLabel] = manualValues[field.id] ?? ""
+    })
+
+    return mappings
+  }
+
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const mappings: Record<string, string> = {}
-
-      mappings["CLIENT_NAME"]         = client.name          || ""
-      mappings["CLIENT_CUI"]          = client.cui           || ""
-      mappings["CLIENT_ADDRESS"]      = client.adresa        || ""
-      mappings["CLIENT_TYPE"]         = client.tip           || ""
-      mappings["CLIENT_ADMIN"]        = client.administratie || ""
-      mappings["CONTRACT_START_DATE"] = client.deLa          || ""
-      mappings["CONTRACT_END_DATE"]   = client.panaLa        || ""
-      mappings["CONTRACT_VALUE"]      = fmt(client.tarifConta)
-      mappings["TARIF_CONTA"]         = fmt(client.tarifConta)
-      mappings["TARIF_BILANT"]        = fmt(client.tarifBilant)
-      mappings["CONTRACT_NOTES"]      = notes || ""
-
-      manualFields.forEach((f) => {
-        mappings[f.fieldLabel] = manualValues[f.id] ?? ""
-      })
-
       const payload = {
         templateId: Number(selectedTemplate),
-        userId: 1,
-        userMail: "admin@clm.com",
         clientId: client.id,
-        startDate: client.deLa || "",
-        endDate: client.panaLa || "",
-        mappings,
-        value: client.tarifConta ?? null,
+        startDate: String(clientSource.deLa || ""),
+        endDate: String(clientSource.panaLa || ""),
+        mappings: buildMappings(),
+        autoRenew: true,
+        value: toNumberOrNull(clientSource.tarifConta),
         notes: notes || null,
       }
 
@@ -126,6 +160,7 @@ export function GenerateContractModal({ client }: { client: any }) {
       if (res.success) {
         toast.success("Contract generat cu succes!")
         setOpen(false)
+        router.refresh()
       } else {
         toast.error("Eroare la generare: " + res.error)
       }
@@ -197,38 +232,41 @@ export function GenerateContractModal({ client }: { client: any }) {
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div>
                   <span className="text-muted-foreground">De la: </span>
-                  <span className="font-medium">{client.deLa || "—"}</span>
+                  <span className="font-medium">{clientSource.deLa || "—"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Până la: </span>
-                  <span className="font-medium">{client.panaLa || "—"}</span>
+                  <span className="font-medium">{clientSource.panaLa || "—"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Tarif conta: </span>
-                  <span className="font-medium">{client.tarifConta != null ? client.tarifConta : "—"}</span>
+                  <span className="font-medium">{clientSource.tarifConta != null ? clientSource.tarifConta : "—"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground">Tarif bilanț: </span>
-                  <span className="font-medium">{client.tarifBilant != null ? client.tarifBilant : "—"}</span>
+                  <span className="font-medium">{clientSource.tarifBilant != null ? clientSource.tarifBilant : "—"}</span>
                 </div>
               </div>
 
-              {needsNotes && (
-                <div className="space-y-2">
-                  <Label>Notițe</Label>
-                  <Input
-                    placeholder="Detalii adiționale..."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                  />
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Notițe</Label>
+                <Input
+                  placeholder="Detalii adiționale..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
 
               {/* Auto-filled fields info */}
               <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                Datele clientului (denumire, CUI, adresă, tip, administrator) sunt completate
+                Câmpurile mapate la fișa clientului sunt completate
                 automat din baza de date.
               </div>
+              {(!clientSource.deLa || !clientSource.panaLa) && (
+                <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded px-3 py-2">
+                  Completează câmpurile De la și Până la în tabel înainte de generare.
+                </div>
+              )}
 
               {/* Manual / custom fields */}
               {manualFields.length > 0 && (

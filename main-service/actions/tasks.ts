@@ -1,223 +1,268 @@
 "use server";
-import { prisma } from "@/lib/prisma";
 
-import type { Prisma } from "@/lib/generated/prisma-client";
+import { clientServiceFetch } from "@/lib/client-service-fetch";
 import { getSession } from "@/lib/auth";
-import { unstable_noStore as noStore, revalidatePath } from "next/cache";
-import { getUsers } from "@/lib/user-service-client";
-
+import { getUsers, type ServiceUser } from "@/lib/user-service-client";
 
 export type TaskRow = {
-	id: number;
-	title: string;
-		date?: string; // dd/mm/yyyy
-		dateTs?: number; // timestamp for sorting
-	done: boolean;
-	user?: string;
-	userId?: number;
-	client?: string;
-	objective?: string;
-	blocked?: string;
+  id: number;
+  title: string;
+  date?: string;
+  dateTs?: number;
+  done: boolean;
+  user?: string;
+  userId?: number;
+  client?: string;
+  objective?: string;
+  blocked?: string;
 };
-
-const toDMY = (d?: Date | null) => {
-	if (!d) return undefined;
-	const dd = String(d.getDate()).padStart(2, "0");
-	const mm = String(d.getMonth() + 1).padStart(2, "0");
-	const yy = d.getFullYear();
-	return `${dd}/${mm}/${yy}`;
-};
-
-export async function getTaskRows(): Promise<TaskRow[]> {
-	noStore();
-	const session = await getSession();
-	const role = (session?.user as unknown as { role?: string })?.role;
-	const currentUserId = (session?.user as unknown as { id?: string })?.id;
-	const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
-
-	const where: Prisma.TaskWhereInput | undefined =
-		role === "ADMIN" || role === "MANAGER"
-			? undefined
-			: currentUserId
-			? { userId: Number(currentUserId) }
-			: { id: -1 }; // no session: return empty
-
-	const [tasks, allUsers] = await Promise.all([
-		prisma.task.findMany({
-			where,
-				orderBy: { date: "desc" },
-			include: { client: true },
-		}),
-		getUsers(token),
-	]);
-
-	const userMap = new Map(allUsers.map((u) => [u.id, u]));
-
-	return tasks.map((t) => {
-		const u = userMap.get(t.userId);
-		return {
-			id: t.id,
-			title: t.title,
-				date: toDMY(t.date),
-				dateTs: t.date ? new Date(t.date).getTime() : undefined,
-			done: t.done,
-			user: u ? (u.name || u.email) : undefined,
-				userId: t.userId,
-			client: t.client?.denumire || undefined,
-			objective: t.objective || undefined,
-			blocked: t.blocked || undefined,
-		};
-	});
-}
 
 export type TaskDetails = {
-	id: number;
-	title: string;
-	date?: string;
-	done: boolean;
-	notes?: string;
-	blocked?: string;
-	objective?: string;
-	userId: number;
-	clientId: number;
+  id: number;
+  title: string;
+  date?: string;
+  done: boolean;
+  notes?: string;
+  blocked?: string;
+  objective?: string;
+  userId: number;
+  clientId: number;
 };
 
-export async function getTask(id: number): Promise<TaskDetails | null> {
-	noStore();
-	const t = await prisma.task.findUnique({ where: { id } });
-	if (!t) return null;
-	return {
-		id: t.id,
-		title: t.title,
-		date: toDMY(t.date),
-		done: t.done,
-		notes: t.notes ?? undefined,
-		blocked: t.blocked ?? undefined,
-		objective: t.objective ?? undefined,
-		userId: t.userId,
-		clientId: t.clientId,
-	};
+type SessionUserWithServiceToken = {
+  serviceToken?: string;
+};
+
+type TaskApiResponse = {
+  id: number;
+  title: string;
+  date?: string | null;
+  done?: boolean;
+  notes?: string | null;
+  blocked?: string | null;
+  objective?: string | null;
+  userId: number;
+  clientId: number;
+  clientName?: string | null;
+};
+
+type ClientApiResponse = {
+  id: number;
+  denumire?: string | null;
+  name?: string | null;
+};
+
+type ClientsApiResponse = {
+  content?: ClientApiResponse[];
+};
+
+type TaskMutationBody = {
+  title?: string;
+  date?: string;
+  done?: boolean;
+  notes?: string | null;
+  blocked?: string | null;
+  objective?: string | null;
+  userId?: number;
+  clientId?: number;
+};
+
+function toDMY(d?: string | null): string | undefined {
+  if (!d) return undefined
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return undefined
+  const dd = String(dt.getDate()).padStart(2, "0")
+  const mm = String(dt.getMonth() + 1).padStart(2, "0")
+  return `${dd}/${mm}/${dt.getFullYear()}`
 }
 
-function bool(v: FormDataEntryValue | null): boolean {
-	return v === "on" || v === "true" || v === "1";
+function dateToLocalDateTime(value: FormDataEntryValue | null): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error("Data este obligatorie")
+  }
+
+  const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  if (!match) {
+    throw new Error("Data trebuie aleasa in formatul dd/mm/yyyy")
+  }
+
+  const day = Number(match[1])
+  const month = Number(match[2])
+  const year = Number(match[3])
+  const parsed = new Date(year, month - 1, day)
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    throw new Error("Data selectata nu este valida")
+  }
+
+  return `${match[3]}-${match[2]}-${match[1]}T00:00:00`
 }
-function str(v: FormDataEntryValue | null | undefined): string | undefined {
-	return typeof v === "string" && v.trim() !== "" ? v : undefined;
+
+function requiredString(value: FormDataEntryValue | null, field: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${field} este obligatoriu`)
+  }
+  return value.trim()
 }
-function dateStr(v: FormDataEntryValue | null): Date | null {
-	if (typeof v !== "string" || !v) return null;
-	// Accept dd/mm/yyyy or ISO-like yyyy-mm-dd
-	const ddmmyyyy = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-	const m = v.match(ddmmyyyy);
-	if (m) {
-		const [, dd, mm, yyyy] = m;
-		const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-		return isNaN(d.getTime()) ? null : d;
-	}
-	const d = new Date(v);
-	return isNaN(d.getTime()) ? null : d;
+
+function requiredNumber(value: FormDataEntryValue | null, field: string): number {
+  const number = Number(value)
+  if (!Number.isInteger(number) || number <= 0) {
+    throw new Error(`${field} este obligatoriu`)
+  }
+  return number
 }
-function num(v: FormDataEntryValue | null): number | null {
-	if (typeof v !== "string" || v.trim() === "") return null;
-	const n = Number(v);
-	return Number.isNaN(n) ? null : n;
+
+function optionalString(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== "string" || !value.trim()) return null
+  return value.trim()
+}
+
+function userLabel(user: ServiceUser): string {
+  if (!user.name?.trim()) return user.email
+  return `${user.name} (${user.email})`
+}
+
+export async function getTaskRows(): Promise<TaskRow[]> {
+  const session = await getSession()
+  const token = (session?.user as unknown as SessionUserWithServiceToken | undefined)?.serviceToken ?? ""
+
+  const [res, allUsers] = await Promise.all([
+    clientServiceFetch("/api/tasks", { cache: "no-store" }),
+    getUsers(token),
+  ])
+
+  if (!res.ok) return []
+
+  const tasks = (await res.json()) as TaskApiResponse[]
+  const userMap = new Map<number, ServiceUser>(allUsers.map((u) => [u.id, u]))
+
+  return (tasks ?? []).map((t) => {
+    const u = userMap.get(t.userId)
+    return {
+      id: t.id,
+      title: t.title,
+      date: toDMY(t.date),
+      dateTs: t.date ? new Date(t.date).getTime() : undefined,
+      done: !!t.done,
+      user: u ? userLabel(u) : undefined,
+      userId: t.userId,
+      client: t.clientName ?? undefined,
+      objective: t.objective ?? undefined,
+      blocked: t.blocked ?? undefined,
+    }
+  })
+}
+
+export async function getTask(id: number): Promise<TaskDetails | null> {
+  const res = await clientServiceFetch(`/api/tasks/${id}`, { cache: "no-store" })
+  if (!res.ok) return null
+  const t = (await res.json()) as TaskApiResponse
+  return {
+    id: t.id,
+    title: t.title,
+    date: toDMY(t.date),
+    done: !!t.done,
+    notes: t.notes ?? undefined,
+    blocked: t.blocked ?? undefined,
+    objective: t.objective ?? undefined,
+    userId: t.userId,
+    clientId: t.clientId,
+  }
 }
 
 export async function createTask(formData: FormData) {
-	const title = str(formData.get("title"));
-	const date = dateStr(formData.get("date"));
-	const done = bool(formData.get("done"));
-	const notes = str(formData.get("notes"));
-	const blocked = str(formData.get("blocked"));
-	const objective = str(formData.get("objective"));
-	const userId = num(formData.get("userId"));
-	const clientId = num(formData.get("clientId"));
-	if (!title || !date || userId === null || clientId === null) {
-		throw new Error("Campuri lipsa");
-	}
-	const created = await prisma.task.create({
-		data: {
-			title,
-			date,
-			done,
-			notes,
-			blocked,
-			objective,
-			userId,
-			client: { connect: { id: clientId } },
-		},
-		select: { id: true },
-	});
-	revalidatePath("/taskuri");
-	return { id: created.id };
+  const body = {
+    title: requiredString(formData.get("title"), "Titlul"),
+    date: dateToLocalDateTime(formData.get("date")),
+    done: formData.get("done") === "on" || formData.get("done") === "true",
+    notes: optionalString(formData.get("notes")),
+    blocked: optionalString(formData.get("blocked")),
+    objective: optionalString(formData.get("objective")),
+    userId: requiredNumber(formData.get("userId"), "Userul"),
+    clientId: requiredNumber(formData.get("clientId"), "Clientul"),
+  }
+
+  const res = await clientServiceFetch("/api/tasks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to create task: ${err}`)
+  }
+
+  const created = await res.json()
+  return { id: created.id }
 }
 
 export async function updateTask(id: number, formData: FormData) {
-	const title = str(formData.get("title"));
-	const date = dateStr(formData.get("date"));
-	const doneMaybe = formData.get("done");
-	const notes = str(formData.get("notes"));
-	const blocked = str(formData.get("blocked"));
-	const objective = str(formData.get("objective"));
-	const userId = num(formData.get("userId"));
-	const clientId = num(formData.get("clientId"));
-	const data: Partial<Prisma.TaskUpdateInput> = {};
-	if (title !== undefined) data.title = title;
-	if (date !== null) data.date = date || undefined;
-	if (doneMaybe !== null) data.done = bool(doneMaybe);
-	if (notes !== undefined) data.notes = notes;
-	if (blocked !== undefined) data.blocked = blocked;
-	if (objective !== undefined) data.objective = objective;
-	if (userId !== null) data.userId = userId;
-	if (clientId !== null) data.client = { connect: { id: clientId } };
-	const updated = await prisma.task.update({
-		where: { id },
-		data,
-		select: {
-			id: true,
-			title: true,
-			date: true,
-			done: true,
-			notes: true,
-			blocked: true,
-			objective: true,
-			userId: true,
-			clientId: true,
-		},
-	});
-	revalidatePath(`/taskuri/edit/${id}`);
-	revalidatePath("/taskuri");
-	return {
-		id: updated.id,
-		title: updated.title,
-		date: toDMY(updated.date),
-		done: updated.done,
-		notes: updated.notes ?? undefined,
-		blocked: updated.blocked ?? undefined,
-		objective: updated.objective ?? undefined,
-		userId: updated.userId,
-		clientId: updated.clientId,
-	};
+  const body: TaskMutationBody = {}
+
+  const dateFd = formData.get("date")
+  if (dateFd) {
+    body.date = dateToLocalDateTime(dateFd)
+  }
+
+  const title = formData.get("title")
+  if (typeof title === "string" && title.trim()) body.title = title.trim()
+  if (formData.get("done") !== null) body.done = formData.get("done") === "on" || formData.get("done") === "true"
+  if (formData.get("notes") !== null) body.notes = optionalString(formData.get("notes"))
+  if (formData.get("blocked") !== null) body.blocked = optionalString(formData.get("blocked"))
+  if (formData.get("objective") !== null) body.objective = optionalString(formData.get("objective"))
+  if (formData.get("userId")) body.userId = Number(formData.get("userId"))
+  if (formData.get("clientId")) body.clientId = Number(formData.get("clientId"))
+
+  const res = await clientServiceFetch(`/api/tasks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Failed to update task: ${err}`)
+  }
+
+  const t = (await res.json()) as TaskApiResponse
+  return {
+    id: t.id,
+    title: t.title,
+    date: toDMY(t.date),
+    done: !!t.done,
+    notes: t.notes ?? undefined,
+    blocked: t.blocked ?? undefined,
+    objective: t.objective ?? undefined,
+    userId: t.userId,
+    clientId: t.clientId,
+  }
 }
 
 export async function deleteTask(id: number) {
-	await prisma.task.delete({ where: { id } });
-	revalidatePath("/taskuri");
-	return { id };
+  const res = await clientServiceFetch(`/api/tasks/${id}`, { method: "DELETE" })
+  if (!res.ok && res.status !== 404) throw new Error("Failed to delete task")
+  return { id }
 }
 
 export async function getTaskFormOptions() {
-	noStore();
-	const session = await getSession();
-	const token = (session?.user as unknown as { serviceToken?: string })?.serviceToken ?? "";
+  const session = await getSession()
+  const token = (session?.user as unknown as SessionUserWithServiceToken | undefined)?.serviceToken ?? ""
 
-	const [users, clients] = await Promise.all([
-		getUsers(token),
-		prisma.client.findMany({ select: { id: true, denumire: true }, orderBy: { denumire: "asc" } }),
-	]);
-	return {
-		users: users.map((u) => ({ id: u.id, label: u.name || u.email })),
-		clients: clients.map((c) => ({ id: c.id, label: c.denumire })),
-	};
+  const [usersRes, clientsRes] = await Promise.all([
+    getUsers(token),
+    clientServiceFetch("/api/clients?size=1000&page=0&sort=denumire,asc", { cache: "no-store" }),
+  ])
+
+  const clientsData = clientsRes.ok ? ((await clientsRes.json()) as ClientsApiResponse | ClientApiResponse[]) : { content: [] }
+  const clients = Array.isArray(clientsData) ? clientsData : clientsData.content ?? []
+
+  return {
+    users: usersRes.map((u) => ({ id: u.id, label: userLabel(u) })),
+    clients: clients.map((c) => ({ id: c.id, label: c.denumire ?? c.name ?? String(c.id) })),
+  }
 }

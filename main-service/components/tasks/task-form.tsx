@@ -3,8 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { CalendarIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
 	Dialog,
@@ -28,18 +31,40 @@ export type TaskFormValues = {
 };
 
 type Option = { id: number; label: string };
+type TaskFormOptions = { users: Option[]; clients: Option[] };
 
 type Props = {
 	initial?: Partial<TaskFormValues>;
-	options: { users: Option[]; clients: Option[] };
+	options: TaskFormOptions;
+	loadOptions?: () => Promise<TaskFormOptions>;
 	onSubmit: (fd: FormData) => Promise<{ id: number } | (TaskFormValues & { id: number })>;
 	submitLabel?: string;
 };
 
-export default function TaskForm({ initial, options, onSubmit, submitLabel = "Salveaza" }: Props) {
+function parseDMY(value?: string): Date | undefined {
+	if (!value) return undefined;
+	const match = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+	if (!match) return undefined;
+	const day = Number(match[1]);
+	const month = Number(match[2]);
+	const year = Number(match[3]);
+	const date = new Date(year, month - 1, day);
+	if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return undefined;
+	return date;
+}
+
+function formatDMY(date: Date): string {
+	const dd = String(date.getDate()).padStart(2, "0");
+	const mm = String(date.getMonth() + 1).padStart(2, "0");
+	return `${dd}/${mm}/${date.getFullYear()}`;
+}
+
+export default function TaskForm({ initial, options, loadOptions, onSubmit, submitLabel = "Salveaza" }: Props) {
 	const router = useRouter();
 	const [busy, setBusy] = useState(false);
 	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [dateOpen, setDateOpen] = useState(false);
+	const [formOptions, setFormOptions] = useState<TaskFormOptions>(options);
 	const [title, setTitle] = useState(initial?.title ?? "");
 	const [date, setDate] = useState(initial?.date ?? "");
 	const [done, setDone] = useState<boolean>(initial?.done ?? false);
@@ -48,6 +73,7 @@ export default function TaskForm({ initial, options, onSubmit, submitLabel = "Sa
 	const [objective, setObjective] = useState(initial?.objective ?? "");
 	const [userId, setUserId] = useState<number>(initial?.userId ?? (options.users[0]?.id || 0));
 	const [clientId, setClientId] = useState<number>(initial?.clientId ?? (options.clients[0]?.id || 0));
+	const selectedDate = parseDMY(date);
 
 	useEffect(() => {
 		setTitle(initial?.title ?? "");
@@ -60,6 +86,35 @@ export default function TaskForm({ initial, options, onSubmit, submitLabel = "Sa
 		if (initial?.clientId) setClientId(initial.clientId);
 	}, [initial]);
 
+	useEffect(() => {
+		setFormOptions(options);
+	}, [options]);
+
+	useEffect(() => {
+		if (!loadOptions) return;
+		let cancelled = false;
+		loadOptions()
+			.then((fresh) => {
+				if (cancelled) return;
+				setFormOptions(fresh);
+				setUserId((current) => {
+					if (initial?.userId || fresh.users.some((user) => user.id === current)) return current;
+					return fresh.users[0]?.id || current;
+				});
+				setClientId((current) => {
+					if (initial?.clientId || fresh.clients.some((client) => client.id === current)) return current;
+					return fresh.clients[0]?.id || current;
+				});
+			})
+			.catch(() => {
+				toast.error("Nu am putut actualiza lista de useri");
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, [initial?.clientId, initial?.userId, loadOptions]);
+
 	async function handleAction(fd: FormData) {
 		setBusy(true);
 		try {
@@ -68,8 +123,12 @@ export default function TaskForm({ initial, options, onSubmit, submitLabel = "Sa
 				if (initial?.id) {
 					toast.success("Task salvat");
 				} else {
-					router.push(`/taskuri/edit/${res.id}`);
 					toast.success("Task creat");
+					if (window.history.length > 1) {
+						router.back();
+					} else {
+						router.push("/taskuri");
+					}
 				}
 			}
 		} catch (e: unknown) {
@@ -122,25 +181,39 @@ export default function TaskForm({ initial, options, onSubmit, submitLabel = "Sa
 			</div>
 					<div>
 						<label className="mb-2 block text-indigo-800">Data</label>
-						<Input
-							type="text"
-							name="date"
-							placeholder="dd/mm/yyyy"
-							inputMode="numeric"
-							pattern="^\\d{2}/\\d{2}/\\d{4}$"
-							title="Format acceptat: dd/mm/yyyy"
-							value={date}
-							onChange={(e) => setDate(e.target.value)}
-							required
-							disabled={done}
-						/>
+						<input type="hidden" name="date" value={date} />
+						<Popover open={dateOpen} onOpenChange={setDateOpen}>
+							<PopoverTrigger asChild>
+								<Button
+									type="button"
+									variant="outline"
+									className="w-full justify-start gap-2 px-3 font-normal"
+									disabled={done}
+								>
+									<CalendarIcon className="h-4 w-4" />
+									{date || "Alege data"}
+								</Button>
+							</PopoverTrigger>
+							<PopoverContent className="w-auto p-0" align="start">
+								<Calendar
+									mode="single"
+									selected={selectedDate}
+									onSelect={(value) => {
+										if (!value) return;
+										setDate(formatDMY(value));
+										setDateOpen(false);
+									}}
+									disabled={done}
+								/>
+							</PopoverContent>
+						</Popover>
 					</div>
 			<div>
 				<label className="mb-2 block text-indigo-800">User</label>
 						<Select value={String(userId)} onValueChange={(v) => setUserId(Number(v))} disabled={done}>
 					<SelectTrigger><SelectValue placeholder="Selecteaza user" /></SelectTrigger>
 					<SelectContent>
-						{options.users.map((u) => (
+						{formOptions.users.map((u) => (
 							<SelectItem key={u.id} value={String(u.id)}>{u.label}</SelectItem>
 						))}
 					</SelectContent>
@@ -151,7 +224,7 @@ export default function TaskForm({ initial, options, onSubmit, submitLabel = "Sa
 						<Select value={String(clientId)} onValueChange={(v) => setClientId(Number(v))} disabled={done}>
 					<SelectTrigger><SelectValue placeholder="Selecteaza client" /></SelectTrigger>
 					<SelectContent>
-						{options.clients.map((c) => (
+						{formOptions.clients.map((c) => (
 							<SelectItem key={c.id} value={String(c.id)}>{c.label}</SelectItem>
 						))}
 					</SelectContent>

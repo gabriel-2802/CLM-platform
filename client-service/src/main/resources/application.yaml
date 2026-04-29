@@ -2,7 +2,7 @@ spring:
   application:
     name: client-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5445/client_platform}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5445/client_platform}
     username: ${SPRING_DATASOURCE_USERNAME:client_user}
     password: ${SPRING_DATASOURCE_PASSWORD:client_password}
   jpa:
@@ -22,7 +22,7 @@ server:
 # REQUIRED in production: set JWT_SECRET to a cryptographically random string
 # of at least 32 characters. The fallback is for local development ONLY.
 jwt:
-  secret: ${JWT_SECRET:}
+  secret: ${JWT_SECRET:dev-shared-jwt-secret-used-by-both-nextauth-and-spring-change-before-deploy}
 
 app:
   cors:

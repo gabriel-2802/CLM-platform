@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { getUserById, updateUser, deleteUser, normalizeUser } from "@/lib/user-service-client";
+import { revalidatePath } from "next/cache";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: NextRequest,
@@ -23,7 +26,9 @@ export async function GET(
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  return NextResponse.json(normalizeUser(user));
+  return NextResponse.json(normalizeUser(user), {
+    headers: { "Cache-Control": "no-store" },
+  });
 }
 
 export async function PUT(
@@ -61,6 +66,10 @@ export async function PUT(
 
   if (status === 200) {
     const u = resBody as { id: number; email: string; name: string | null; roles: string[] };
+    revalidatePath("/users");
+    revalidatePath("/taskuri");
+    revalidatePath("/taskuri/edit/new");
+    revalidatePath("/taskuri/edit/nou");
     return NextResponse.json({ id: u.id, email: u.email, name: u.name, rol: rol ?? "USER" });
   }
   if (status === 404) {
@@ -91,6 +100,10 @@ export async function DELETE(
   const status = await deleteUser(id, token);
 
   if (status === 204) {
+    revalidatePath("/users");
+    revalidatePath("/taskuri");
+    revalidatePath("/taskuri/edit/new");
+    revalidatePath("/taskuri/edit/nou");
     return NextResponse.json({ message: "User deleted successfully" });
   }
   if (status === 404) {

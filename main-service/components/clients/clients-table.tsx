@@ -12,8 +12,144 @@ import ClientRow from "@/components/clients/client-row";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GenerateContractModal } from "@/components/clients/generate-contract-modal";
+import { terminateContract, toggleAutoRenewal, uploadSignedContract } from "@/actions/contracts";
+import { toast } from "sonner";
 
 type RowEditFields = { deLa: string; panaLa: string; tarifConta: string; tarifBilant: string }
+
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_SIGNATURE: "In asteptare",
+  ACTIVE: "Activ",
+  TERMINATED: "Incetat",
+  ARCHIVED: "Arhivat",
+};
+
+function SignedContractUploadDialog({
+  contractId,
+  onUploaded,
+}: {
+  contractId: number;
+  onUploaded: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleUpload = async () => {
+    if (!file) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await uploadSignedContract(contractId, formData);
+    if (res.success) {
+      toast.success("Contract semnat incarcat.");
+      setOpen(false);
+      setFile(null);
+      onUploaded();
+    } else {
+      toast.error("Eroare la incarcare: " + res.error);
+    }
+    setIsUploading(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
+        incarca
+      </Button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Incarca contract semnat</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label>Fisier (PDF/DOCX)</Label>
+          <Input
+            type="file"
+            accept=".pdf,.doc,.docx"
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Anuleaza
+          </Button>
+          <Button onClick={handleUpload} disabled={!file || isUploading}>
+            {isUploading ? "Se incarca..." : "Incarca"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function TerminateContractDialog({
+  contractId,
+  onTerminated,
+}: {
+  contractId: number;
+  onTerminated: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [terminationDate, setTerminationDate] = useState("");
+  const [reasons, setReasons] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleTerminate = async () => {
+    if (!terminationDate) return;
+    setIsSubmitting(true);
+    const res = await terminateContract(contractId, terminationDate, reasons);
+    if (res.success) {
+      toast.success("Contract inchis.");
+      setOpen(false);
+      setTerminationDate("");
+      setReasons("");
+      onTerminated();
+    } else {
+      toast.error("Eroare la inchidere: " + res.error);
+    }
+    setIsSubmitting(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
+        incheie
+      </Button>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Incheie contract</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Data incetare</Label>
+            <Input
+              type="date"
+              value={terminationDate}
+              onChange={(e) => setTerminationDate(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Motive</Label>
+            <Input
+              placeholder="Motive incetare..."
+              value={reasons}
+              onChange={(e) => setReasons(e.target.value)}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Anuleaza
+          </Button>
+          <Button onClick={handleTerminate} disabled={!terminationDate || isSubmitting}>
+            {isSubmitting ? "Se inchide..." : "Incheie"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 // Defined outside ClientsTable so its identity is stable across parent re-renders.
 // Uses local state for display (prevents focus loss) and calls onCommit to sync parent.
@@ -39,7 +175,7 @@ function EditableTarifCell({
         setVal(e.target.value)
         commitRef.current(id, fieldKey, e.target.value)
       }}
-      className="h-8 px-2 py-1 w-24 text-sm"
+      className="h-8 px-2 py-1 w-24 text-sm text-slate-900"
     />
   )
 }
@@ -51,14 +187,15 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
   const initialFormer = (searchParams.get("former") ?? "1").toString();
   const [showFormer, setShowFormer] = useState<boolean>(initialFormer === "1" || initialFormer === "true");
   const [openCabinet, setOpenCabinet] = useState(false);
+  const [togglingAutoRenew, setTogglingAutoRenew] = useState<Record<number, boolean>>({});
 
   const [rowEdits, setRowEdits] = useState<Record<number, RowEditFields>>(() => {
     const init: Record<number, RowEditFields> = {};
     rows.forEach((r) => {
       init[r.id] = {
-        deLa: r.deLa ?? "",
-        panaLa: r.panaLa ?? "",
-        tarifConta: r.tarifConta != null ? String(r.tarifConta) : "",
+        deLa: r.contractStartDate ?? r.deLa ?? "",
+        panaLa: r.contractEndDate ?? r.panaLa ?? "",
+        tarifConta: r.contractValue != null ? String(r.contractValue) : (r.tarifConta != null ? String(r.tarifConta) : ""),
         tarifBilant: r.tarifBilant != null ? String(r.tarifBilant) : "",
       };
     });
@@ -80,6 +217,21 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       [id]: { ...(prev[id] ?? { deLa: "", panaLa: "", tarifConta: "", tarifBilant: "" }), [key]: val },
     }));
   }, []);
+
+  const handleToggleAutoRenew = useCallback(
+    async (contractId: number) => {
+      setTogglingAutoRenew((prev) => ({ ...prev, [contractId]: true }));
+      const res = await toggleAutoRenewal(contractId);
+      if (res.success) {
+        toast.success("Auto-renew actualizat.");
+        router.refresh();
+      } else {
+        toast.error("Eroare auto-renew: " + res.error);
+      }
+      setTogglingAutoRenew((prev) => ({ ...prev, [contractId]: false }));
+    },
+    [router]
+  );
 
   // Persist "former" checkbox in URL (?former=1|0)
   React.useEffect(() => {
@@ -109,7 +261,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       header: "Firma",
       enableSorting: true,
       cell: ({ row }) => (
-        <span className="text-primary underline">
+        <span className="text-slate-900 underline">
           <Link href={`/clients/edit/${row.original.id}`}>{row.original.name}</Link>
         </span>
       ),
@@ -136,7 +288,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
             type="date"
             value={getEdit(row.original.id, "deLa")}
             onChange={(e) => setEdit(row.original.id, "deLa", e.target.value)}
-            className="h-8 px-2 py-1 text-sm w-full"
+            className="h-8 px-2 py-1 text-sm w-full text-slate-900"
           />
         </div>
       ),
@@ -151,7 +303,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
             type="date"
             value={getEdit(row.original.id, "panaLa")}
             onChange={(e) => setEdit(row.original.id, "panaLa", e.target.value)}
-            className="h-8 px-2 py-1 text-sm w-full"
+            className="h-8 px-2 py-1 text-sm w-full text-slate-900"
           />
         </div>
       ),
@@ -164,7 +316,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
         <EditableTarifCell
           id={row.original.id}
           fieldKey="tarifConta"
-          initialValue={row.original.tarifConta != null ? String(row.original.tarifConta) : ""}
+          initialValue={getEdit(row.original.id, "tarifConta")}
           onCommit={setEdit}
         />
       ),
@@ -177,7 +329,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
         <EditableTarifCell
           id={row.original.id}
           fieldKey="tarifBilant"
-          initialValue={row.original.tarifBilant != null ? String(row.original.tarifBilant) : ""}
+          initialValue={getEdit(row.original.id, "tarifBilant")}
           onCommit={setEdit}
         />
       ),
@@ -188,12 +340,6 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       enableSorting: false,
       cell: ({ row }) => {
         const id = row.original.id;
-        const canGenerate =
-          !!getEdit(id, "deLa") &&
-          !!getEdit(id, "panaLa") &&
-          !!getEdit(id, "tarifConta") &&
-          !!getEdit(id, "tarifBilant");
-
         const enrichedClient = {
           ...row.original,
           deLa: getEdit(id, "deLa"),
@@ -205,29 +351,30 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
         return (
           <div className="flex flex-col gap-1">
             {row.original.contractId ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  window.open(
-                    `/api/contracts/download/${row.original.contractId}?type=unsigned`,
-                    "_blank"
-                  );
-                }}
-              >
-                Vizualizează contract
-              </Button>
-            ) : canGenerate ? (
-              <GenerateContractModal client={enrichedClient} />
+              <>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  disabled
+                  className="bg-slate-300 text-slate-900 disabled:opacity-100"
+                >
+                  {STATUS_LABELS[row.original.contractStatus ?? ""] ?? "Generat"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    window.open(
+                      `/api/contracts/download/${row.original.contractId}?type=unsigned`,
+                      "_blank"
+                    );
+                  }}
+                >
+                  Descarca nesemnat
+                </Button>
+              </>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                title="Completați câmpurile De la, Până la, Tarif servicii conta și Tarif bilanț"
-              >
-                gen.
-              </Button>
+              <GenerateContractModal client={enrichedClient} />
             )}
           </div>
         );
@@ -237,24 +384,87 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       accessorKey: "contractSemnat",
       header: "Contract semnat",
       enableSorting: false,
-      cell: ({ row }) =>
-        row.original.contractSemnat ? (
-          <span className="text-blue-700 underline">
-            <Link href="#">{row.original.contractSemnat}</Link>
-          </span>
-        ) : (
-          <Button variant="destructive" size="sm">incarca</Button>
-        ),
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        const status = row.original.contractStatus;
+        const hasSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat);
+
+        if (!contractId) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        if (hasSigned) {
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                window.open(
+                  `/api/contracts/download/${contractId}?type=signed`,
+                  "_blank"
+                );
+              }}
+            >
+              Descarca semnat
+            </Button>
+          );
+        }
+
+        if (status === "TERMINATED" || status === "ARCHIVED") {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        return (
+          <SignedContractUploadDialog
+            contractId={contractId}
+            onUploaded={() => router.refresh()}
+          />
+        );
+      },
+    },
+    {
+      id: "autoRenew",
+      header: "Auto-renew",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        const status = row.original.contractStatus;
+        if (!contractId) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        const isBusy = Boolean(togglingAutoRenew[contractId]);
+        return (
+          <Checkbox
+            checked={Boolean(row.original.autoRenew)}
+            onCheckedChange={() => handleToggleAutoRenew(contractId)}
+            disabled={isBusy || status === "TERMINATED" || status === "ARCHIVED"}
+          />
+        );
+      },
     },
     {
       id: "incheie",
       header: "Incheie",
       enableSorting: false,
-      cell: () => (
-        <Button variant="destructive" size="sm">
-          incheie
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        const status = row.original.contractStatus;
+        if (!contractId) {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        if (status === "TERMINATED" || status === "ARCHIVED") {
+          return <span className="text-muted-foreground">—</span>;
+        }
+
+        return (
+          <TerminateContractDialog
+            contractId={contractId}
+            onTerminated={() => router.refresh()}
+          />
+        );
+      },
     },
     {
       id: "probleme",
@@ -269,7 +479,6 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
           </ul>
         ) : null,
     },
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   ], [getEdit, setEdit]);
 
   return (

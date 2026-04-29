@@ -83,6 +83,32 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── Client-service database (clients schema — owned exclusively by client-service) ─
+  postgres-clients:
+    image: postgres:16-alpine
+    container_name: clm-postgres-clients-prod
+    environment:
+      POSTGRES_USER:         ${DB_USER}
+      POSTGRES_PASSWORD:     ${DB_PASSWORD}
+      POSTGRES_DB:           ${DB_CLIENTS_NAME:-clm_clients}
+      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+    volumes:
+      - postgres_clients_data:/var/lib/postgresql/data
+    networks:
+      - data-net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    mem_reservation: 128m
+    cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_CLIENTS_NAME:-clm_clients}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # ── User service (auth + user management) ──────────────────────────────────
   user-service:
     build:
@@ -214,6 +240,59 @@ services:
       retries: 5
       start_period: 40s
 
+  client-service:
+    build:
+      context: client-service
+      dockerfile: Dockerfile
+    container_name: clm-client-service-prod
+    read_only: true
+    tmpfs:
+      - /tmp
+    environment:
+      # --- Database (dedicated postgres-clients instance) ---
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
+      SPRING_DATASOURCE_USERNAME:           ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- JPA ---
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clients
+      # --- Flyway ---
+      SPRING_FLYWAY_ENABLED:    "true"
+      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:    clients
+      # --- JWT ---
+      JWT_SECRET:  ${JWT_SECRET}
+      # --- CORS ---
+      CORS_ALLOWED_ORIGINS:  ${FRONTEND_URL}
+      # --- Server ---
+      SERVER_PORT:  8084
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-prod}
+      # --- Logging ---
+      LOGGING_LEVEL_ROOT:                  WARN
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   WARN
+    depends_on:
+      postgres-clients:
+        condition: service_healthy
+    networks:
+      - dmz-net
+      - data-net
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8084"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
   notifications:
     build:
       context: notification-service
@@ -278,15 +357,15 @@ services:
       NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL}
       NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL}
       NEXT_PUBLIC_USER_SERVICE_URL:       ${NEXT_PUBLIC_USER_SERVICE_URL}
+      NEXT_PUBLIC_CLIENT_SERVICE_URL:     ${NEXT_PUBLIC_CLIENT_SERVICE_URL}
       # --- Server-side URLs (resolved inside Docker network) ---
       API_BASE_URL:               http://contracts:8081
       CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
       USER_SERVICE_URL:           http://user-service:8083
+      CLIENT_SERVICE_URL:         http://client-service:8084
       # --- Admin credentials ---
       ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE}
-      # --- Database (Prisma — general schema for clients/tasks) ---
-      DATABASE_URL:  postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?schema=general
       # --- NextAuth ---
       NEXTAUTH_URL:     ${FRONTEND_URL}
       NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET}
@@ -298,6 +377,8 @@ services:
       notifications:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      client-service:
         condition: service_healthy
     networks:
       - dmz-net
@@ -325,4 +406,6 @@ volumes:
   postgres_data:
     driver: local
   postgres_users_data:
+    driver: local
+  postgres_clients_data:
     driver: local

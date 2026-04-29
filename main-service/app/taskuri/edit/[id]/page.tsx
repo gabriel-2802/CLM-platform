@@ -5,6 +5,7 @@ import TaskForm from "@/components/tasks/task-form";
 import PageTitleSetter from "@/components/page-title-setter";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
 	const { id: idParam } = await params;
@@ -32,7 +33,13 @@ export default async function EditTaskPage({ params }: { params: Promise<{ id: s
 			<BackButton className="-mt-2" />
 			<PageTitleSetter title={`Taskuri / ${isCreate ? "Nou" : task?.title || "Edit"}`} />
 			<h1 className="text-2xl font-semibold">{isCreate ? "Task nou" : `Editeaza: ${task?.title}`}</h1>
-			<TaskForm initial={task ?? undefined} options={options} onSubmit={onSubmit} submitLabel={isCreate ? "Creeaza" : "Salveaza"} />
+			<TaskForm
+				initial={task ?? undefined}
+				options={options}
+				loadOptions={getTaskFormOptions}
+				onSubmit={onSubmit}
+				submitLabel={isCreate ? "Creeaza" : "Salveaza"}
+			/>
 		</div>
 	);
 }

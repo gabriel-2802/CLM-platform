@@ -2,6 +2,41 @@
 
 import { revalidatePath } from "next/cache"
 import { contractsFetch } from "@/lib/auth/contracts-fetch";
+import { clientServiceFetch } from "@/lib/client-service-fetch";
+
+export type TemplateMappingOption = {
+  label: string;
+  value: string;
+};
+
+export type TemplateSummary = {
+  id: number;
+  name: string;
+  createdAt?: string;
+  fullyMapped?: boolean;
+  fieldCount?: number;
+};
+
+export type TemplateField = {
+  id: number;
+  fieldPosition?: number | null;
+  fieldLabel?: string | null;
+  isRequired?: boolean;
+};
+
+export type TemplateDetails = {
+  fields?: TemplateField[];
+};
+
+type TemplateSummaryResponse = {
+  templateId: number;
+  templateName: string;
+  createdAt?: string;
+  fullyMapped?: boolean;
+  fieldCount?: number;
+};
+
+const EXTRA_TEMPLATE_FIELDS = ["deLa", "panaLa", "tarifConta", "tarifBilant"];
 
 export async function uploadTemplate(formData: FormData) {
   const file = formData.get("file") as File
@@ -40,7 +75,7 @@ export async function deleteTemplate(id: number) {
   revalidatePath("/contract-templates")
 }
 
-export async function getTemplates() {
+export async function getTemplates(): Promise<TemplateSummary[]> {
   const res = await contractsFetch("/api/templates?page=0&size=50", {
     cache: "no-store",
   });
@@ -52,10 +87,10 @@ export async function getTemplates() {
 
   if (res.status === 204) return [];
 
-  const data = await res.json();
-  const content = data.content || data || [];
+  const data = (await res.json()) as { content?: TemplateSummaryResponse[] } | TemplateSummaryResponse[];
+  const content = Array.isArray(data) ? data : data.content ?? [];
 
-  return content.map((t: any) => ({
+  return content.map((t) => ({
     id: t.templateId,
     name: t.templateName,
     createdAt: t.createdAt,
@@ -64,7 +99,7 @@ export async function getTemplates() {
   }));
 }
 
-export async function getTemplateById(id: number) {
+export async function getTemplateById(id: number): Promise<TemplateDetails | null> {
   const res = await contractsFetch(`/api/templates/${id}`, {
     cache: "no-store",
   });
@@ -75,6 +110,25 @@ export async function getTemplateById(id: number) {
   }
 
   return res.json();
+}
+
+export async function getClientTemplateFields(): Promise<TemplateMappingOption[]> {
+  const res = await clientServiceFetch("/api/clients/template-fields", {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    console.error("Failed to fetch client template fields", await res.text());
+    return [];
+  }
+
+  const fields = (await res.json()) as string[];
+  const uniqueFields = Array.from(new Set([...fields, ...EXTRA_TEMPLATE_FIELDS]));
+
+  return uniqueFields.map((field) => ({
+    value: field,
+    label: field,
+  }));
 }
 
 export async function updateTemplateMappings(templateId: number, mappings: { fieldId: number, fieldLabel: string }[]) {

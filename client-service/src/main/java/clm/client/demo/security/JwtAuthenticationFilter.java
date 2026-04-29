@@ -37,12 +37,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull FilterChain filterChain)
             throws ServletException, IOException {
 
-        extractBearer(request)
-                .flatMap(tokenProvider::getClaims)
-                .ifPresentOrElse(
-                        this::authenticate,
-                        () -> log.debug("No valid Bearer token — request proceeds unauthenticated")
-                );
+        var bearerToken = extractBearer(request);
+
+        if (bearerToken.isPresent()) {
+            log.info("Bearer token found, attempting to parse claims");
+            var claims = tokenProvider.getClaims(bearerToken.get());
+            if (claims.isPresent()) {
+                authenticate(claims.get());
+            } else {
+                log.warn("Bearer token present but claims parsing failed");
+            }
+        } else {
+            log.debug("No Bearer token found in request");
+        }
 
         filterChain.doFilter(request, response);
     }

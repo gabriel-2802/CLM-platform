@@ -64,6 +64,31 @@ services:
       retries: 5
       start_period: 20s
 
+  # ── Client-service database (clients schema — owned exclusively by client-service) ─
+  postgres-clients:
+    image: postgres:16-alpine
+    container_name: clm-postgres-clients-test
+    environment:
+      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:           ${DB_CLIENTS_NAME:-clm_clients}
+      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+    volumes:
+      - postgres_clients_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_CLIENTS_EXPOSE_PORT:-5435}:5432"
+    networks:
+      - data-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_CLIENTS_NAME:-clm_clients}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   # ── User service (auth + user management) ──────────────────────────────────
   user-service:
     build:
@@ -188,6 +213,55 @@ services:
       retries: 5
       start_period: 40s
 
+  client-service:
+    build:
+      context: client-service
+      dockerfile: Dockerfile
+    container_name: clm-client-service-test
+    environment:
+      # --- Database (dedicated postgres-clients instance) ---
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
+      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- JPA ---
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "true"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clients
+      # --- Flyway ---
+      SPRING_FLYWAY_ENABLED:    "true"
+      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:    clients
+      # --- JWT ---
+      JWT_SECRET:  ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      # --- CORS ---
+      CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      # --- Server ---
+      SERVER_PORT:  8084
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Logging ---
+      LOGGING_LEVEL_ROOT:                  INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
+    ports:
+      - "${CLIENT_SERVICE_PORT:-8084}:8084"
+    depends_on:
+      postgres-clients:
+        condition: service_healthy
+    networks:
+      - dmz-net
+      - data-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8084"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
   notifications:
     build:
       context: notification-service
@@ -252,15 +326,15 @@ services:
       NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
       NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}
       NEXT_PUBLIC_USER_SERVICE_URL:       ${NEXT_PUBLIC_USER_SERVICE_URL:-http://localhost:8083}
+      NEXT_PUBLIC_CLIENT_SERVICE_URL:     ${NEXT_PUBLIC_CLIENT_SERVICE_URL:-http://localhost:8084}
       # --- Server-side URLs (resolved inside Docker network) ---
       API_BASE_URL:               http://contracts:8081
       CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
       USER_SERVICE_URL:           http://user-service:8083
-      # --- Admin credentials (used by user-service for initial seed) ---
+      CLIENT_SERVICE_URL:         http://client-service:8084
+      # --- Admin credentials ---
       ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
-      # --- Database (Prisma — general schema for clients/tasks/contracts) ---
-      DATABASE_URL:  postgresql://${DB_USER:-clm_user}:${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}@postgres:5432/${DB_NAME:-clm_platform}?schema=general
       # --- NextAuth ---
       NEXTAUTH_URL:     ${FRONTEND_URL:-http://localhost:3000}
       NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required — check .env.testing}
@@ -272,6 +346,8 @@ services:
       notifications:
         condition: service_healthy
       user-service:
+        condition: service_healthy
+      client-service:
         condition: service_healthy
     networks:
       - dmz-net
@@ -296,4 +372,6 @@ volumes:
   postgres_data:
     driver: local
   postgres_users_data:
+    driver: local
+  postgres_clients_data:
     driver: local
