@@ -239,10 +239,15 @@ services:
       dockerfile: Dockerfile
       target: development
     container_name: clm-client-test
+    volumes:
+      - ./main-service:/app
+      - /app/node_modules
+      - /app/.next
     environment:
       # --- Node ---
       NODE_ENV:                  development
       NEXT_TELEMETRY_DISABLED:   "1"
+      WATCHPACK_POLLING:         "true"
       # --- Public API URLs (resolved in the browser) ---
       NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
       NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}

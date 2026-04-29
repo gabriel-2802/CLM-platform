@@ -1,5 +1,6 @@
 package clm.user.demo.security;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,14 +9,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -27,7 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX        = "Bearer ";
 
     private final JwtTokenProvider tokenProvider;
-    private final UserDetailsService userDetailsService;
 
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
@@ -36,18 +37,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         extractBearer(request).flatMap(tokenProvider::getClaims).ifPresent(claims -> {
-            String email = claims.getSubject();
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                 var auth = new UsernamePasswordAuthenticationToken(
-                        userDetails, null, userDetails.getAuthorities());
+                        claims.getSubject(), null, authoritiesFromClaims(claims));
                 auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(auth);
-                log.debug("Authenticated '{}' via JWT", email);
+                log.debug("Authenticated '{}' via JWT", claims.getSubject());
             }
         });
 
         filterChain.doFilter(request, response);
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<SimpleGrantedAuthority> authoritiesFromClaims(Claims claims) {
+        Object rolesClaim = claims.get("roles");
+        if (!(rolesClaim instanceof List<?> rawList)) return Collections.emptyList();
+        return ((List<String>) rawList).stream()
+                .map(SimpleGrantedAuthority::new)
+                .toList();
     }
 
     private Optional<String> extractBearer(HttpServletRequest request) {

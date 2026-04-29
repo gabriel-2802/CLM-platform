@@ -74,7 +74,7 @@ export async function getUsers(token: string | null | undefined): Promise<Servic
   try {
     const res = await fetch(`${USER_SERVICE_URL}/api/users`, {
       headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
+      next: { revalidate: 60 },
     });
     if (!res.ok) return [];
     return res.json();
