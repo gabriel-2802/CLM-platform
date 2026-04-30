@@ -321,3 +321,4 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
     </Dialog>
   )
 }
+``
