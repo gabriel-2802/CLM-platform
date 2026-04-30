@@ -6,34 +6,49 @@ import clm.demo.models.enums.DocumentFormat;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Objects;
+
 @Slf4j
 @UtilityClass
 public class Utils {
 
+    private static final byte[] PDF_MAGIC  = { 0x25, 0x50, 0x44, 0x46 }; // %PDF
+    private static final byte[] DOCX_MAGIC = { 0x50, 0x4B };             // PK (ZIP)
+
+    private static final String CONTENT_TYPE_PDF  = "application/pdf";
+    private static final String CONTENT_TYPE_DOCX =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
     /**
-     *  Checks the format of a file using magic BYTES
-     * @param fileBytes binary file
-     * @return the DOCUMENT FORMAT
+     * Checks the format of a file using magic bytes.
+     *
+     * @param fileBytes binary file content
+     * @return the detected {@link DocumentFormat}
+     * @throws UnsupportedFileException if the file is null, too short, or unrecognised
      */
-    public static DocumentFormat detectDocumentFormat(byte[] fileBytes) {
-        if (fileBytes == null || fileBytes.length < 4) {
+    public DocumentFormat detectDocumentFormat(byte[] fileBytes) {
+        if (Objects.isNull(fileBytes) || fileBytes.length < PDF_MAGIC.length) {
             throw new UnsupportedFileException("Invalid file: insufficient data to determine format");
         }
-        if (fileBytes[0] == 0x25 && fileBytes[1] == 0x50 &&
-                fileBytes[2] == 0x44 && fileBytes[3] == 0x46) {
+        if (startsWith(fileBytes, PDF_MAGIC)) {
             return DocumentFormat.PDF;
         }
-        if (fileBytes[0] == 0x50 && fileBytes[1] == 0x4B) {
+        if (startsWith(fileBytes, DOCX_MAGIC)) {
             return DocumentFormat.DOCX;
         }
-        throw new UnsupportedFileException("File content does not match a supported format. Supported formats: PDF, DOCX");
+        throw new UnsupportedFileException(
+                "File content does not match a supported format. Supported formats: PDF, DOCX");
     }
 
-        /**
-     * Helper method to convert string data type to enum.
+    /**
+     * Converts a raw string to its {@link DataType} enum equivalent,
+     * defaulting to {@link DataType#STRING} for null, blank, or unrecognised input.
+     *
+     * @param dataTypeStr the raw string representation of the data type
+     * @return the matching {@link DataType}, or {@link DataType#STRING} as fallback
      */
-    public static DataType convertStringToDataType(String dataTypeStr) {
-        if (dataTypeStr == null || dataTypeStr.trim().isEmpty()) {
+    public DataType convertStringToDataType(String dataTypeStr) {
+        if (Objects.isNull(dataTypeStr) || dataTypeStr.isBlank()) {
             return DataType.STRING;
         }
         try {
@@ -44,11 +59,24 @@ public class Utils {
         }
     }
 
-    public static String getContentType(DocumentFormat format) {
+    /**
+     * Returns the MIME content-type string for a given {@link DocumentFormat}.
+     *
+     * @param format the document format
+     * @return the corresponding MIME type string
+     */
+    public String getContentType(DocumentFormat format) {
         return switch (format) {
-            case PDF  -> "application/pdf";
-            case DOCX -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            default   -> "application/octet-stream";
+            case PDF  -> CONTENT_TYPE_PDF;
+            case DOCX -> CONTENT_TYPE_DOCX;
         };
+    }
+
+    private boolean startsWith(byte[] data, byte[] magic) {
+        if (data.length < magic.length) return false;
+        for (int i = 0; i < magic.length; i++) {
+            if (data[i] != magic[i]) return false;
+        }
+        return true;
     }
 }

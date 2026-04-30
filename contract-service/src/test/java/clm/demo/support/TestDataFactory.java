@@ -109,6 +109,7 @@ public final class TestDataFactory {
                 .clientId(42)
                 .contractStatus(status)
                 .contractValue(BigDecimal.valueOf(10_000))
+                .contractBalance(BigDecimal.valueOf(5_000))
                 .contractStartDate(LocalDate.of(2026, 1, 1))
                 .contractEndDate(LocalDate.of(2027, 1, 1))
                 .build();
@@ -155,6 +156,7 @@ public final class TestDataFactory {
                 LocalDate.of(2027, 1, 1),
                 Map.of("Client Name", "Acme Corp"),
                 true,
+                BigDecimal.valueOf(5_000),
                 BigDecimal.valueOf(10_000),
                 "test notes"
         );

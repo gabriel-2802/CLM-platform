@@ -25,6 +25,7 @@ public class ContractResponseDTO {
     private Integer generatedBy;
     private String generatedByMail;
     private BigDecimal contractValue;
+    private BigDecimal contractBalance;
     private LocalDate contractStartDate;
     private LocalDate contractEndDate;
     private String notes;

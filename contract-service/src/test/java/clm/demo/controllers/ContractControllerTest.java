@@ -72,7 +72,8 @@ class ContractControllerTest {
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
                   "mappings": { "Client Name": "Acme Corp" },
-                  "autoRenew": true
+                  "autoRenew": true,
+                  "contractBalance": 5000
                 }
                 """;
 
@@ -108,7 +109,8 @@ class ContractControllerTest {
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
                   "mappings": { "Client Name": "Acme Corp" },
-                  "autoRenew": true
+                  "autoRenew": true,
+                  "contractBalance": 5000
                 }
                 """;
 
@@ -132,7 +134,8 @@ class ContractControllerTest {
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
                   "mappings": { "Client Name": "Acme Corp" },
-                  "autoRenew": true
+                  "autoRenew": true,
+                  "contractBalance": 5000
                 }
                 """;
 
@@ -157,7 +160,8 @@ class ContractControllerTest {
                   "startDate": "2026-01-01",
                   "endDate": "2027-01-01",
                   "mappings": {},
-                  "autoRenew": true
+                  "autoRenew": true,
+                  "contractBalance": 5000
                 }
                 """;
 

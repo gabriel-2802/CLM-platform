@@ -28,8 +28,7 @@ public class Constants {
      * <p>Compiled once at class-load time; reused by all callers.</p>
      */
     public static final Pattern PLACEHOLDER_PATTERN =
-            Pattern.compile("\\.{4,}(?:[ \\t]*\\.+)*");
-
+            Pattern.compile("\\.{4,}(?:[ \\t]*\\.+)*+");
     /**
      * Canonical form that every placeholder is normalised to at upload time.
      * Exactly four ASCII dots.

@@ -10,9 +10,10 @@ import java.time.LocalDate;
 import java.util.Map;
 
 /**
- * @param mappings LABEL - VALUE MAPPINGS
- * @param value    contract monetary value; {@code BigDecimal} used instead of
- *                 {@code Double} to avoid floating-point rounding issues in financial contexts
+ * @param mappings         LABEL - VALUE MAPPINGS
+ * @param value            contract monetary value; {@code BigDecimal} used instead of
+ *                         {@code Double} to avoid floating-point rounding issues in financial contexts
+ * @param contractBalance  initial balance of the contract
  */
 public record GenContractRequest(@NotNull(message = "Template ID is required") Long templateId,
                                  @NotNull(message = "User ID is required") Long userId,
@@ -22,6 +23,7 @@ public record GenContractRequest(@NotNull(message = "Template ID is required") L
                                  @NotNull(message = "End date is required") LocalDate endDate,
                                  @NotNull(message = "Field mappings map is required") Map<String, String> mappings,
                                  @NotNull(message = "Auto-renewal flag is required") Boolean autoRenew,
+                                 @NotNull(message = "Contract balance is required") BigDecimal contractBalance,
                                  BigDecimal value, String notes) {
 
 }
