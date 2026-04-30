@@ -97,7 +97,7 @@ services:
     container_name: clm-user-service-test
     environment:
       # --- Database ---
-      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}
+      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
       SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
       SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
       SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
@@ -107,9 +107,10 @@ services:
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: users
       # --- Flyway ---
-      SPRING_FLYWAY_ENABLED:    "true"
-      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
-      SPRING_FLYWAY_SCHEMAS:    users
+      SPRING_FLYWAY_ENABLED:         "true"
+      SPRING_FLYWAY_LOCATIONS:       classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:         users
+      SPRING_FLYWAY_DEFAULT_SCHEMA:  users
       # --- JWT ---
       JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
       JWT_EXPIRATION:      ${JWT_EXPIRATION:-2592000000}
