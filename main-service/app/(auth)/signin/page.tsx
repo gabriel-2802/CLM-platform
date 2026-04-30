@@ -26,7 +26,8 @@ export default function SignInPage() {
         setError(res.error || "Invalid credentials");
         setLoading(false);
       } else if (res?.ok) {
-        router.push("/");
+        router.replace("/");
+        router.refresh();
       }
     } catch (err) {
       setError("An error occurred. Please try again.");

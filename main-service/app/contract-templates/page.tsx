@@ -9,8 +9,8 @@ export default async function ContractTemplatesPage() {
     <div className="p-8 max-w-5xl mx-auto w-full">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Contract Templates</h1>
-          <p className="text-gray-500 mt-1">Manage your available contract blueprints</p>
+          <h1 className="text-2xl font-bold text-gray-900">Document Templates</h1>
+          <p className="text-gray-500 mt-1">Manage your available document templates</p>
         </div>
         <UploadTemplateDialog />
       </div>
@@ -50,9 +50,14 @@ export default async function ContractTemplatesPage() {
                     <div className="text-sm font-medium text-gray-900">{template.name}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <a href={`/api/templates/download/${template.id}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900 font-medium">
-                      Download DOCX
-                    </a>
+                    <div className="flex items-center gap-3">
+                      <a href={`/api/templates/download/${template.id}`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900 font-medium">
+                        Download DOCX
+                      </a>
+                      <a href={`/api/templates/download/${template.id}/pdf`} target="_blank" rel="noreferrer" className="text-sm text-indigo-600 hover:text-indigo-900 font-medium">
+                        Download PDF
+                      </a>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-2">

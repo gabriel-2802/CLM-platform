@@ -208,7 +208,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
               <p className="text-xs text-muted-foreground">
                 Încarcă și mapează un template în pagina{" "}
                 <a href="/contract-templates" className="text-indigo-600 underline">
-                  Contract Templates
+                  Document Templates
                 </a>{" "}
                 mai întâi.
               </p>

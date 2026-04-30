@@ -21,6 +21,19 @@ function toISODate(d: string | null | undefined): string | undefined {
   return dt.toISOString().slice(0, 10)
 }
 
+function toDateTime(value: FormDataEntryValue | null): string | null {
+  if (!value) return null
+  const raw = String(value).trim()
+  if (!raw) return null
+  // Normalize date-only inputs to ISO date-time for the API
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return `${raw}T00:00:00.000Z`
+  }
+  const dt = new Date(raw)
+  if (isNaN(dt.getTime())) return raw
+  return dt.toISOString()
+}
+
 function mapPoint(p: any): PunctDeLucruValues {
   return {
     id: p.id,
@@ -57,8 +70,8 @@ export async function upsertClientPunctDeLucru(clientId: number, formData: FormD
 
   const body = {
     denumire: (formData.get("denumire") as string)?.trim() || "",
-    deLa: formData.get("deLa"),
-    panaLa: formData.get("panaLa") || null,
+    deLa: toDateTime(formData.get("deLa")),
+    panaLa: toDateTime(formData.get("panaLa")),
     administratie: formData.get("administratie") ?? "SECTOR_1",
     registruUC: formData.get("registruUC") === "on" || formData.get("registruUC") === "true",
     salariati: parseInt(formData.get("salariati") as string ?? "0", 10) || 0,
