@@ -1,0 +1,12 @@
+{
+  "ignores": [
+    "eslint-config-next",
+    "autoprefixer",
+    "postcss",
+    "tailwindcss"
+  ],
+  "parsers": {
+    "**/*.ts": "typescript",
+    "**/*.tsx": "typescript"
+  }
+}

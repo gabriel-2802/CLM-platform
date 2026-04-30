@@ -1,21 +1,26 @@
-# ─── Stage 1: Build ───────────────────────────────────────────────────────────
+# syntax=docker/dockerfile:1
+
+# stage 1: build ───────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
 RUN apk add --no-cache maven
 
 WORKDIR /build
 
+# copy dependency manifest only — layer invalidates only when pom.xml changes
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 \
     mvn dependency:go-offline -q
 
+# copy source and package — breaks only on src changes, deps served from cache
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn package -DskipTests -q
 
-# ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
+# stage 2: runtime ─────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 
+# nc for healthcheck
 RUN apk add --no-cache netcat-openbsd
 
 RUN addgroup -g 1001 -S appgroup && \

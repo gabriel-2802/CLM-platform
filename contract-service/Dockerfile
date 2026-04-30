@@ -1,32 +1,35 @@
-# ─── Stage 1: Build ───────────────────────────────────────────────────────────
+# syntax=docker/dockerfile:1
+
+# stage 1: build ───────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
 RUN apk add --no-cache maven
 
 WORKDIR /build
 
-# Copy POM first — dependency layer is only invalidated when pom.xml changes
+# copy dependency manifest only — layer invalidates only when pom.xml changes
 COPY pom.xml .
 RUN --mount=type=cache,target=/root/.m2 \
     mvn dependency:go-offline -q
 
+# copy source and package — breaks only on src changes, deps served from cache
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     mvn package -DskipTests -q
 
-# ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
+# stage 2: runtime ─────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
 
-# LibreOffice for DOCX-to-PDF conversion, fonts for accurate rendering, nc for healthcheck
+# libreoffice for docx-to-pdf conversion, fonts for accurate rendering, nc for healthcheck
 RUN apk add --no-cache \
     libreoffice \
     font-noto \
     ttf-dejavu \
     netcat-openbsd
 
-# /usr/bin/libreoffice is the Alpine package entry-point (symlinks to soffice)
+# /usr/bin/libreoffice is the alpine package entry-point (symlinks to soffice)
 ENV LIBREOFFICE_PATH=/usr/bin/libreoffice
-# LibreOffice headless needs a writable home directory; /tmp is a tmpfs in production
+# libreoffice headless needs a writable home directory; /tmp is a tmpfs in production
 ENV HOME=/tmp
 
 RUN addgroup -g 1001 -S appgroup && \

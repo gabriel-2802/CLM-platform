@@ -1,16 +1,18 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage: development — hot-reload dev server
-# ─────────────────────────────────────────────────────────────────────────────
+# syntax=docker/dockerfile:1
+
+#  stage: development — hot-reload dev server ───────
 FROM node:20-alpine AS development
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app
 
+# copy manifests and prisma schema before source — deps layer stays cached
 COPY package*.json ./
 COPY prisma ./prisma
 RUN npm ci
 
+# copied here as fallback — docker compose mounts override this at runtime
 COPY . .
 
 EXPOSE 3000
@@ -20,22 +22,23 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=60s \
 
 CMD ["npm", "run", "dev"]
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage: builder — compile production bundle
-# Requires `output: 'standalone'` in next.config.ts for the runner stage.
-# ─────────────────────────────────────────────────────────────────────────────
+# stage: builder — compile production bundle ───────
+# requires output: 'standalone' in next.config.ts for the runner stage
 FROM node:20-alpine AS builder
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app
 
+# copy manifests and prisma schema before source — deps layer stays cached
 COPY package*.json ./
 COPY prisma ./prisma
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
 
 COPY . .
 
+# build-time public env vars must be baked in at compile time for next.js
 ARG NEXT_PUBLIC_CONTRACTS_API_URL
 ARG NEXT_PUBLIC_NOTIFICATIONS_API_URL
 ARG NEXT_PUBLIC_USER_SERVICE_URL
@@ -43,11 +46,10 @@ ENV NEXT_PUBLIC_CONTRACTS_API_URL=$NEXT_PUBLIC_CONTRACTS_API_URL
 ENV NEXT_PUBLIC_NOTIFICATIONS_API_URL=$NEXT_PUBLIC_NOTIFICATIONS_API_URL
 ENV NEXT_PUBLIC_USER_SERVICE_URL=$NEXT_PUBLIC_USER_SERVICE_URL
 
-RUN npm run build
+RUN --mount=type=cache,target=/root/.npm \
+    npm run build
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Stage: runner — minimal production image (no source, no dev deps)
-# ─────────────────────────────────────────────────────────────────────────────
+# stage: runner — minimal production image (no source, no dev deps) 
 FROM node:20-alpine AS runner
 
 ENV NODE_ENV=production
@@ -60,10 +62,10 @@ RUN addgroup -g 1001 -S nodejs && \
 
 WORKDIR /app
 
-# Standalone bundle embeds all required node_modules — no npm install needed at runtime
+# standalone bundle embeds all required node_modules — no npm install needed at runtime
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static   ./.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/public          ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
 
 USER nextjs
 

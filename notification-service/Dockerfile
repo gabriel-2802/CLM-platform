@@ -1,22 +1,24 @@
-# ─── Stage 1: Build ───────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jdk-alpine AS builder
+# syntax=docker/dockerfile:1
+
+#  stage 1: build ──
+FROM eclipse-temurin:25-jdk-alpine AS builder
 
 RUN apk add --no-cache maven
 
 WORKDIR /build
 
-# Copy POM first — dependency layer is only invalidated when pom.xml changes
+# copy dependency manifest only — layer invalidates only when pom.xml changes
 COPY pom.xml .
-# pom.xml targets Java 25; override to 21 to match the JDK and runtime image
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:go-offline -q -Djava.version=21
+    mvn dependency:go-offline -q
 
+# copy source and package — breaks only on src changes, deps served from cache
 COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn package -DskipTests -q -Djava.version=21
+    mvn package -DskipTests -q
 
-# ─── Stage 2: Runtime ─────────────────────────────────────────────────────────
-FROM eclipse-temurin:21-jre-alpine
+#  stage 2: runtime 
+FROM eclipse-temurin:25-jre-alpine
 
 # nc for healthcheck
 RUN apk add --no-cache netcat-openbsd
