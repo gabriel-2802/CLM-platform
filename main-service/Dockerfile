@@ -1,15 +1,14 @@
 # syntax=docker/dockerfile:1
 
-#  stage: development — hot-reload dev server ───────
+#  stage: development — hot-reload dev server 
 FROM node:20-alpine AS development
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app
 
-# copy manifests and prisma schema before source — deps layer stays cached
+# copy manifests before source — deps layer stays cached
 COPY package*.json ./
-COPY prisma ./prisma
 RUN npm ci
 
 # copied here as fallback — docker compose mounts override this at runtime
@@ -22,7 +21,7 @@ HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=60s \
 
 CMD ["npm", "run", "dev"]
 
-# stage: builder — compile production bundle ───────
+#  stage: builder — compile production bundle 
 # requires output: 'standalone' in next.config.ts for the runner stage
 FROM node:20-alpine AS builder
 
@@ -30,9 +29,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 WORKDIR /app
 
-# copy manifests and prisma schema before source — deps layer stays cached
+# copy manifests before source — deps layer stays cached
 COPY package*.json ./
-COPY prisma ./prisma
 RUN --mount=type=cache,target=/root/.npm \
     npm ci
 
@@ -42,14 +40,16 @@ COPY . .
 ARG NEXT_PUBLIC_CONTRACTS_API_URL
 ARG NEXT_PUBLIC_NOTIFICATIONS_API_URL
 ARG NEXT_PUBLIC_USER_SERVICE_URL
+ARG NEXT_PUBLIC_CLIENT_SERVICE_URL
 ENV NEXT_PUBLIC_CONTRACTS_API_URL=$NEXT_PUBLIC_CONTRACTS_API_URL
 ENV NEXT_PUBLIC_NOTIFICATIONS_API_URL=$NEXT_PUBLIC_NOTIFICATIONS_API_URL
 ENV NEXT_PUBLIC_USER_SERVICE_URL=$NEXT_PUBLIC_USER_SERVICE_URL
+ENV NEXT_PUBLIC_CLIENT_SERVICE_URL=$NEXT_PUBLIC_CLIENT_SERVICE_URL
 
 RUN --mount=type=cache,target=/root/.npm \
     npm run build
 
-# stage: runner — minimal production image (no source, no dev deps) 
+#  stage: runner — minimal production image (no source, no dev deps) 
 FROM node:20-alpine AS runner
 
 ENV NODE_ENV=production
