@@ -6,18 +6,19 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import java.util.Objects;
+
 @Mapper(componentModel = "spring", uses = DocumentFieldValueMapper.class)
 public interface AppendixMapper {
 
-    @Mapping(source = "contract.id",          target = "contractId")
-    @Mapping(source = "documentTemplate.id",  target = "templateId")
-    @Mapping(source = "appendixStatus",        target = "appendixStatus", qualifiedByName = "enumToString")
-    @Mapping(source = "documentFormat",        target = "documentFormat", qualifiedByName = "enumToString")
-    @Mapping(source = "fieldValues",           target = "fieldValues")
+    @Mapping(source = "contract.id",         target = "contractId")
+    @Mapping(source = "documentTemplate.id", target = "templateId")
+    @Mapping(source = "appendixStatus",      target = "appendixStatus", qualifiedByName = "enumToString")
+    @Mapping(source = "documentFormat",      target = "documentFormat", qualifiedByName = "enumToString")
     AppendixResponseDTO toResponseDTO(Appendix entity);
 
     @Named("enumToString")
     default String enumToString(Object value) {
-        return value != null ? value.toString() : null;
+        return Objects.nonNull(value) ? value.toString() : null;
     }
 }

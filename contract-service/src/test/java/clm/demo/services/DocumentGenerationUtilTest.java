@@ -7,6 +7,7 @@ import clm.demo.models.DocumentTemplate;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.enums.DataType;
+import clm.demo.services.utility.DocumentGenerationUtil;
 import clm.demo.support.TestDataFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;

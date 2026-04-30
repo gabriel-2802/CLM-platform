@@ -43,10 +43,6 @@ public class ContractController {
     private final ContractService contractService;
     private final DocumentDownloadService downloadService;
 
-    // ------------------------------------------------------------------ //
-    //  Generate                                                            //
-    // ------------------------------------------------------------------ //
-
     @Operation(
         summary     = "Generate a contract from a template",
         description = """
@@ -75,10 +71,6 @@ public class ContractController {
                 .toUri();
         return ResponseEntity.created(location).body(response);
     }
-
-    // ------------------------------------------------------------------ //
-    //  Sign                                                                //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Upload signed document",
@@ -110,10 +102,6 @@ public class ContractController {
         }
     }
 
-    // ------------------------------------------------------------------ //
-    //  Terminate                                                           //
-    // ------------------------------------------------------------------ //
-
     @Operation(
         summary     = "Terminate an ACTIVE contract",
         description = "Records the termination date and reason, and transitions the contract status to `TERMINATED`. Only `ACTIVE` contracts can be terminated."
@@ -129,10 +117,6 @@ public class ContractController {
         contractService.terminateContract(contractId, request);
         return ResponseEntity.noContent().build();
     }
-
-    // ------------------------------------------------------------------ //
-    //  Auto-Renewal Management                                             //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Toggle auto-renewal status",
@@ -153,9 +137,6 @@ public class ContractController {
         return ResponseEntity.ok(response);
     }
 
-    // ------------------------------------------------------------------ //
-    //  List / Search                                                       //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "List all contracts",
@@ -199,10 +180,6 @@ public class ContractController {
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.ok(result.getContent());
     }
-
-    // ------------------------------------------------------------------ //
-    //  Download                                                            //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Download a contract file",

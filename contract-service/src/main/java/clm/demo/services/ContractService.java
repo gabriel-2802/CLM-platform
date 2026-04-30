@@ -16,6 +16,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentFieldValueRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
+import clm.demo.services.utility.DocumentGenerationUtil;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.utils.Utils;
 import clm.demo.utils.docx.DocxFiller;
@@ -31,8 +32,10 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static clm.demo.utils.Constants.DEFAULT_PAGE;
 import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
@@ -43,16 +46,16 @@ import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
 @RequiredArgsConstructor
 public class ContractService {
 
-    private final DocumentTemplateRepository templateRepository;
-    private final ContractRepository contractRepository;
+    private static final String SORT_FIELD_CREATED_AT = "createdAt";
+
+    private final DocumentTemplateRepository   templateRepository;
+    private final ContractRepository           contractRepository;
     private final DocumentFieldValueRepository fieldValueRepository;
-
-    private final ContractGenerationMapper generationMapper;
-    private final GeneratedContractMapper contractMapper;
-
-    private final ContractSpecification contractSpecification;
-    private final FileUtils fileUtils;
-    private final DocumentGenerationUtil documentGenerationUtil;
+    private final ContractGenerationMapper     generationMapper;
+    private final GeneratedContractMapper      contractMapper;
+    private final ContractSpecification        contractSpecification;
+    private final FileUtils                    fileUtils;
+    private final DocumentGenerationUtil       documentGenerationUtil;
 
     /**
      * Generates a new contract from a template with provided field mappings.
@@ -67,10 +70,12 @@ public class ContractService {
     @Transactional
     public ContractResponseDTO generateContract(GenContractRequest request) {
         DocumentTemplate template = templateRepository.findById(request.templateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.templateId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Template not found: " + request.templateId()));
 
-        if (!template.getIsFullyMapped()) {
-            throw new TemplateIncompleteException("Template " + template.getId() + " is not fully mapped.");
+        if (Boolean.FALSE.equals(template.getIsFullyMapped())) {
+            throw new TemplateIncompleteException(
+                    "Template " + template.getId() + " is not fully mapped.");
         }
 
         documentGenerationUtil.validateMandatoryFields(template, request.mappings());
@@ -78,26 +83,19 @@ public class ContractService {
         Contract contract = generationMapper.toContractEntity(request, template);
         contract = contractRepository.save(contract);
 
-        List<DocumentFieldValue> fieldValues = documentGenerationUtil.buildFieldValues(contract, template, request.mappings());
+        List<DocumentFieldValue> fieldValues =
+                documentGenerationUtil.buildFieldValues(contract, template, request.mappings());
+
         if (!fieldValues.isEmpty()) {
             fieldValueRepository.saveAll(fieldValues);
             contract.setFieldValues(fieldValues);
         }
 
         try {
-            List<TemplateField> ordered = template.getTemplateFields().stream()
-                    .filter(f -> f.getFieldPosition() != null && f.getFieldLabel() != null)
-                    .sorted(java.util.Comparator.comparingInt(TemplateField::getFieldPosition))
-                    .toList();
-            Map<String, String> labelToValue = documentGenerationUtil.buildLabelValueMap(fieldValues);
-            byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
-            byte[] filled = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
-            byte[] pdf = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
-            contract.setDocumentContent(fileUtils.compress(pdf));
-            contract.setDocumentFormat(DocumentFormat.PDF);
-            contract = contractRepository.save(contract);
+            contract = fillAndPersistDocument(contract, template, fieldValues);
         } catch (IOException e) {
-            throw new ContractGenerationFailException("Failed to generate contract document: " + e.getMessage());
+            throw new ContractGenerationFailException(
+                    "Failed to generate contract document: " + e.getMessage());
         }
 
         return contractMapper.toResponseDTO(contract);
@@ -114,7 +112,8 @@ public class ContractService {
     @Transactional
     public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes) {
         Contract contract = contractRepository.findById(contractId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Contract not found: " + contractId));
 
         try {
             DocumentFormat sourceFormat = Utils.detectDocumentFormat(fileBytes);
@@ -126,7 +125,8 @@ public class ContractService {
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract = contractRepository.save(contract);
         } catch (IOException e) {
-            throw new FileConversionException("Failed to process signed document: " + e.getMessage(), e);
+            throw new FileConversionException(
+                    "Failed to process signed document: " + e.getMessage(), e);
         }
 
         return contractMapper.toResponseDTO(contract);
@@ -135,13 +135,13 @@ public class ContractService {
     @Transactional
     public void terminateContract(Long contractId, @Valid ContractTerminationRequest request) {
         Contract contract = contractRepository.findById(contractId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Contract not found: " + contractId));
 
         if (contract.getContractStatus() != ContractStatus.ACTIVE) {
             throw new InvalidContractStateException(
-                    "Cannot terminate contract in status: " + contract.getContractStatus() +
-                            ". Only ACTIVE contracts can be terminated."
-            );
+                    "Cannot terminate contract in status: " + contract.getContractStatus()
+                            + ". Only ACTIVE contracts can be terminated.");
         }
 
         contract.setContractStatus(ContractStatus.TERMINATED);
@@ -161,18 +161,21 @@ public class ContractService {
     @Transactional
     public ContractResponseDTO toggleAutoRenewal(Long contractId) {
         Contract contract = contractRepository.findById(contractId)
-                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Contract not found: " + contractId));
 
         contract.setAutoRenew(!contract.getAutoRenew());
         contract = contractRepository.save(contract);
-        log.info("Auto-renewal toggled for contract {}: new state = {}", contractId, contract.getAutoRenew());
+        log.info("Auto-renewal toggled for contract {}: new state = {}",
+                contractId, contract.getAutoRenew());
 
         return contractMapper.toResponseDTO(contract);
     }
 
-    // ...existing code...
+    @Transactional(readOnly = true)
     public Page<ContractResponseDTO> getAll(int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageRequest pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATED_AT));
         return contractRepository.findAll(pageable)
                 .map(contractMapper::toResponseDTO);
     }
@@ -181,17 +184,39 @@ public class ContractService {
     public Page<ContractResponseDTO> search(SearchRequest request) {
         log.info("Searching contracts with criteria: {}", request);
 
-        int pageIndex = request.page() != null ? request.page() : DEFAULT_PAGE;
-        int pageSize  = request.size() != null ? request.size() : DEFAULT_PAGE_SIZE;
+        int pageIndex = Objects.nonNull(request.page()) ? request.page() : DEFAULT_PAGE;
+        int pageSize  = Objects.nonNull(request.size()) ? request.size() : DEFAULT_PAGE_SIZE;
 
-        PageRequest pageable = PageRequest.of(pageIndex, pageSize, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Contract> page = contractRepository.findAll(
+        PageRequest pageable = PageRequest.of(pageIndex, pageSize,
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATED_AT));
+
+        Page<Contract> result = contractRepository.findAll(
                 contractSpecification.buildSearchSpecification(request), pageable);
 
         log.debug("Search returned {}/{} contracts (page {}/{})",
-                page.getNumberOfElements(), page.getTotalElements(),
-                page.getNumber(), page.getTotalPages());
+                result.getNumberOfElements(), result.getTotalElements(),
+                result.getNumber(), result.getTotalPages());
 
-        return page.map(contractMapper::toResponseDTO);
+        return result.map(contractMapper::toResponseDTO);
+    }
+
+    private Contract fillAndPersistDocument(
+            Contract contract,
+            DocumentTemplate template,
+            List<DocumentFieldValue> fieldValues) throws IOException {
+
+        List<TemplateField> ordered = template.getTemplateFields().stream()
+                .filter(f -> Objects.nonNull(f.getFieldPosition()) && Objects.nonNull(f.getFieldLabel()))
+                .sorted(Comparator.comparingInt(TemplateField::getFieldPosition))
+                .toList();
+
+        Map<String, String> labelToValue = documentGenerationUtil.buildLabelValueMap(fieldValues);
+        byte[] templateBytes = fileUtils.decompress(template.getDocumentContent());
+        byte[] filled        = DocxFiller.fillDocx(templateBytes, ordered, labelToValue);
+        byte[] pdf           = fileUtils.convert(filled, DocumentFormat.DOCX, DocumentFormat.PDF);
+
+        contract.setDocumentContent(fileUtils.compress(pdf));
+        contract.setDocumentFormat(DocumentFormat.PDF);
+        return contractRepository.save(contract);
     }
 }

@@ -16,6 +16,7 @@ import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentFieldValueRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
+import clm.demo.services.utility.DocumentGenerationUtil;
 import clm.demo.specifications.ContractSpecification;
 import clm.demo.support.TestDataFactory;
 import clm.demo.utils.docx.DocxFiller;
@@ -50,7 +51,8 @@ class ContractServiceTest {
     @Mock GeneratedContractMapper       contractMapper;
     @Mock ContractSpecification         contractSpecification;
     @Mock FileUtils                     fileUtils;
-    @Mock DocumentGenerationUtil        documentGenerationUtil;
+    @Mock
+    DocumentGenerationUtil documentGenerationUtil;
 
     @InjectMocks ContractService service;
 

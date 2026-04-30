@@ -2,22 +2,24 @@ package clm.demo.services;
 
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.UploadTemplateRequest;
-import clm.demo.dto.responses.*;
+import clm.demo.dto.responses.TemplateFieldResponseDTO;
+import clm.demo.dto.responses.TemplateResponseDTO;
+import clm.demo.dto.responses.TemplateUploadResponseDTO;
+import clm.demo.exceptions.DuplicateTemplateNameException;
 import clm.demo.exceptions.ResourceNotFoundException;
 import clm.demo.exceptions.TemplateFieldOwnershipException;
 import clm.demo.exceptions.TemplateUploadException;
-import clm.demo.exceptions.DuplicateTemplateNameException;
 import clm.demo.mappers.DocumentTemplateMapper;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.DocumentTemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
+import clm.demo.utils.Utils;
 import clm.demo.utils.docx.DocxNormalizer;
 import clm.demo.utils.file.FileParser;
 import clm.demo.utils.file.FileUtils;
 import clm.demo.utils.file.PlaceholderProcessor;
-import clm.demo.utils.Utils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -38,10 +41,12 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class TemplateService {
 
+    private static final String SORT_FIELD_CREATED_AT = "createdAt";
+
     private final DocumentTemplateRepository templateRepository;
-    private final TemplateFieldRepository templateFieldRepository;
-    private final DocumentTemplateMapper templateMapper;
-    private final FileUtils fileUtils;
+    private final TemplateFieldRepository    templateFieldRepository;
+    private final DocumentTemplateMapper     templateMapper;
+    private final FileUtils                  fileUtils;
 
     @Transactional
     public TemplateUploadResponseDTO uploadTemplate(UploadTemplateRequest request) {
@@ -55,11 +60,12 @@ public class TemplateService {
         }
 
         try {
-            byte[] fileBytes = request.getFile().getBytes();
-            DocumentFormat uploadedFormat = Utils.detectDocumentFormat(fileBytes);
-            FileParser.ParsedDocument parsedDoc = FileParser.parseTemplate(request.getFile(), uploadedFormat);
+            byte[] fileBytes      = request.getFile().getBytes();
+            DocumentFormat format = Utils.detectDocumentFormat(fileBytes);
 
-            byte[] docxBytes = uploadedFormat == DocumentFormat.PDF
+            FileParser.ParsedDocument parsedDoc = FileParser.parseTemplate(request.getFile(), format);
+
+            byte[] docxBytes = format == DocumentFormat.PDF
                     ? fileUtils.convert(fileBytes, DocumentFormat.PDF, DocumentFormat.DOCX)
                     : fileBytes;
 
@@ -84,26 +90,18 @@ public class TemplateService {
                             .toList()
             );
 
-            log.info("Template '{}' uploaded: {} placeholder(s) extracted", template.getTemplateName(), savedFields.size());
-
-            String documentText = replaceWithFieldIds(parsedDoc.documentText(), savedFields);
+            log.info("Template '{}' uploaded: {} placeholder(s) extracted",
+                    template.getTemplateName(), savedFields.size());
 
             return TemplateUploadResponseDTO.builder()
                     .templateId(template.getId())
                     .templateName(template.getTemplateName())
-                    .documentText(documentText)
+                    .documentText(replaceWithFieldIds(parsedDoc.documentText(), savedFields))
                     .build();
 
         } catch (IOException e) {
             throw new TemplateUploadException("Failed to process uploaded template: " + e.getMessage());
         }
-    }
-
-    private String replaceWithFieldIds(String normalizedText, List<TemplateField> savedFields) {
-        return PlaceholderProcessor.substituteEach(
-                normalizedText,
-                i -> i < savedFields.size() ? "{{" + savedFields.get(i).getId() + "}}" : null
-        ).text();
     }
 
     @Transactional(readOnly = true)
@@ -115,7 +113,8 @@ public class TemplateService {
 
     @Transactional(readOnly = true)
     public Page<TemplateResponseDTO> getAllTemplates(int page, int size) {
-        PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        PageRequest pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATED_AT));
         return templateRepository.findAll(pageable)
                 .map(templateMapper::toResponseDTO);
     }
@@ -144,41 +143,63 @@ public class TemplateService {
                 .collect(Collectors.toMap(TemplateField::getId, f -> f));
 
         List<TemplateField> updatedFields = request.getMappings().stream()
-                .map(mapping -> {
-                    TemplateField field = fieldMap.get(mapping.getFieldId());
-                    if (field == null) {
-                        throw new ResourceNotFoundException("Field not found: " + mapping.getFieldId());
-                    }
-                    if (!field.getDocumentTemplate().getId().equals(request.getTemplateId())) {
-                        throw new TemplateFieldOwnershipException(
-                                "Field " + mapping.getFieldId() + " does not belong to template " + request.getTemplateId());
-                    }
-                    field.setFieldLabel(mapping.getFieldLabel());
-                    field.setDataType(Utils.convertStringToDataType(mapping.getDataType()));
-                    field.setIsRequired(mapping.isRequired());
-                    field.setFormatPattern(mapping.getFormatPattern());
-                    return field;
-                })
+                .map(mapping -> resolveAndUpdateField(mapping, fieldMap, request.getTemplateId()))
                 .toList();
 
         List<TemplateField> savedFields = templateFieldRepository.saveAll(updatedFields);
 
         DocumentTemplate template = templateRepository.findById(request.getTemplateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Template not found: " + request.getTemplateId()));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Template not found: " + request.getTemplateId()));
 
+        updateMappingStatus(template);
+
+        return savedFields.stream()
+                .map(TemplateFieldResponseDTO::new)
+                .toList();
+    }
+
+    private TemplateField resolveAndUpdateField(
+            FieldMappingRequest.FieldMappingDefinition mapping,
+            Map<Long, TemplateField> fieldMap,
+            Long templateId) {
+
+        TemplateField field = fieldMap.get(mapping.getFieldId());
+
+        if (Objects.isNull(field)) {
+            throw new ResourceNotFoundException("Field not found: " + mapping.getFieldId());
+        }
+        if (!field.getDocumentTemplate().getId().equals(templateId)) {
+            throw new TemplateFieldOwnershipException(
+                    "Field " + mapping.getFieldId() + " does not belong to template " + templateId);
+        }
+
+        field.setFieldLabel(mapping.getFieldLabel());
+        field.setDataType(Utils.convertStringToDataType(mapping.getDataType()));
+        field.setIsRequired(mapping.isRequired());
+        field.setFormatPattern(mapping.getFormatPattern());
+        return field;
+    }
+
+    private void updateMappingStatus(DocumentTemplate template) {
         long mappedCount = template.getTemplateFields().stream()
-                .filter(f -> f.getFieldLabel() != null && !f.getFieldLabel().isBlank())
+                .filter(f -> Objects.nonNull(f.getFieldLabel()) && !f.getFieldLabel().isBlank())
                 .count();
 
-        boolean fullyMapped = !template.getTemplateFields().isEmpty() && mappedCount == template.getFieldCount();
+        boolean fullyMapped = !template.getTemplateFields().isEmpty()
+                && mappedCount == template.getFieldCount();
+
         template.setIsFullyMapped(fullyMapped);
         templateRepository.save(template);
 
         log.info("Template {} field labels updated: {}/{} fields mapped",
                 template.getId(), mappedCount, template.getFieldCount());
+    }
 
-        return savedFields.stream()
-                .map(TemplateFieldResponseDTO::new)
-                .toList();
+    private String replaceWithFieldIds(String normalizedText, List<TemplateField> savedFields) {
+        return PlaceholderProcessor.substituteEach(
+                normalizedText,
+                i -> i < savedFields.size() ? "{{" + savedFields.get(i).getId() + "}}" : null
+        ).text();
     }
 }

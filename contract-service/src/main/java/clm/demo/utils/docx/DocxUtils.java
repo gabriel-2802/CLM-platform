@@ -23,16 +23,19 @@ public class DocxUtils {
     /**
      * Visits every paragraph in {@code doc} in canonical order and passes it to {@code consumer}.
      */
-    public static void forEachParagraph(XWPFDocument doc, Consumer<XWPFParagraph> consumer) {
+    public void forEachParagraph(XWPFDocument doc, Consumer<XWPFParagraph> consumer) {
         doc.getParagraphs().forEach(consumer);
 
-        for (XWPFTable table : doc.getTables())
-            for (XWPFTableRow row : table.getRows())
-                for (XWPFTableCell cell : row.getTableCells())
+        for (XWPFTable table : doc.getTables()) {
+            for (XWPFTableRow row : table.getRows()) {
+                for (XWPFTableCell cell : row.getTableCells()) {
                     cell.getParagraphs().forEach(consumer);
+                }
+            }
+        }
 
-        for (XWPFHeader h : doc.getHeaderList()) h.getParagraphs().forEach(consumer);
-        for (XWPFFooter f : doc.getFooterList()) f.getParagraphs().forEach(consumer);
+        doc.getHeaderList().forEach(h -> h.getParagraphs().forEach(consumer));
+        doc.getFooterList().forEach(f -> f.getParagraphs().forEach(consumer));
     }
 
     /**
@@ -44,7 +47,7 @@ public class DocxUtils {
      * @param rewritten the fully substituted string
      * @param spans     one {@link PlaceholderProcessor.SubstitutionSpan} per placeholder, in match order
      */
-    public static void writebackSpans(
+    public void writebackSpans(
             List<XWPFRun> runs, int[] runStarts,
             String rewritten, List<PlaceholderProcessor.SubstitutionSpan> spans) {
 
@@ -59,18 +62,15 @@ public class DocxUtils {
             while (origPos < origRunEnd) {
                 if (spanIdx < spans.size()
                         && origPos == spans.get(spanIdx).originalStart()) {
-                    // at a span boundary: jump both cursors over the entire span atomically
                     PlaceholderProcessor.SubstitutionSpan sp = spans.get(spanIdx++);
                     origPos = sp.originalEnd();
                     rwPos  += sp.replacementLen();
                 } else {
-                    // plain character: 1-to-1
                     origPos++;
                     rwPos++;
                 }
             }
 
-            // safety clamp: rwPos must never exceed rewritten.length()
             int rwEnd = Math.min(rwPos, rewritten.length());
             runs.get(r).setText(rewritten.substring(rwStart, rwEnd), 0);
         }

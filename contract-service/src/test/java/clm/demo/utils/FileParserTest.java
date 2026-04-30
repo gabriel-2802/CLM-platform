@@ -1,5 +1,6 @@
 package clm.demo.utils;
 
+import clm.demo.exceptions.InvalidFileException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.file.FileParser;
 import clm.demo.utils.file.FileParser.ParsedDocument;
@@ -31,7 +32,7 @@ class FileParserTest {
         @Test
         void null_file_throws_illegal_argument() {
             assertThatThrownBy(() -> FileParser.parseTemplate(null, DocumentFormat.DOCX))
-                    .isInstanceOf(IllegalArgumentException.class);
+                    .isInstanceOf(InvalidFileException.class);
         }
 
         @Test
@@ -40,7 +41,7 @@ class FileParserTest {
                     "file", "template.docx", "application/octet-stream", new byte[0]);
 
             assertThatThrownBy(() -> FileParser.parseTemplate(empty, DocumentFormat.DOCX))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidFileException.class)
                     .hasMessageContaining("null or empty");
         }
 
@@ -50,7 +51,7 @@ class FileParserTest {
                     "file", null, "application/octet-stream", new byte[]{1, 2, 3});
 
             assertThatThrownBy(() -> FileParser.parseTemplate(file, DocumentFormat.DOCX))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidFileException.class)
                     .hasMessageContaining("valid filename");
         }
 
@@ -60,7 +61,7 @@ class FileParserTest {
                     "file", "   ", "application/octet-stream", new byte[]{1, 2, 3});
 
             assertThatThrownBy(() -> FileParser.parseTemplate(file, DocumentFormat.DOCX))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidFileException.class)
                     .hasMessageContaining("valid filename");
         }
 
@@ -74,7 +75,7 @@ class FileParserTest {
             };
 
             assertThatThrownBy(() -> FileParser.parseTemplate(oversized, DocumentFormat.DOCX))
-                    .isInstanceOf(IllegalArgumentException.class)
+                    .isInstanceOf(InvalidFileException.class)
                     .hasMessageContaining("50 MB");
         }
     }

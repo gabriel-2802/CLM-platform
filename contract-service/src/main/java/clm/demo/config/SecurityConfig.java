@@ -25,10 +25,28 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+    private static final String CORS_PATTERN               = "/**";
+    private static final String HEADER_AUTHORIZATION       = "Authorization";
+    private static final String HEADER_CONTENT_DISPOSITION = "Content-Disposition";
+    private static final String WILDCARD                   = "*";
+    private static final long   CORS_MAX_AGE               = 3600L;
+
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html",
+            "/swagger-resources/**",
+            "/webjars/**"
+    };
+
+    private static final List<String> ALLOWED_METHODS =
+            List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+
     private final JwtAuthenticationFilter     jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
 
     @Bean
+    @SuppressWarnings("java:S112") // throws Exception is mandated by Spring's HttpSecurity API
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .exceptionHandling(ex -> ex
@@ -45,14 +63,7 @@ public class SecurityConfig {
                         .configurationSource(corsConfigurationSource()))
 
                 .authorizeHttpRequests(authz -> authz
-                        // Swagger / OpenAPI — must be accessible without a token
-                        .requestMatchers(
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
-                                "/swagger-resources/**",
-                                "/webjars/**"
-                        ).permitAll()
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated())
 
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
@@ -64,16 +75,15 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition"));
+        configuration.setAllowedOrigins(List.of(WILDCARD));
+        configuration.setAllowedMethods(ALLOWED_METHODS);
+        configuration.setAllowedHeaders(List.of(WILDCARD));
+        configuration.setExposedHeaders(List.of(HEADER_AUTHORIZATION, HEADER_CONTENT_DISPOSITION));
         configuration.setAllowCredentials(false);
-        configuration.setMaxAge(3600L);
+        configuration.setMaxAge(CORS_MAX_AGE);
 
         var source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration(CORS_PATTERN, configuration);
         return source;
     }
-
 }

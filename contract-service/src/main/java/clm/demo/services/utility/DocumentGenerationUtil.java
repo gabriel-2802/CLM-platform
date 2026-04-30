@@ -1,4 +1,4 @@
-package clm.demo.services;
+package clm.demo.services.utility;
 
 import clm.demo.exceptions.MissingMandatoryFieldException;
 import clm.demo.models.Document;
@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Utility component for shared document generation logic used by multiple services.
@@ -31,7 +32,7 @@ public class DocumentGenerationUtil {
     public void validateMandatoryFields(DocumentTemplate template, Map<String, String> mappings) {
         List<String> missing = template.getTemplateFields().stream()
                 .filter(TemplateField::getIsRequired)
-                .filter(f -> f.getFieldLabel() != null)
+                .filter(f -> Objects.nonNull(f.getFieldLabel()))
                 .filter(f -> !mappings.containsKey(f.getFieldLabel()) || mappings.get(f.getFieldLabel()).isBlank())
                 .map(TemplateField::getFieldLabel)
                 .toList();
@@ -52,12 +53,16 @@ public class DocumentGenerationUtil {
      * @return a list of DocumentFieldValue objects
      */
     public List<DocumentFieldValue> buildFieldValues(Document document, DocumentTemplate template,
-                                                       Map<String, String> mappings) {
+                                                     Map<String, String> mappings) {
         List<DocumentFieldValue> fieldValues = new ArrayList<>();
         for (TemplateField field : template.getTemplateFields()) {
-            if (field.getFieldLabel() == null) continue;
+            if (Objects.isNull(field.getFieldLabel())) {
+                continue;
+            }
             String value = mappings.get(field.getFieldLabel());
-            if (value == null || value.isBlank()) continue;
+            if (Objects.isNull(value) || value.isBlank()) {
+                continue;
+            }
             fieldValues.add(DocumentFieldValue.builder()
                     .document(document)
                     .templateField(field)
@@ -78,11 +83,12 @@ public class DocumentGenerationUtil {
         Map<String, String> map = new HashMap<>(fieldValues.size() * 2);
         for (DocumentFieldValue dfv : fieldValues) {
             TemplateField field = dfv.getTemplateField();
-            if (field != null && field.getFieldLabel() != null && dfv.getFieldValue() != null) {
+            if (Objects.nonNull(field)
+                    && Objects.nonNull(field.getFieldLabel())
+                    && Objects.nonNull(dfv.getFieldValue())) {
                 map.put(field.getFieldLabel(), dfv.getFieldValue());
             }
         }
         return map;
     }
 }
-

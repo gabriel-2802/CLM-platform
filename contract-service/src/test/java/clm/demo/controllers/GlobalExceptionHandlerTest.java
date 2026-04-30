@@ -153,12 +153,12 @@ class GlobalExceptionHandlerTest {
 
         @GetMapping("/invalid-data-access-unique")
         void throwInvalidDataAccessUnique() {
-            throw new InvalidDataAccessResourceUsageException("UNIQUE constraint violation");
+            throw new InvalidDataAccessResourceUsageException("duplicate key value violates unique constraint");
         }
 
         @GetMapping("/invalid-data-access-check")
         void throwInvalidDataAccessCheck() {
-            throw new InvalidDataAccessResourceUsageException("CHECK constraint failed");
+            throw new InvalidDataAccessResourceUsageException("violates check constraint");
         }
 
         @GetMapping("/invalid-data-access-unknown")
@@ -197,7 +197,7 @@ class GlobalExceptionHandlerTest {
             mockMvc.perform(get("/probe/resource-not-found"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").value(404))
-                    .andExpect(jsonPath("$.message").value("Resource not found"));
+                    .andExpect(jsonPath("$.title").value("Resource Not Found"));
         }
     }
 
@@ -213,7 +213,7 @@ class GlobalExceptionHandlerTest {
             mockMvc.perform(get("/probe/illegal-argument"))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.status").value(400))
-                    .andExpect(jsonPath("$.details").value("bad input provided"));
+                    .andExpect(jsonPath("$.detail").value("bad input provided"));
         }
     }
 
@@ -227,7 +227,7 @@ class GlobalExceptionHandlerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"));
+                    .andExpect(jsonPath("$.title").value("Validation Failed"));
         }
     }
 
@@ -249,7 +249,7 @@ class GlobalExceptionHandlerTest {
         void maps_to_400() throws Exception {
             mockMvc.perform(get("/probe/constraint-violation"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message").value("Validation failed"));
+                    .andExpect(jsonPath("$.title").value("Validation Failed"));
         }
     }
 
@@ -260,7 +260,8 @@ class GlobalExceptionHandlerTest {
         void maps_to_400_with_field_names_in_details() throws Exception {
             mockMvc.perform(get("/probe/missing-mandatory-field"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value(containsString("Client Name")));
+                    .andExpect(jsonPath("$.missingFields[0]").value("Client Name"))
+                    .andExpect(jsonPath("$.missingFields[1]").value("Date"));
         }
     }
 
@@ -291,14 +292,14 @@ class GlobalExceptionHandlerTest {
         void maps_to_400_with_details_when_present() throws Exception {
             mockMvc.perform(get("/probe/database-validation"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value("contractValue must be positive"));
+                    .andExpect(jsonPath("$.detail").value("contractValue must be positive"));
         }
 
         @Test
         void maps_to_400_using_message_when_details_absent() throws Exception {
             mockMvc.perform(get("/probe/database-validation-no-details"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value("constraint failed"));
+                    .andExpect(jsonPath("$.detail").value("constraint failed"));
         }
     }
 
@@ -309,7 +310,7 @@ class GlobalExceptionHandlerTest {
         void unique_constraint_resolves_to_friendly_message() throws Exception {
             mockMvc.perform(get("/probe/invalid-data-access-unique"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value(
+                    .andExpect(jsonPath("$.detail").value(
                             "A record with this value already exists."));
         }
 
@@ -317,16 +318,16 @@ class GlobalExceptionHandlerTest {
         void check_constraint_resolves_to_friendly_message() throws Exception {
             mockMvc.perform(get("/probe/invalid-data-access-check"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value(
-                            "Data violates validation constraints."));
+                    .andExpect(jsonPath("$.detail").value(
+                            "Data violates a validation rule."));
         }
 
         @Test
         void unknown_pattern_returns_generic_message() throws Exception {
             mockMvc.perform(get("/probe/invalid-data-access-unknown"))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.details").value(
-                            "A data validation error occurred. Please check your input data."));
+                    .andExpect(jsonPath("$.detail").value(
+                            "A data validation error occurred. Please check your input."));
         }
     }
 
@@ -362,7 +363,7 @@ class GlobalExceptionHandlerTest {
         void maps_to_409_with_message() throws Exception {
             mockMvc.perform(get("/probe/duplicate-template"))
                     .andExpect(status().isConflict())
-                    .andExpect(jsonPath("$.message").value("Template name already exists"));
+                    .andExpect(jsonPath("$.title").value("Template Name Already Exists"));
         }
     }
 
@@ -458,7 +459,7 @@ class GlobalExceptionHandlerTest {
         void maps_to_500_with_generic_message() throws Exception {
             mockMvc.perform(get("/probe/data-access"))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.details").value(
+                    .andExpect(jsonPath("$.detail").value(
                             "A database error occurred. Please contact support."));
         }
     }
@@ -470,7 +471,7 @@ class GlobalExceptionHandlerTest {
         void maps_to_500_and_hides_internal_details() throws Exception {
             mockMvc.perform(get("/probe/unexpected"))
                     .andExpect(status().isInternalServerError())
-                    .andExpect(jsonPath("$.details").value(
+                    .andExpect(jsonPath("$.detail").value(
                             "An unexpected error occurred. Please contact support."));
         }
     }
@@ -487,8 +488,8 @@ class GlobalExceptionHandlerTest {
             mockMvc.perform(get("/probe/resource-not-found"))
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.status").isNumber())
-                    .andExpect(jsonPath("$.message").isString())
-                    .andExpect(jsonPath("$.details").isString())
+                    .andExpect(jsonPath("$.title").isString())
+                    .andExpect(jsonPath("$.detail").isString())
                     .andExpect(jsonPath("$.timestamp").isString());
         }
     }

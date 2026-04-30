@@ -7,6 +7,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
 
+import java.util.Objects;
+
 @Mapper(componentModel = "spring")
 public interface ContractGenerationMapper {
 
@@ -16,10 +18,9 @@ public interface ContractGenerationMapper {
     @Mapping(source = "request.userMail",      target = "generatedByMail")
     @Mapping(source = "request.startDate",     target = "contractStartDate")
     @Mapping(source = "request.endDate",       target = "contractEndDate")
-    @Mapping(source = "request.value",           target = "contractValue")
+    @Mapping(source = "request.value",         target = "contractValue")
     @Mapping(source = "request.contractBalance", target = "contractBalance")
     @Mapping(source = "template",              target = "documentTemplate")
-    @Mapping(source = "request.notes",         target = "notes")
     @Mapping(target = "contractStatus",        ignore = true)
     @Mapping(target = "documentContent",       ignore = true)
     @Mapping(target = "documentFormat",        ignore = true)
@@ -33,6 +34,6 @@ public interface ContractGenerationMapper {
     /** Narrows Long userId to Integer generatedBy (contract IDs fit well within Integer range). */
     @Named("toInteger")
     default Integer toInteger(Long value) {
-        return value != null ? value.intValue() : null;
+        return Objects.nonNull(value) ? value.intValue() : null;
     }
 }

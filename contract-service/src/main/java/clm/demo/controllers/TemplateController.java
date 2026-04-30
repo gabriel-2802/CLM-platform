@@ -42,10 +42,6 @@ public class TemplateController {
     private final TemplateService templateService;
     private final DocumentDownloadService downloadService;
 
-    // ------------------------------------------------------------------ //
-    //  Upload                                                              //
-    // ------------------------------------------------------------------ //
-
     @Operation(
         summary     = "Upload a template",
         description = """
@@ -69,9 +65,6 @@ public class TemplateController {
         return ResponseEntity.status(HttpStatus.CREATED).body(templateService.uploadTemplate(request));
     }
 
-    // ------------------------------------------------------------------ //
-    //  Read                                                                //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "List all templates",
@@ -106,10 +99,6 @@ public class TemplateController {
         return ResponseEntity.ok(templateService.getTemplate(templateId));
     }
 
-    // ------------------------------------------------------------------ //
-    //  Update                                                              //
-    // ------------------------------------------------------------------ //
-
     @Operation(
         summary     = "Map field labels on a template",
         description = """
@@ -132,9 +121,6 @@ public class TemplateController {
         return ResponseEntity.ok(templateService.updateFieldLabels(request));
     }
 
-    // ------------------------------------------------------------------ //
-    //  Delete                                                              //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Delete a template",
@@ -155,9 +141,6 @@ public class TemplateController {
         return ResponseEntity.noContent().build();
     }
 
-    // ------------------------------------------------------------------ //
-    //  Download                                                            //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Download a template file",

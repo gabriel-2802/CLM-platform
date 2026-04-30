@@ -1,5 +1,6 @@
 package clm.demo.utils.docx;
 
+import clm.demo.utils.Constants;
 import clm.demo.utils.file.PlaceholderProcessor;
 import clm.demo.utils.file.PlaceholderProcessor.SubstitutionResultWithSpans;
 import lombok.experimental.UtilityClass;
@@ -12,6 +13,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Normalizes all dot-sequence placeholders in a DOCX document to exactly four dots ({@code ....}).
@@ -39,13 +41,13 @@ public class DocxNormalizer {
      * @return DOCX bytes with every placeholder replaced by exactly {@code ....}
      * @throws IOException if the document cannot be parsed or written
      */
-    public static byte[] normalizePlaceholdersInDocx(byte[] docxBytes) throws IOException {
+    public byte[] normalizePlaceholdersInDocx(byte[] docxBytes) throws IOException {
         try (XWPFDocument doc = new XWPFDocument(new ByteArrayInputStream(docxBytes))) {
             DocxUtils.forEachParagraph(doc, DocxNormalizer::normalizeParagraph);
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             doc.write(out);
-            log.debug("placeholder normalization complete ({} bytes)", out.size());
+            log.debug("Placeholder normalization complete ({} bytes)", out.size());
             return out.toByteArray();
         }
     }
@@ -65,28 +67,32 @@ public class DocxNormalizer {
      *
      * @param paragraph the DOCX paragraph to normalize
      */
-    private static void normalizeParagraph(XWPFParagraph paragraph) {
+    private void normalizeParagraph(XWPFParagraph paragraph) {
         List<XWPFRun> runs = paragraph.getRuns();
-        if (runs.isEmpty()) return;
+        if (runs.isEmpty()) {
+            return;
+        }
 
-        // Merge all runs after normalizing unicode glyphs, so the regex can
-        // match dot sequences that span multiple XML runs.
-        int[]         runStarts = new int[runs.size() + 1];
+        int[] runStarts = new int[runs.size() + 1];
         StringBuilder merged    = new StringBuilder();
 
         for (int i = 0; i < runs.size(); i++) {
             runStarts[i] = merged.length();
             String text = runs.get(i).getText(0);
-            merged.append(PlaceholderProcessor.normalize(text != null ? text : ""));
+            merged.append(PlaceholderProcessor.normalize(Objects.isNull(text) ? "" : text));
         }
         runStarts[runs.size()] = merged.length();
 
-        if (merged.isEmpty()) return;
+        if (merged.isEmpty()) {
+            return;
+        }
 
         SubstitutionResultWithSpans result =
-                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> "....");
+                PlaceholderProcessor.substituteEachWithSpans(merged.toString(), i -> Constants.PLACEHOLDER);
 
-        if (!result.anyFilled()) return;
+        if (!result.anyFilled()) {
+            return;
+        }
 
         DocxUtils.writebackSpans(runs, runStarts, result.text(), result.spans());
     }

@@ -1,16 +1,20 @@
 package clm.demo.utils.file;
 
+import clm.demo.exceptions.InvalidFileException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.docx.DocxUtils;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
 
 /**
  * Parses uploaded contract templates (DOCX or PDF) and extracts placeholder count.
@@ -23,15 +27,17 @@ public class FileParser {
     private static final long MAX_FILE_SIZE = 50L * 1024 * 1024; // 50 MB
 
     /**
-     * Parses the uploaded document and returns the full normalized text and placeholder count.
+     * Parses the uploaded document and returns the full normalized text
+     * and placeholder count.
      *
      * @param file   uploaded DOCX or PDF template
      * @param format document format, selects the parser
      * @return {@link ParsedDocument} with normalized text and placeholder count
-     * @throws IOException              if the document cannot be read or parsed
-     * @throws IllegalArgumentException if the file is invalid or too large
+     * @throws IOException          if the document cannot be read or parsed
+     * @throws InvalidFileException if the file is null, empty, too large,
+     *                              or has an invalid filename
      */
-    public static ParsedDocument parseTemplate(MultipartFile file, DocumentFormat format)
+    public ParsedDocument parseTemplate(MultipartFile file, DocumentFormat format)
             throws IOException {
         validateFile(file);
 
@@ -41,22 +47,33 @@ public class FileParser {
 
         return new ParsedDocument(normalized, placeholderCount);
     }
-    
-    private static String extractText(MultipartFile file, DocumentFormat format) throws IOException {
+
+    // -------------------------------------------------------------------------
+    // Private extraction helpers
+    // -------------------------------------------------------------------------
+
+    private String extractText(MultipartFile file, DocumentFormat format) throws IOException {
         return switch (format) {
             case PDF  -> extractPdf(file);
             case DOCX -> extractDocx(file);
+            default   -> throw new InvalidFileException(
+                    "Unsupported document format: " + format);
         };
     }
 
-    private static String extractPdf(MultipartFile file) throws IOException {
-        try (PDDocument document = Loader.loadPDF(file.getBytes())) {
+    private String extractPdf(MultipartFile file) throws IOException {
+        try (
+                InputStream inputStream = file.getInputStream();
+                PDDocument document = Loader.loadPDF(new RandomAccessReadBuffer(inputStream))
+        ) {
             String text = new PDFTextStripper().getText(document);
-            log.info("parsed PDF '{}': {} chars", file.getOriginalFilename(), text.length());
+            log.debug("Parsed PDF '{}': {} chars", file.getOriginalFilename(), text.length());
             return text;
+        } catch (InvalidFileException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("failed to parse PDF '{}'", file.getOriginalFilename(), e);
-            throw new IOException("Failed to parse PDF: " + e.getMessage(), e);
+            log.error("Failed to parse PDF '{}'", file.getOriginalFilename(), e);
+            throw new IOException("Failed to parse PDF document.", e);
         }
     }
 
@@ -68,35 +85,45 @@ public class FileParser {
      * remain accurate — skipping them would shift every subsequent
      * {@code startOffset}/{@code endOffset}.</p>
      */
-    private static String extractDocx(MultipartFile file) throws IOException {
+    private String extractDocx(MultipartFile file) throws IOException {
         try (XWPFDocument document = new XWPFDocument(file.getInputStream())) {
             StringBuilder sb = new StringBuilder();
-            // Preserve blank lines as empty entries to keep placeholder offsets accurate.
             DocxUtils.forEachParagraph(document, p -> sb.append(p.getText()).append("\n"));
 
             String content = sb.toString();
-            log.info("parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
+            log.debug("Parsed DOCX '{}': {} chars", file.getOriginalFilename(), content.length());
             return content;
         } catch (Exception e) {
-            log.error("failed to parse DOCX '{}'", file.getOriginalFilename(), e);
-            throw new IOException("Failed to parse DOCX: " + e.getMessage(), e);
+            log.error("Failed to parse DOCX '{}'", file.getOriginalFilename(), e);
+            throw new IOException("Failed to parse DOCX document.", e);
         }
     }
-    
-    private static void validateFile(MultipartFile file) {
-        if (file == null || file.isEmpty())
-            throw new IllegalArgumentException("File cannot be null or empty");
-        if (file.getSize() > MAX_FILE_SIZE)
-            throw new IllegalArgumentException("File exceeds 50 MB limit: " + file.getOriginalFilename());
+
+    private void validateFile(MultipartFile file) {
+        if (Objects.isNull(file) || file.isEmpty()) {
+            throw new InvalidFileException("File must not be null or empty.");
+        }
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new InvalidFileException(
+                    "File exceeds the 50 MB size limit: " + file.getOriginalFilename());
+        }
 
         String name = file.getOriginalFilename();
-        if (name == null || name.isBlank())
-            throw new IllegalArgumentException("File must have a valid filename");
+        if (Objects.isNull(name) || name.isBlank()) {
+            throw new InvalidFileException("File must have a valid filename.");
+        }
 
-        log.debug("file validated: {} ({} bytes)", name, file.getSize());
+        log.debug("File validated: '{}' ({} bytes)", name, file.getSize());
     }
 
-    public record  ParsedDocument(
+    /**
+     * Immutable result of a parsed document template.
+     *
+     * @param documentText     full normalized text extracted from the document
+     * @param placeholderCount number of placeholder sequences (4+ consecutive dots) found
+     */
+    public record ParsedDocument(
             String documentText,
-            int placeholderCount) {}
+            int placeholderCount) {
+    }
 }

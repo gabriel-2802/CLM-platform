@@ -1,6 +1,5 @@
 package clm.demo.services;
 
-import clm.demo.dto.requests.GenAppendixRequest;
 import clm.demo.dto.responses.AppendixResponseDTO;
 import clm.demo.exceptions.InvalidAppendixStateException;
 import clm.demo.exceptions.ResourceNotFoundException;
@@ -16,6 +15,7 @@ import clm.demo.repositories.AppendixRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentFieldValueRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
+import clm.demo.services.utility.DocumentGenerationUtil;
 import clm.demo.support.TestDataFactory;
 import clm.demo.utils.docx.DocxFiller;
 import clm.demo.utils.file.FileUtils;
@@ -45,7 +45,8 @@ class AppendixServiceTest {
     @Mock DocumentFieldValueRepository fieldValueRepository;
     @Mock AppendixMapper              appendixMapper;
     @Mock FileUtils                   fileUtils;
-    @Mock DocumentGenerationUtil      documentGenerationUtil;
+    @Mock
+    DocumentGenerationUtil documentGenerationUtil;
 
     @InjectMocks AppendixService service;
 

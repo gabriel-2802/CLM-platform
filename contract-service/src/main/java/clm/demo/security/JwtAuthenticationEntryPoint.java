@@ -25,6 +25,13 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
     private static final ObjectMapper MAPPER =
             new ObjectMapper().registerModule(new JavaTimeModule());
 
+    private static final String KEY_TIMESTAMP = "timestamp";
+    private static final String KEY_STATUS    = "status";
+    private static final String KEY_ERROR     = "error";
+    private static final String KEY_MESSAGE   = "message";
+    private static final String KEY_PATH      = "path";
+    private static final String ERROR_LABEL   = "Unauthorized";
+
     @Override
     public void commence(HttpServletRequest request,
                          HttpServletResponse response,
@@ -34,13 +41,13 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        
+
         var body = Map.of(
-                "timestamp", Instant.now().toString(),
-                "status",    HttpServletResponse.SC_UNAUTHORIZED,
-                "error",     "Unauthorized",
-                "message",   authException.getMessage(),
-                "path",      request.getRequestURI()
+                KEY_TIMESTAMP, Instant.now().toString(),
+                KEY_STATUS,    HttpServletResponse.SC_UNAUTHORIZED,
+                KEY_ERROR,     ERROR_LABEL,
+                KEY_MESSAGE,   authException.getMessage(),
+                KEY_PATH,      request.getRequestURI()
         );
 
         MAPPER.writeValue(response.getOutputStream(), body);

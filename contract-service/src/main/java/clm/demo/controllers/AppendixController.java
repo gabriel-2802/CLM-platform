@@ -38,10 +38,6 @@ public class AppendixController {
     private final AppendixService appendixService;
     private final DocumentDownloadService downloadService;
 
-    // ------------------------------------------------------------------ //
-    //  Generate                                                            //
-    // ------------------------------------------------------------------ //
-
     @Operation(
         summary     = "Generate an appendix from a template",
         description = """
@@ -67,9 +63,6 @@ public class AppendixController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // ------------------------------------------------------------------ //
-    //  Direct upload                                                       //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Upload a non-fillable appendix directly",
@@ -103,9 +96,6 @@ public class AppendixController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // ------------------------------------------------------------------ //
-    //  Sign                                                                //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Upload signed document for a DRAFT appendix",
@@ -139,9 +129,6 @@ public class AppendixController {
         }
     }
 
-    // ------------------------------------------------------------------ //
-    //  Read                                                                //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "List all appendices for a contract",
@@ -163,9 +150,6 @@ public class AppendixController {
                 : ResponseEntity.ok(result);
     }
 
-    // ------------------------------------------------------------------ //
-    //  Delete                                                              //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Delete an appendix",
@@ -180,10 +164,6 @@ public class AppendixController {
         appendixService.deleteAppendix(appendixId);
         return ResponseEntity.noContent().build();
     }
-
-    // ------------------------------------------------------------------ //
-    //  Download                                                            //
-    // ------------------------------------------------------------------ //
 
     @Operation(
         summary     = "Download an appendix file",
