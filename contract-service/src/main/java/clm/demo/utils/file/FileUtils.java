@@ -1,7 +1,7 @@
 package clm.demo.utils.file;
 
-import clm.demo.exceptions.FileConversionException;
-import clm.demo.exceptions.UnsupportedConversionException;
+import clm.demo.exceptions.exceptions.FileConversionException;
+import clm.demo.exceptions.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;

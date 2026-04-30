@@ -1,6 +1,6 @@
 package clm.demo.services.download;
 
-import clm.demo.exceptions.FileConversionException;
+import clm.demo.exceptions.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.download.document.providers.DocumentProvider;

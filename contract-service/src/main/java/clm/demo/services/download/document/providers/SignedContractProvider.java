@@ -1,7 +1,7 @@
 package clm.demo.services.download.document.providers;
 
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.SignedDocumentNotAvailableException;
+import clm.demo.exceptions.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.exceptions.SignedDocumentNotAvailableException;
 import clm.demo.models.Contract;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;

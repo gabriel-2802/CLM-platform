@@ -1,6 +1,7 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.responses.ContractResponseDTO;
+import clm.demo.exceptions.GlobalExceptionHandler;
 import clm.demo.services.ReportService;
 import clm.demo.support.TestDataFactory;
 import org.junit.jupiter.api.BeforeEach;

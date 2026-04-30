@@ -3,7 +3,7 @@ package clm.demo.controllers;
 import clm.demo.dto.requests.GenAppendixRequest;
 import clm.demo.dto.requests.UploadDirectAppendixRequest;
 import clm.demo.dto.responses.AppendixResponseDTO;
-import clm.demo.exceptions.FileConversionException;
+import clm.demo.exceptions.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.AppendixService;

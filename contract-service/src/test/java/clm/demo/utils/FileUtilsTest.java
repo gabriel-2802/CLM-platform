@@ -1,7 +1,5 @@
 package clm.demo.utils;
 
-import clm.demo.exceptions.FileConversionException;
-import clm.demo.exceptions.UnsupportedConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.file.FileUtils;
 import org.junit.jupiter.api.Nested;

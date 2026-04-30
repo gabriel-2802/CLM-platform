@@ -1,6 +1,6 @@
 package clm.demo.utils;
 
-import clm.demo.exceptions.UnsupportedFileException;
+import clm.demo.exceptions.exceptions.UnsupportedFileException;
 import clm.demo.models.enums.DataType;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.support.TestDataFactory;

@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 import lombok.Getter;
 import java.util.List;

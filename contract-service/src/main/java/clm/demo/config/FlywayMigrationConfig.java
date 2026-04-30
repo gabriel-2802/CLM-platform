@@ -1,6 +1,6 @@
 package clm.demo.config;
 
-import clm.demo.exceptions.DatabaseValidationException;
+import clm.demo.exceptions.exceptions.DatabaseValidationException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;

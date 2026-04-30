@@ -1,10 +1,11 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.responses.ContractResponseDTO;
-import clm.demo.exceptions.InvalidContractStateException;
-import clm.demo.exceptions.MissingMandatoryFieldException;
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.TemplateIncompleteException;
+import clm.demo.exceptions.*;
+import clm.demo.exceptions.exceptions.InvalidContractStateException;
+import clm.demo.exceptions.exceptions.MissingMandatoryFieldException;
+import clm.demo.exceptions.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.exceptions.TemplateIncompleteException;
 import clm.demo.services.ContractService;
 import clm.demo.services.download.DocumentDownloadService;
 import clm.demo.support.TestDataFactory;

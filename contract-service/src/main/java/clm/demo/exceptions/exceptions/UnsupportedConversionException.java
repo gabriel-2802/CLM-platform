@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 /**
  * Thrown when a requested format conversion is not supported.

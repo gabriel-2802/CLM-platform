@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 public class InvalidFileException extends RuntimeException {
     public InvalidFileException(String message) {

@@ -1,9 +1,9 @@
 package clm.demo.services;
 
 import clm.demo.dto.responses.AppendixResponseDTO;
-import clm.demo.exceptions.InvalidAppendixStateException;
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.TemplateIncompleteException;
+import clm.demo.exceptions.exceptions.InvalidAppendixStateException;
+import clm.demo.exceptions.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.exceptions.TemplateIncompleteException;
 import clm.demo.mappers.AppendixMapper;
 import clm.demo.models.Appendix;
 import clm.demo.models.Contract;

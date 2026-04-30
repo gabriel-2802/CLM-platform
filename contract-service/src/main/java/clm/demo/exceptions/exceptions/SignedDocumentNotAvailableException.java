@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 /**
  * Thrown when a signed document is not available (e.g., contract not yet signed).

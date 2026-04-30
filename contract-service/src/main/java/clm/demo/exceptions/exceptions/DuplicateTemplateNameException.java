@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 /**
  * Exception thrown when attempting to create a template with a name that already exists.

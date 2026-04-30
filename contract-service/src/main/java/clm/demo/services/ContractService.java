@@ -4,7 +4,7 @@ import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
-import clm.demo.exceptions.*;
+import clm.demo.exceptions.exceptions.*;
 import clm.demo.mappers.ContractGenerationMapper;
 import clm.demo.mappers.GeneratedContractMapper;
 import clm.demo.models.Contract;

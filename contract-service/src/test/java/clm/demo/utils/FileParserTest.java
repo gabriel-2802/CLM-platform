@@ -1,6 +1,6 @@
 package clm.demo.utils;
 
-import clm.demo.exceptions.InvalidFileException;
+import clm.demo.exceptions.exceptions.InvalidFileException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.file.FileParser;
 import clm.demo.utils.file.FileParser.ParsedDocument;

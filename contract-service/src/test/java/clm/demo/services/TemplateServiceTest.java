@@ -1,23 +1,18 @@
 package clm.demo.services;
 
 import clm.demo.dto.requests.FieldMappingRequest;
-import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
-import clm.demo.dto.responses.TemplateUploadResponseDTO;
-import clm.demo.exceptions.DuplicateTemplateNameException;
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.TemplateFieldOwnershipException;
+import clm.demo.exceptions.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.exceptions.TemplateFieldOwnershipException;
 import clm.demo.mappers.DocumentTemplateMapper;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.DataType;
-import clm.demo.models.enums.DocumentFormat;
 import clm.demo.repositories.DocumentTemplateRepository;
 import clm.demo.repositories.TemplateFieldRepository;
 import clm.demo.support.TestDataFactory;
 import clm.demo.utils.file.FileUtils;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,9 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
-import org.springframework.mock.web.MockMultipartFile;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

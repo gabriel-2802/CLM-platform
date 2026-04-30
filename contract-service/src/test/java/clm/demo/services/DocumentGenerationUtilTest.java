@@ -1,6 +1,6 @@
 package clm.demo.services;
 
-import clm.demo.exceptions.MissingMandatoryFieldException;
+import clm.demo.exceptions.exceptions.MissingMandatoryFieldException;
 import clm.demo.models.Contract;
 import clm.demo.models.DocumentFieldValue;
 import clm.demo.models.DocumentTemplate;

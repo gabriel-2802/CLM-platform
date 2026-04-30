@@ -1,6 +1,6 @@
-package clm.demo.controllers;
+package clm.demo.exceptions;
 
-import clm.demo.exceptions.*;
+import clm.demo.exceptions.exceptions.*;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;

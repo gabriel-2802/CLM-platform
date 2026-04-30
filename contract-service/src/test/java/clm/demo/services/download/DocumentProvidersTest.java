@@ -1,7 +1,7 @@
 package clm.demo.services.download;
 
-import clm.demo.exceptions.ResourceNotFoundException;
-import clm.demo.exceptions.SignedDocumentNotAvailableException;
+import clm.demo.exceptions.exceptions.ResourceNotFoundException;
+import clm.demo.exceptions.exceptions.SignedDocumentNotAvailableException;
 import clm.demo.models.Appendix;
 import clm.demo.models.Contract;
 import clm.demo.models.DocumentTemplate;

@@ -3,7 +3,7 @@ package clm.demo.services;
 import clm.demo.dto.requests.GenAppendixRequest;
 import clm.demo.dto.requests.UploadDirectAppendixRequest;
 import clm.demo.dto.responses.AppendixResponseDTO;
-import clm.demo.exceptions.*;
+import clm.demo.exceptions.exceptions.*;
 import clm.demo.mappers.AppendixMapper;
 import clm.demo.models.Appendix;
 import clm.demo.models.Contract;

@@ -1,4 +1,4 @@
-package clm.demo.exceptions;
+package clm.demo.exceptions.exceptions;
 
 /**
  * Exception thrown when database validation constraints are violated.

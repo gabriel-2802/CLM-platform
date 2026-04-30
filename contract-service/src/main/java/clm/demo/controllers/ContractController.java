@@ -4,7 +4,7 @@ import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
-import clm.demo.exceptions.FileConversionException;
+import clm.demo.exceptions.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
 import clm.demo.services.ContractService;

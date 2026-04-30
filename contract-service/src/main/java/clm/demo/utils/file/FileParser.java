@@ -1,6 +1,6 @@
 package clm.demo.utils.file;
 
-import clm.demo.exceptions.InvalidFileException;
+import clm.demo.exceptions.exceptions.InvalidFileException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.utils.docx.DocxUtils;
 import lombok.experimental.UtilityClass;
