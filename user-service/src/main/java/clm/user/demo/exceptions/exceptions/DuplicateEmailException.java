@@ -1,4 +1,4 @@
-package clm.user.demo.exceptions;
+package clm.user.demo.exceptions.exceptions;
 
 public class DuplicateEmailException extends RuntimeException {
     @java.io.Serial

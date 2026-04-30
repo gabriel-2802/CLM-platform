@@ -2,6 +2,7 @@ package clm.user.demo.security;
 
 import clm.user.demo.models.User;
 import clm.user.demo.repositories.UserRepository;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,13 +17,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
+    private static final String USER_NOT_FOUND = "User not found: ";
+
     private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(@NotNull String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+                .orElseThrow(() -> new UsernameNotFoundException(USER_NOT_FOUND + email));
         return toUserDetails(user);
     }
 

@@ -10,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
@@ -23,23 +22,30 @@ import java.util.Optional;
 @Component
 public class JwtTokenProvider {
 
-    private final String jwtSecret;
-    private final long jwtExpirationMs;
-    private SecretKey signingKey;
+    private static final int    MIN_SECRET_LENGTH      = 32;
+    private static final String CLAIMS_KEY_ROLES       = "roles";
+    private static final String PROP_JWT_SECRET        = "${jwt.secret}";
+    private static final String PROP_JWT_EXPIRATION    = "${jwt.expiration}";
+    private static final String ERR_SECRET_NULL        = "jwt.secret must not be null";
+    private static final String ERR_SECRET_TOO_SHORT   = "jwt.secret must be at least 32 characters for HMAC-SHA256.";
+    private static final String LOG_JWT_PARSE_FAILED   = "JWT parsing failed: {}";
+
+    private final String     jwtSecret;
+    private final long       jwtExpirationMs;
+    private       SecretKey  signingKey;
 
     public JwtTokenProvider(
-            @Value("${jwt.secret}") String jwtSecret,
-            @Value("${jwt.expiration}") long jwtExpirationMs) {
-        this.jwtSecret = Objects.requireNonNull(jwtSecret, "jwt.secret must not be null");
+            @Value(PROP_JWT_SECRET)     String jwtSecret,
+            @Value(PROP_JWT_EXPIRATION) long   jwtExpirationMs) {
+        this.jwtSecret       = Objects.requireNonNull(jwtSecret, ERR_SECRET_NULL);
         this.jwtExpirationMs = jwtExpirationMs;
     }
 
     @PostConstruct
     void init() {
         byte[] keyBytes = jwtSecret.getBytes(StandardCharsets.UTF_8);
-        if (keyBytes.length < 32) {
-            throw new IllegalStateException(
-                    "jwt.secret must be at least 32 characters for HMAC-SHA256.");
+        if (keyBytes.length < MIN_SECRET_LENGTH) {
+            throw new IllegalStateException(ERR_SECRET_TOO_SHORT);
         }
         this.signingKey = Keys.hmacShaKeyFor(keyBytes);
     }
@@ -54,7 +60,7 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(userDetails.getUsername())
-                .claim("roles", roles)
+                .claim(CLAIMS_KEY_ROLES, roles)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(signingKey)
@@ -74,7 +80,7 @@ public class JwtTokenProvider {
     }
 
     private Optional<Claims> parseClaims(String token) {
-        if (!StringUtils.hasText(token)) {
+        if (Objects.isNull(token) || token.isBlank()) {
             return Optional.empty();
         }
         try {
@@ -85,7 +91,7 @@ public class JwtTokenProvider {
                     .getPayload();
             return Optional.of(payload);
         } catch (JwtException | IllegalArgumentException e) {
-            log.debug("JWT parsing failed: {}", e.getMessage());
+            log.debug(LOG_JWT_PARSE_FAILED, e.getMessage());
             return Optional.empty();
         }
     }

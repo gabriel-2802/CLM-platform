@@ -5,7 +5,11 @@ import lombok.NoArgsConstructor;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RoleName {
-    public static final String USER    = "ROLE_USER";
-    public static final String ADMIN   = "ROLE_ADMIN";
-    public static final String MANAGER = "ROLE_MANAGER";
+    public static final String USER         = "ROLE_USER";
+    public static final String ADMIN        = "ROLE_ADMIN";
+    public static final String MANAGER      = "ROLE_MANAGER";
+
+    public static final String USER_SHORT    = "USER";
+    public static final String ADMIN_SHORT   = "ADMIN";
+    public static final String MANAGER_SHORT = "MANAGER";
 }

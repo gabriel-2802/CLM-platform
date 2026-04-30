@@ -30,22 +30,39 @@ import java.util.List;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private static final String PROP_ALLOWED_ORIGINS      = "${app.cors.allowed-origins:http://localhost:3000}";
+
+    private static final String CORS_PATTERN              = "/**";
+    private static final String ORIGINS_DELIMITER         = ",";
+    private static final String HEADER_WILDCARD           = "*";
+
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/api/auth/**",
+            "/v3/api-docs/**",
+            "/swagger-ui/**",
+            "/swagger-ui.html"
+    };
+
+    private static final List<String> ALLOWED_METHODS =
+            List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS");
+
+    private final JwtAuthenticationFilter     jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
-    private final UserDetailsService userDetailsService;
-    private final String allowedOrigins;
+    private final UserDetailsService          userDetailsService;
+    private final String                      allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
                           JwtAuthenticationEntryPoint authenticationEntryPoint,
                           UserDetailsService userDetailsService,
-                          @Value("${app.cors.allowed-origins:http://localhost:3000}") String allowedOrigins) {
+                          @Value(PROP_ALLOWED_ORIGINS) String allowedOrigins) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
         this.authenticationEntryPoint = authenticationEntryPoint;
-        this.userDetailsService = userDetailsService;
-        this.allowedOrigins = allowedOrigins;
+        this.userDetailsService       = userDetailsService;
+        this.allowedOrigins           = allowedOrigins;
     }
 
     @Bean
+    @SuppressWarnings("java:S112")
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -53,12 +70,7 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(authenticationEntryPoint))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                "/api/auth/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html"
-                        ).permitAll()
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
@@ -74,6 +86,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @SuppressWarnings("java:S112")
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
     }
@@ -87,16 +100,16 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
         config.setAllowedOrigins(
-                Arrays.stream(allowedOrigins.split(","))
+                Arrays.stream(allowedOrigins.split(ORIGINS_DELIMITER))
                         .map(String::trim)
                         .toList()
         );
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedMethods(ALLOWED_METHODS);
+        config.setAllowedHeaders(List.of(HEADER_WILDCARD));
         config.setAllowCredentials(true);
 
         var source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", config);
+        source.registerCorsConfiguration(CORS_PATTERN, config);
         return source;
     }
 }

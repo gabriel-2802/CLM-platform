@@ -1,7 +1,8 @@
 package clm.user.demo.controllers;
 
 import clm.user.demo.dto.responses.UserResponse;
-import clm.user.demo.exceptions.ResourceNotFoundException;
+import clm.user.demo.exceptions.GlobalExceptionHandler;
+import clm.user.demo.exceptions.exceptions.ResourceNotFoundException;
 import clm.user.demo.services.UserService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,9 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import java.time.Instant;
 import java.util.List;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import static org.mockito.ArgumentMatchers.anyInt;
 import java.util.Set;
 
 import static org.mockito.BDDMockito.given;
@@ -104,19 +108,22 @@ class UserControllerTest {
         given(userService.getById(99L)).willThrow(new ResourceNotFoundException("User not found: 99"));
 
         mockMvc.perform(get("/api/users/99"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("User not found: 99"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/resource-not-found"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     // ─── GET /api/users ───────────────────────────────────────────────────────
 
     @Test
     void getAll_returns200WithList() throws Exception {
-        given(userService.getAll()).willReturn(List.of(USER_RESPONSE));
+        given(userService.getAll(anyInt(), anyInt())).willReturn(new PageImpl<>(List.of(USER_RESPONSE), PageRequest.of(0,20), 1));
 
         mockMvc.perform(get("/api/users"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isArray())
-                .andExpect(jsonPath("$[0].email").value("user@test.com"));
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].email").value("user@test.com"));
     }
 
     // ─── PUT /api/users/{id}/roles/admin ──────────────────────────────────────
@@ -146,7 +153,10 @@ class UserControllerTest {
         given(userService.revokeAdmin(99L)).willThrow(new ResourceNotFoundException("User not found: 99"));
 
         mockMvc.perform(delete("/api/users/99/roles/admin"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("User not found: 99"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/resource-not-found"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     // ─── PATCH /api/users/{id}/enabled ────────────────────────────────────────
@@ -183,6 +193,9 @@ class UserControllerTest {
         given(userService.setEnabled(99L, false)).willThrow(new ResourceNotFoundException("User not found: 99"));
 
         mockMvc.perform(patch("/api/users/99/enabled").param("enabled", "false"))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("User not found: 99"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/resource-not-found"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 }

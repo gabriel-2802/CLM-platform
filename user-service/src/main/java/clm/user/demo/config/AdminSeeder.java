@@ -16,19 +16,27 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class AdminSeeder implements ApplicationRunner {
 
-    private final UserRepository userRepository;
-    private final RoleRepository roleRepository;
+    private static final String PROP_ADMIN_EMAIL    = "${app.admin.email:admin@example.com}";
+    private static final String PROP_ADMIN_PASSWORD = "${app.admin.password:Admin123!}";
+    private static final String PROP_ADMIN_NAME     = "${app.admin.name:Admin}";
+
+    private static final String ERR_ROLE_USER_MISSING  = "ROLE_USER missing — check migrations";
+    private static final String ERR_ROLE_ADMIN_MISSING = "ROLE_ADMIN missing — check migrations";
+    private static final String LOG_ADMIN_SEEDED       = "Seeded default admin: {}";
+
+    private final UserRepository  userRepository;
+    private final RoleRepository  roleRepository;
     private final PasswordEncoder passwordEncoder;
-    private final String adminEmail;
-    private final String adminPassword;
-    private final String adminName;
+    private final String          adminEmail;
+    private final String          adminPassword;
+    private final String          adminName;
 
     public AdminSeeder(UserRepository userRepository,
                        RoleRepository roleRepository,
                        PasswordEncoder passwordEncoder,
-                       @Value("${app.admin.email:admin@example.com}") String adminEmail,
-                       @Value("${app.admin.password:Admin123!}") String adminPassword,
-                       @Value("${app.admin.name:Admin}") String adminName) {
+                       @Value(PROP_ADMIN_EMAIL)    String adminEmail,
+                       @Value(PROP_ADMIN_PASSWORD) String adminPassword,
+                       @Value(PROP_ADMIN_NAME)     String adminName) {
         this.userRepository  = userRepository;
         this.roleRepository  = roleRepository;
         this.passwordEncoder = passwordEncoder;
@@ -45,9 +53,9 @@ public class AdminSeeder implements ApplicationRunner {
         }
 
         var userRole  = roleRepository.findByName(RoleName.USER)
-                .orElseThrow(() -> new IllegalStateException("ROLE_USER missing — check migrations"));
+                .orElseThrow(() -> new IllegalStateException(ERR_ROLE_USER_MISSING));
         var adminRole = roleRepository.findByName(RoleName.ADMIN)
-                .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN missing — check migrations"));
+                .orElseThrow(() -> new IllegalStateException(ERR_ROLE_ADMIN_MISSING));
 
         var admin = new User();
         admin.setEmail(adminEmail);
@@ -57,6 +65,6 @@ public class AdminSeeder implements ApplicationRunner {
         admin.getRoles().add(adminRole);
 
         userRepository.save(admin);
-        log.info("Seeded default admin: {}", adminEmail);
+        log.info(LOG_ADMIN_SEEDED, adminEmail);
     }
 }

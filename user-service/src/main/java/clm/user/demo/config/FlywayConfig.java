@@ -1,6 +1,6 @@
 package clm.user.demo.config;
 
-import clm.user.demo.exceptions.DatabaseValidationException;
+import clm.user.demo.exceptions.exceptions.DatabaseValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
@@ -9,20 +9,26 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 
-@Configuration
 @Slf4j
+@Configuration
 public class FlywayConfig {
+
+    private static final String SCHEMA                   = "users";
+    private static final String MIGRATION_LOCATION       = "classpath:db/migration";
+    private static final String BASELINE_VERSION         = "0";
+    private static final String LOG_MIGRATION_FAILED     = "Flyway migration failed: {}";
+    private static final String ERR_MIGRATION_FAILED     = "Database migration failed: ";
 
     @Bean
     public Flyway flyway(DataSource dataSource) {
         try {
             Flyway flyway = Flyway.configure()
                     .dataSource(dataSource)
-                    .schemas("users")
-                    .defaultSchema("users")
-                    .locations("classpath:db/migration")
+                    .schemas(SCHEMA)
+                    .defaultSchema(SCHEMA)
+                    .locations(MIGRATION_LOCATION)
                     .baselineOnMigrate(true)
-                    .baselineVersion("0")
+                    .baselineVersion(BASELINE_VERSION)
                     .validateOnMigrate(true)
                     .outOfOrder(false)
                     .failOnMissingLocations(false)
@@ -32,8 +38,8 @@ public class FlywayConfig {
             flyway.migrate();
             return flyway;
         } catch (FlywayException e) {
-            log.error("Flyway migration failed: {}", e.getMessage(), e);
-            throw new DatabaseValidationException("Database migration failed: " + e.getMessage());
+            log.error(LOG_MIGRATION_FAILED, e.getMessage(), e);
+            throw new DatabaseValidationException(ERR_MIGRATION_FAILED + e.getMessage());
         }
     }
 }

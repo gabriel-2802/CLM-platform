@@ -1,7 +1,7 @@
 package clm.user.demo.services;
 
 import clm.user.demo.dto.responses.UserResponse;
-import clm.user.demo.exceptions.ResourceNotFoundException;
+import clm.user.demo.exceptions.exceptions.ResourceNotFoundException;
 import clm.user.demo.models.Role;
 import clm.user.demo.models.User;
 import clm.user.demo.repositories.RoleRepository;
@@ -14,6 +14,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import static org.mockito.ArgumentMatchers.any;
+
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -84,12 +88,12 @@ class UserServiceTest {
 
     @Test
     void getAll_returnsMappedList() {
-        given(userRepository.findAll()).willReturn(List.of(testUser));
+        given(userRepository.findAll(any(Pageable.class))).willReturn(new PageImpl<>(List.of(testUser)));
 
-        var all = userService.getAll();
+        var page = userService.getAll(0, 20);
 
-        assertThat(all).hasSize(1);
-        assertThat(all.get(0).email()).isEqualTo("user@test.com");
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).email()).isEqualTo("user@test.com");
     }
 
     // ─── role management ──────────────────────────────────────────────────────

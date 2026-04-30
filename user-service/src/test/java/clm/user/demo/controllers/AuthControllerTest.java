@@ -4,8 +4,9 @@ import clm.user.demo.dto.requests.LoginRequest;
 import clm.user.demo.dto.requests.RegisterRequest;
 import clm.user.demo.dto.responses.AuthResponse;
 import clm.user.demo.dto.responses.UserResponse;
-import clm.user.demo.exceptions.DuplicateEmailException;
-import clm.user.demo.exceptions.InvalidCredentialsException;
+import clm.user.demo.exceptions.GlobalExceptionHandler;
+import clm.user.demo.exceptions.exceptions.DuplicateEmailException;
+import clm.user.demo.exceptions.exceptions.InvalidCredentialsException;
 import clm.user.demo.services.AuthService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -87,7 +88,13 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 registerBody("not-an-email", "Password1!", "Name", null))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Validation failed"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/validation-failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.errors").isArray())
+                .andExpect(jsonPath("$.errors[0].field").value("email"))
+                .andExpect(jsonPath("$.errors[0].message").exists());
     }
 
     @Test
@@ -96,7 +103,11 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 registerBody("user@test.com", "short", "Name", null))))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Validation failed"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/validation-failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.errors").isArray());
     }
 
     @Test
@@ -107,7 +118,10 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 registerBody("user@test.com", "Password1!", "Name", null))))
-                .andExpect(status().isConflict());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Email already registered"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/duplicate-email"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     // ─── POST /api/auth/login ─────────────────────────────────────────────────
@@ -133,7 +147,10 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(
                                 loginBody("user@test.com", "WrongPass1!"))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value("Invalid email or password"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/invalid-credentials"))
+                .andExpect(jsonPath("$.timestamp").exists());
     }
 
     @Test
@@ -141,7 +158,11 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value("Validation failed"))
+                .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/validation-failed"))
+                .andExpect(jsonPath("$.timestamp").exists())
+                .andExpect(jsonPath("$.errors").isArray());
     }
 
     // ─── helpers ──────────────────────────────────────────────────────────────

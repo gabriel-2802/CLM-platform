@@ -10,18 +10,25 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    private static final String SECURITY_SCHEME_NAME   = "bearerAuth";
+    private static final String BEARER_SCHEME          = "bearer";
+    private static final String BEARER_FORMAT          = "JWT";
+    private static final String API_TITLE              = "CLM User Service API";
+    private static final String API_DESCRIPTION        = "Authentication and user management";
+    private static final String API_VERSION            = "1.0";
+
     @Bean
     public OpenAPI openAPI() {
         return new OpenAPI()
                 .info(new Info()
-                        .title("CLM User Service API")
-                        .description("Authentication and user management")
-                        .version("1.0"))
+                        .title(API_TITLE)
+                        .description(API_DESCRIPTION)
+                        .version(API_VERSION))
                 .components(new Components()
-                        .addSecuritySchemes("bearerAuth",
+                        .addSecuritySchemes(SECURITY_SCHEME_NAME,
                                 new SecurityScheme()
                                         .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
-                                        .bearerFormat("JWT")));
+                                        .scheme(BEARER_SCHEME)
+                                        .bearerFormat(BEARER_FORMAT)));
     }
 }
