@@ -1,0 +1,22 @@
+apiVersion: 1
+
+datasources:
+  - name:    Prometheus
+    type:    prometheus
+    # FIX: explicit uid so dashboard JSON can reference it by stable ID
+    #      rather than by display name, which breaks if someone renames it.
+    uid:     prometheus-clm
+    access:  proxy
+    url:     http://prometheus:9090
+    isDefault: true
+    # FIX: editable: false — prevents UI edits from drifting out of sync with
+    #      this provisioned file (IaC principle: source-of-truth is git).
+    editable: false
+    version: 1
+    jsonData:
+      timeInterval: 15s
+      # FIX: POST avoids URL-length limits on large multi-series queries;
+      #      GET will silently truncate label-selector queries above ~8 KB.
+      httpMethod: POST
+      # Grafana 10+: keep exemplar support available for trace correlation.
+      exemplarTraceIdDestinations: []

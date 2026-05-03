@@ -52,7 +52,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
                                 "/webjars/**",
-                                "/api/enums"
+                                "/api/enums",
+                                "/actuator/**"
                         ).permitAll()
                         .anyRequest().authenticated())
 

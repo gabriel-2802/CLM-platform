@@ -9,9 +9,10 @@ NC     := \033[0m
 
 .PHONY: help \
         check-docker \
-        test test-up test-down test-restart test-logs test-ps test-rebuild \
-        db-test db-users-test \
+        test test-up test-down test-restart test-logs test-ps test-rebuild test-rebuild-service \
+        db-test db-users-test db-clients-test \
         test-init \
+        monitoring-logs prometheus-reload \
         clean nuke-test
 
 # ─── help ─────────────────────────────────────────────────────────────────────
@@ -23,26 +24,31 @@ help:
 	@echo "$(BLUE)$(BOLD)╚══════════════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(BOLD)PRE-REQUISITES$(NC)"
-	@echo "  $(YELLOW)make check-docker$(NC)       Verify Docker daemon is running"
+	@echo "  $(YELLOW)make check-docker$(NC)         Verify Docker daemon is running"
 	@echo ""
 	@echo "$(BOLD)TESTING STACK$(NC)  (all services exposed on host, verbose logging)"
-	@echo "  $(YELLOW)make test$(NC)               Build images and start all services"
-	@echo "  $(YELLOW)make test-up$(NC)            Start testing stack (images must already exist)"
-	@echo "  $(YELLOW)make test-down$(NC)          Stop and remove testing containers"
-	@echo "  $(YELLOW)make test-restart$(NC)       Restart all testing services"
-	@echo "  $(YELLOW)make test-rebuild$(NC)       Stop => rebuild images => start"
-	@echo "  $(YELLOW)make test-logs$(NC)          Follow logs for all testing services"
-	@echo "  $(YELLOW)make test-ps$(NC)            Show testing service status and health"
-	@echo "  $(YELLOW)make db-test$(NC)            Open psql shell in test postgres"
-	@echo "  $(YELLOW)make db-users-test$(NC)      Open psql shell in test users postgres"
+	@echo "  $(YELLOW)make test$(NC)                 Build images and start all services"
+	@echo "  $(YELLOW)make test-up$(NC)              Start testing stack (images must already exist)"
+	@echo "  $(YELLOW)make test-down$(NC)            Stop and remove testing containers"
+	@echo "  $(YELLOW)make test-restart$(NC)         Restart all testing services"
+	@echo "  $(YELLOW)make test-rebuild$(NC)         Stop => rebuild images => start"
+	@echo "  $(YELLOW)make test-logs$(NC)            Follow logs for all testing services"
+	@echo "  $(YELLOW)make test-ps$(NC)              Show testing service status and health"
+	@echo "  $(YELLOW)make db-test$(NC)              Open psql shell in test postgres (clm_platform)"
+	@echo "  $(YELLOW)make db-users-test$(NC)        Open psql shell in test users postgres (clm_users)"
+	@echo "  $(YELLOW)make db-clients-test$(NC)      Open psql shell in test clients postgres (clm_clients)"
 	@echo ""
 	@echo "$(BOLD)FIRST-RUN SETUP$(NC)"
-	@echo "  $(YELLOW)make test-init$(NC)          Push Prisma schema + seed after first make test"
-	@echo "  $(YELLOW)                $(NC)        Creates admin@example.com / Admin123!"
+	@echo "  $(YELLOW)make test-init$(NC)            Push Prisma schema + seed after first make test"
+	@echo "  $(YELLOW)                  $(NC)        Creates admin@example.com / Admin123!"
+	@echo ""
+	@echo "$(BOLD)MONITORING$(NC)"
+	@echo "  $(YELLOW)make monitoring-logs$(NC)      Follow logs for Prometheus and Grafana only"
+	@echo "  $(YELLOW)make prometheus-reload$(NC)    Hot-reload prometheus.yml without restarting"
 	@echo ""
 	@echo "$(BOLD)CLEANUP$(NC)"
-	@echo "  $(YELLOW)make clean$(NC)              Remove node_modules, .next, and build artifacts"
-	@echo "  $(YELLOW)make nuke-test$(NC)          Stop testing stack and delete its volumes (data loss!)"
+	@echo "  $(YELLOW)make clean$(NC)                Remove node_modules, .next, and build artifacts"
+	@echo "  $(YELLOW)make nuke-test$(NC)            Stop testing stack and delete its volumes (data loss!)"
 	@echo ""
 
 # ─── guards ───────────────────────────────────────────────────────────────────
@@ -75,14 +81,15 @@ test: check-docker
 	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5433  (user: clm_user / db: clm_platform)"
 	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5434  (user: clm_user / db: clm_users)"
 	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5435  (user: clm_user / db: clm_clients)"
+	@echo "  $(YELLOW)Prometheus    =>$(NC)  http://localhost:9090"
+	@echo "  $(YELLOW)Grafana       =>$(NC)  http://localhost:3001  (admin / see GRAFANA_PASSWORD in .env.testing)"
 	@echo ""
-	@echo "  $(GREEN) All endpoints docs can be accessed at =>$(NC)  http://localhost:8090"
-	@echo "  
+	@echo "  $(GREEN)All API docs =>$(NC)  http://localhost:8090"
 	@echo ""
-	@echo ""
-	@echo "  $(BLUE)Logs:    make test-logs$(NC)"
-	@echo "  $(BLUE)Status:  make test-ps$(NC)"
-	@echo "  $(BLUE)Stop:    make test-down$(NC)"
+	@echo "  $(BLUE)Logs:             make test-logs$(NC)"
+	@echo "  $(BLUE)Status:           make test-ps$(NC)"
+	@echo "  $(BLUE)Monitoring logs:  make monitoring-logs$(NC)"
+	@echo "  $(BLUE)Stop:             make test-down$(NC)"
 	@echo ""
 
 test-up: check-docker
@@ -123,6 +130,33 @@ db-test:
 db-users-test:
 	@docker exec -it clm-postgres-users-test psql -U clm_user -d clm_users
 
+db-clients-test:
+	@docker exec -it clm-postgres-clients-test psql -U clm_user -d clm_clients
+
+# ─── first-run ────────────────────────────────────────────────────────────────
+
+test-init:
+	@echo "$(BLUE)Running Prisma migrations and seeding admin user...$(NC)"
+	$(COMPOSE_TEST) exec client npx prisma migrate deploy
+	$(COMPOSE_TEST) exec client npx prisma db seed
+	@echo "$(GREEN)✓ Schema pushed and admin seeded$(NC)"
+
+# ─── monitoring ───────────────────────────────────────────────────────────────
+
+monitoring-logs:
+	@echo "$(BLUE)Following Prometheus and Grafana logs (Ctrl+C to stop)...$(NC)"
+	$(COMPOSE_TEST) logs -f prometheus grafana
+
+# Sends a POST to Prometheus's /-/reload endpoint (requires --web.enable-lifecycle,
+# which is set in docker-compose.testing.yml).  Reloads prometheus.yml and all
+# rule files without restarting the container or losing TSDB data.
+prometheus-reload:
+	@echo "$(BLUE)Reloading Prometheus configuration...$(NC)"
+	@docker exec clm-prometheus-test wget -q --post-data='' \
+		http://localhost:9090/-/reload -O - >/dev/null && \
+		echo "$(GREEN)✓ Prometheus configuration reloaded$(NC)" || \
+		echo "$(RED)✗ Reload failed — is the container running?$(NC)"
+
 # ─── cleanup ──────────────────────────────────────────────────────────────────
 
 clean:
@@ -137,5 +171,6 @@ nuke-test:
 	$(COMPOSE_TEST) down -v --remove-orphans; \
 	docker rm -f clm-postgres-test clm-postgres-users-test clm-postgres-clients-test \
 	             clm-user-service-test clm-contracts-test clm-notifications-test \
-	             clm-client-service-test clm-client-test 2>/dev/null || true; \
+	             clm-client-service-test clm-client-test \
+	             clm-prometheus-test clm-grafana-test 2>/dev/null || true; \
 	echo "$(GREEN)✓ Testing stack and volumes removed$(NC)"

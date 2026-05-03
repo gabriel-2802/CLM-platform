@@ -18,10 +18,10 @@ services:
       dockerfile: db.Dockerfile
     container_name: clm-postgres-test
     environment:
-      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
-      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      POSTGRES_DB:           ${DB_NAME:?DB_NAME is required — check .env.testing}
-      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+      POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:          ${DB_NAME:?DB_NAME is required — check .env.testing}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     volumes:
       - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - postgres_data:/var/lib/postgresql/data
@@ -39,15 +39,15 @@ services:
       retries: 5
       start_period: 20s
 
-  # ── User-service database (users schema — owned exclusively by user-service) ─
+  # ── User-service database (users schema) ───────────────────────────────────
   postgres-users:
     image: postgres:16-alpine
     container_name: clm-postgres-users-test
     environment:
-      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
-      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      POSTGRES_DB:           ${DB_USERS_NAME:-clm_users}
-      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+      POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:          ${DB_USERS_NAME:-clm_users}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     volumes:
       - postgres_users_data:/var/lib/postgresql/data
     ports:
@@ -64,15 +64,15 @@ services:
       retries: 5
       start_period: 20s
 
-  # ── Client-service database (clients schema — owned exclusively by client-service) ─
+  # ── Client-service database (clients schema) ───────────────────────────────
   postgres-clients:
     image: postgres:16-alpine
     container_name: clm-postgres-clients-test
     environment:
-      POSTGRES_USER:         ${DB_USER:?DB_USER is required — check .env.testing}
-      POSTGRES_PASSWORD:     ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      POSTGRES_DB:           ${DB_CLIENTS_NAME:-clm_clients}
-      POSTGRES_INITDB_ARGS:  "--encoding=UTF8"
+      POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:          ${DB_CLIENTS_NAME:-clm_clients}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     volumes:
       - postgres_clients_data:/var/lib/postgresql/data
     ports:
@@ -89,7 +89,7 @@ services:
       retries: 5
       start_period: 20s
 
-  # ── User service (auth + user management) ──────────────────────────────────
+  # ── User service (auth + JWT + user management) ────────────────────────────
   user-service:
     build:
       context: user-service
@@ -97,38 +97,47 @@ services:
     container_name: clm-user-service-test
     environment:
       # --- Database ---
-      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
-      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
-      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:          ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       # --- JPA ---
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
-      SPRING_JPA_SHOW_SQL:                         "true"
+      # FIX: show-sql disabled — was logging every query, flooding stdout and
+      #      masking real errors; enable per-session via logger level if needed.
+      SPRING_JPA_SHOW_SQL:                         "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: users
       # --- Flyway ---
-      SPRING_FLYWAY_ENABLED:         "true"
-      SPRING_FLYWAY_LOCATIONS:       classpath:db/migration
-      SPRING_FLYWAY_SCHEMAS:         users
-      SPRING_FLYWAY_DEFAULT_SCHEMA:  users
+      SPRING_FLYWAY_ENABLED:        "true"
+      SPRING_FLYWAY_LOCATIONS:      classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:        users
+      SPRING_FLYWAY_DEFAULT_SCHEMA: users
       # --- JWT ---
-      JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
-      JWT_EXPIRATION:      ${JWT_EXPIRATION:-2592000000}
+      JWT_SECRET:     ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-2592000000}
       # --- Admin seed ---
-      APP_ADMIN_EMAIL:          ${ADMIN_EMAIL:-admin@example.com}
-      APP_ADMIN_PASSWORD:       ${ADMIN_PASSWORD:-Admin123!}
-      APP_ADMIN_NAME:           ${ADMIN_NAME:-Admin}
-      APP_ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      APP_ADMIN_EMAIL:         ${ADMIN_EMAIL:-admin@example.com}
+      APP_ADMIN_PASSWORD:      ${ADMIN_PASSWORD:-Admin123!}
+      APP_ADMIN_NAME:          ${ADMIN_NAME:-Admin}
+      APP_ADMIN_REGISTER_CODE: ${ADMIN_REGISTER_CODE:-devcode123}
       # --- CORS ---
-      CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
       # --- Server ---
-      SERVER_PORT:  8083
+      SERVER_PORT: 8083
       # --- Spring profile ---
-      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Actuator / Prometheus ---
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE:  prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:         /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:    always
+      # Dedicated management port — runs outside the main Spring Security filter
+      # chain so Prometheus can scrape /actuator/prometheus without a JWT token.
+      MANAGEMENT_METRICS_TAGS_APPLICATION:        user-service
       # --- Logging ---
-      LOGGING_LEVEL_ROOT:                  INFO
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
-      LOGGING_LEVEL_CLM_USER_DEMO:         DEBUG
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      LOGGING_LEVEL_CLM_USER_DEMO:       DEBUG
     ports:
       - "${USER_SERVICE_PORT:-8083}:8083"
     depends_on:
@@ -147,6 +156,7 @@ services:
       retries: 5
       start_period: 40s
 
+  # ── Contract service ───────────────────────────────────────────────────────
   contracts:
     build:
       context: contract-service
@@ -154,48 +164,53 @@ services:
     container_name: clm-contracts-test
     environment:
       # --- Database ---
-      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
-      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
-      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:          ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       # --- JPA ---
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
-      SPRING_JPA_SHOW_SQL:                         "true"
+      SPRING_JPA_SHOW_SQL:                         "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
       # --- Flyway ---
-      SPRING_FLYWAY_ENABLED:    "true"
-      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
-      SPRING_FLYWAY_SCHEMAS:    clm
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   clm
       # --- JWT ---
-      JWT_SECRET:          ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
-      APP_JWT_SECRET:      ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
-      APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
+      JWT_SECRET:     ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      APP_JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      APP_JWT_EXPIRATION: ${JWT_EXPIRATION:-2592000000}
       # --- Admin ---
-      APP_ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      APP_ADMIN_REGISTER_CODE: ${ADMIN_REGISTER_CODE:-devcode123}
       # --- Mail ---
-      SPRING_MAIL_HOST:                                    ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
-      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-2525}
-      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME:-your-mailtrap-username}
-      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD:-your-mailtrap-password}
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:  "false"
-      SPRING_MAIL_FROM:                                    ${MAIL_FROM:-noreply@dev.example.com}
-      APP_EMAIL_VERIFICATION_EXPIRATION:  ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
+      SPRING_MAIL_HOST:                                   ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                   ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                               ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                               ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:              "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:   "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "false"
+      SPRING_MAIL_FROM:                                   ${MAIL_FROM:-noreply@dev.example.com}
+      APP_EMAIL_VERIFICATION_EXPIRATION: ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
       # --- URLs / CORS ---
-      APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
-      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      APP_FRONTEND_URL:                ${FRONTEND_URL:-http://localhost:3000}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS: http://localhost:3000
       # --- LibreOffice ---
-      LIBREOFFICE_PATH:  ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
+      LIBREOFFICE_PATH: ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
       # --- Server ---
-      SERVER_PORT:  8081
+      SERVER_PORT: 8081
       # --- Spring profile ---
-      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Actuator / Prometheus ---
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       contract-service
       # --- Logging ---
-      LOGGING_LEVEL_ROOT:                  INFO
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
-      LOGGING_LEVEL_CLM_DEMO:              DEBUG
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      LOGGING_LEVEL_CLM_DEMO:            DEBUG
     ports:
       - "${CONTRACTS_PORT:-8081}:8081"
     depends_on:
@@ -214,37 +229,43 @@ services:
       retries: 5
       start_period: 40s
 
+  # ── Client service ─────────────────────────────────────────────────────────
   client-service:
     build:
       context: client-service
       dockerfile: Dockerfile
     container_name: clm-client-service-test
     environment:
-      # --- Database (dedicated postgres-clients instance) ---
-      SPRING_DATASOURCE_URL:                jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
-      SPRING_DATASOURCE_USERNAME:           ${DB_USER:-clm_user}
-      SPRING_DATASOURCE_PASSWORD:           ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
-      SPRING_DATASOURCE_DRIVER_CLASS_NAME:  org.postgresql.Driver
+      # --- Database ---
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:          ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       # --- JPA ---
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
-      SPRING_JPA_SHOW_SQL:                         "true"
+      SPRING_JPA_SHOW_SQL:                         "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clients
       # --- Flyway ---
-      SPRING_FLYWAY_ENABLED:    "true"
-      SPRING_FLYWAY_LOCATIONS:  classpath:db/migration
-      SPRING_FLYWAY_SCHEMAS:    clients
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   clients
       # --- JWT ---
-      JWT_SECRET:  ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
       # --- CORS ---
-      CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      CORS_ALLOWED_ORIGINS: http://localhost:3000
       # --- Server ---
-      SERVER_PORT:  8084
+      SERVER_PORT: 8084
       # --- Spring profile ---
-      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      # --- Actuator / Prometheus ---
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       client-service
       # --- Logging ---
-      LOGGING_LEVEL_ROOT:                  INFO
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
     ports:
       - "${CLIENT_SERVICE_PORT:-8084}:8084"
     depends_on:
@@ -263,6 +284,7 @@ services:
       retries: 5
       start_period: 40s
 
+  # ── Notification service ───────────────────────────────────────────────────
   notifications:
     build:
       context: notification-service
@@ -270,27 +292,27 @@ services:
     container_name: clm-notifications-test
     environment:
       # --- Mail ---
-      SPRING_MAIL_HOST:                                    ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
-      SPRING_MAIL_PORT:                                    ${MAIL_PORT:-2525}
-      SPRING_MAIL_USERNAME:                                ${MAIL_USERNAME:-your-mailtrap-username}
-      SPRING_MAIL_PASSWORD:                                ${MAIL_PASSWORD:-your-mailtrap-password}
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:               "true"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:    "true"
-      SPRING_MAIL_FROM:                                    ${MAIL_FROM:-noreply@dev.example.com}
+      SPRING_MAIL_HOST:                                  ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                  ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                              ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                              ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:             "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:  "true"
+      SPRING_MAIL_FROM:                                  ${MAIL_FROM:-noreply@dev.example.com}
       # --- Service URLs ---
-      CONTRACTS_SERVICE_URL:    ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
-      CONTRACTS_API_BASE_URL:   ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      CONTRACTS_SERVICE_URL:  ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      CONTRACTS_API_BASE_URL: ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       # --- URLs / CORS ---
-      APP_FRONTEND_URL:                 ${FRONTEND_URL:-http://localhost:3000}
-      SPRING_WEB_CORS_ALLOWED_ORIGINS:  http://localhost:3000
+      APP_FRONTEND_URL:                ${FRONTEND_URL:-http://localhost:3000}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS: http://localhost:3000
       # --- Server ---
-      SERVER_PORT:  8082
+      SERVER_PORT: 8082
       # --- Spring profile ---
-      SPRING_PROFILES_ACTIVE:  ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
       # --- Logging ---
-      LOGGING_LEVEL_ROOT:                  INFO
-      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:   INFO
-      LOGGING_LEVEL_CLM_NOTIFICATIONS:     DEBUG
+      LOGGING_LEVEL_ROOT:                 INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK:  INFO
+      LOGGING_LEVEL_CLM_NOTIFICATIONS:    DEBUG
     ports:
       - "${NOTIFICATIONS_PORT:-8082}:8082"
     depends_on:
@@ -308,6 +330,7 @@ services:
       retries: 5
       start_period: 40s
 
+  # ── Swagger hub ────────────────────────────────────────────────────────────
   swagger-hub:
     build:
       context: swagger-hub
@@ -321,6 +344,7 @@ services:
       - dmz-net
     restart: on-failure:3
 
+  # ── Frontend (Next.js dev server) ──────────────────────────────────────────
   client:
     build:
       context: main-service
@@ -333,25 +357,25 @@ services:
       - /app/.next
     environment:
       # --- Node ---
-      NODE_ENV:                  development
-      NEXT_TELEMETRY_DISABLED:   "1"
-      WATCHPACK_POLLING:         "true"
+      NODE_ENV:                 development
+      NEXT_TELEMETRY_DISABLED:  "1"
+      WATCHPACK_POLLING:        "true"
       # --- Public API URLs (resolved in the browser) ---
-      NEXT_PUBLIC_CONTRACTS_API_URL:      ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
-      NEXT_PUBLIC_NOTIFICATIONS_API_URL:  ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}
-      NEXT_PUBLIC_USER_SERVICE_URL:       ${NEXT_PUBLIC_USER_SERVICE_URL:-http://localhost:8083}
-      NEXT_PUBLIC_CLIENT_SERVICE_URL:     ${NEXT_PUBLIC_CLIENT_SERVICE_URL:-http://localhost:8084}
+      NEXT_PUBLIC_CONTRACTS_API_URL:     ${NEXT_PUBLIC_CONTRACTS_API_URL:-http://localhost:8081}
+      NEXT_PUBLIC_NOTIFICATIONS_API_URL: ${NEXT_PUBLIC_NOTIFICATIONS_API_URL:-http://localhost:8082}
+      NEXT_PUBLIC_USER_SERVICE_URL:      ${NEXT_PUBLIC_USER_SERVICE_URL:-http://localhost:8083}
+      NEXT_PUBLIC_CLIENT_SERVICE_URL:    ${NEXT_PUBLIC_CLIENT_SERVICE_URL:-http://localhost:8084}
       # --- Server-side URLs (resolved inside Docker network) ---
-      API_BASE_URL:               http://contracts:8081
-      CONTRACTS_SERVICE_URL:      ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
-      NOTIFICATIONS_SERVICE_URL:  ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
-      USER_SERVICE_URL:           http://user-service:8083
-      CLIENT_SERVICE_URL:         http://client-service:8084
+      API_BASE_URL:              http://contracts:8081
+      CONTRACTS_SERVICE_URL:     ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      NOTIFICATIONS_SERVICE_URL: ${NOTIFICATIONS_SERVICE_URL:-http://notifications:8082}
+      USER_SERVICE_URL:          http://user-service:8083
+      CLIENT_SERVICE_URL:        http://client-service:8084
       # --- Admin credentials ---
-      ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
+      ADMIN_REGISTER_CODE: ${ADMIN_REGISTER_CODE:-devcode123}
       # --- NextAuth ---
-      NEXTAUTH_URL:     ${FRONTEND_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET:  ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required — check .env.testing}
+      NEXTAUTH_URL:    ${FRONTEND_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required — check .env.testing}
     ports:
       - "${CLIENT_PORT:-3000}:3000"
     depends_on:
@@ -376,6 +400,94 @@ services:
       retries: 5
       start_period: 60s
 
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    # FIX: pinned version — 'latest' caused silent breaking changes between
+    #      restarts when the upstream image changed storage or TSDB formats.
+    image: prom/prometheus:v2.51.2
+    container_name: clm-prometheus-test
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    environment:
+      - TZ=UTC
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      # FIX: retention set explicitly — default is 15d but making it visible
+      #      prevents surprise disk exhaustion in long-running test envs.
+      - --storage.tsdb.retention.time=15d
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      # FIX: lifecycle endpoint enables hot config reload via POST /-/reload
+      #      instead of requiring a full container restart.
+      - --web.enable-lifecycle
+      # Admin API is off by default; omitting --web.enable-admin-api keeps it disabled.
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      user-service:
+        condition: service_healthy
+      contracts:
+        condition: service_healthy
+      client-service:
+        condition: service_healthy
+    networks:
+      - dmz-net
+      - data-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # FIX: check /-/healthy (the proper readiness endpoint), not root /.
+      #      Root returns 302 → wget treats it as success even when TSDB is broken.
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  grafana:
+    build:
+      context: grafana
+      dockerfile: Dockerfile
+    container_name: clm-grafana-test
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-Admin123!}
+      # FIX: sign-up disabled to prevent anonymous users from creating accounts.
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # FIX: Gravatar makes outbound requests to gravatar.com for every user
+      #      avatar — a data-leak and a latency hit in isolated test envs.
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      # FIX: reporting disabled — Grafana phoned home with usage stats by default.
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3001}
+      - TZ=UTC
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    networks:
+      - dmz-net
+    restart: on-failure:3
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
 networks:
   dmz-net:
     driver: bridge
@@ -388,4 +500,8 @@ volumes:
   postgres_users_data:
     driver: local
   postgres_clients_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
     driver: local

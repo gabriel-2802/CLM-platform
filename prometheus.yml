@@ -1,0 +1,60 @@
+# ==============================================================================
+# Prometheus configuration — CLM Platform
+# ==============================================================================
+
+global:
+  scrape_interval:     15s
+  scrape_timeout:      10s
+  evaluation_interval: 15s
+
+  external_labels:
+    monitor:     clm-monitor
+    environment: testing
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files: []
+
+scrape_configs:
+
+  # ── user-service (auth / JWT) ──────────────────────────────────────────────
+  - job_name: user-service
+    metrics_path: /actuator/prometheus
+    honor_labels: false
+    static_configs:
+      - targets:
+          - user-service:8083
+        labels:
+          service: user-service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label:  instance
+
+  # ── contract-service ───────────────────────────────────────────────────────
+  - job_name: contract-service
+    metrics_path: /actuator/prometheus
+    honor_labels: false
+    static_configs:
+      - targets:
+          - contracts:8081
+        labels:
+          service: contract-service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label:  instance
+
+  # ── client-service ─────────────────────────────────────────────────────────
+  - job_name: client-service
+    metrics_path: /actuator/prometheus
+    honor_labels: false
+    static_configs:
+      - targets:
+          - client-service:8084
+        labels:
+          service: client-service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label:  instance

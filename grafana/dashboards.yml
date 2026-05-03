@@ -1,0 +1,18 @@
+apiVersion: 1
+
+providers:
+  - name:   CLM Dashboards
+    orgId:  1
+    folder: CLM Platform
+    type:   file
+    # FIX: disableDeletion: true — prevents Grafana from removing a dashboard
+    #      from the DB if the JSON file is temporarily missing (e.g., during a
+    #      volume remount), which caused silent data loss in previous restarts.
+    disableDeletion: true
+    # FIX: allowUiUpdates: false — UI edits are ephemeral and get overwritten
+    #      on the next reload cycle, which confused devs who thought their
+    #      panel changes were saved. Edit the JSON file instead.
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
