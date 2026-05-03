@@ -11,6 +11,7 @@ export type GenerateContractPayload = {
   endDate: string;
   mappings: Record<string, string>;
   autoRenew?: boolean;
+  contractBalance: number;
   value?: number | null;
   notes?: string | null;
 };

@@ -71,7 +71,10 @@ function toISODate(d?: string | null): string | undefined {
 }
 
 async function fetchAllClients() {
-  const res = await clientServiceFetch("/api/clients?size=1000&page=0", { cache: "no-store" })
+  const params = new URLSearchParams()
+  params.append("request.page", "0")
+  params.append("request.size", "1000")
+  const res = await clientServiceFetch(`/api/clients?${params}`, { cache: "no-store" })
   if (!res.ok) throw new Error("Failed to fetch clients")
   const data = await res.json()
   return data.content ?? data ?? []
@@ -103,23 +106,23 @@ export async function getClientRows(): Promise<Row[]> {
   return clients.map((c: any) => {
     const workPoints: any[] = c.workPoints ?? []
 
-    const earliestDeLa = workPoints
-      .map((p: any) => p.deLa)
+    const earliestValidFrom = workPoints
+      .map((p: any) => p.validFrom)
       .filter(Boolean)
       .sort()[0]
 
-    const latestPanaLa = workPoints
-      .map((p: any) => p.panaLa)
+    const latestValidTo = workPoints
+      .map((p: any) => p.validTo)
       .filter(Boolean)
       .sort()
       .at(-1)
 
     const details = c.details ?? {}
     const problems: string[] = []
-    if (!details.manualPoliticiContabile) problems.push("Manual pol. contabile")
-    if (!details.regulamentOrdineInterioara) problems.push("Regulament OI")
-    if (!details.ofSpalareBani) problems.push("Of spalare bani")
-    if (!details.registruUC) problems.push("Registru UC")
+    if (!details.accountingPoliciesManual) problems.push("Manual pol. contabile")
+    if (!details.internalRules) problems.push("Regulament OI")
+    if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
+    if (!details.ucRegistry) problems.push("Registru UC")
 
     const userIds: number[] = (c.userClients ?? []).map((uc: any) => uc.userId)
 
@@ -136,13 +139,13 @@ export async function getClientRows(): Promise<Row[]> {
 
     return {
       id: c.id,
-      name: c.denumire ?? c.name,
-      tip: c.tip ?? c.type,
-      cui: c.cui ?? c.taxId,
-      adresa: c.adresa ?? c.address,
-      administratie: c.administratie ?? c.administration,
-      deLa: toISODate(earliestDeLa ?? c.dataVerificarii ?? c.verificationDate),
-      panaLa: toISODate(latestPanaLa),
+      name: c.name,
+      tip: c.type,
+      cui: c.taxId,
+      adresa: c.address,
+      administratie: c.administration,
+      deLa: toISODate(earliestValidFrom ?? c.verificationDate),
+      panaLa: toISODate(latestValidTo),
       users: userIds
         .map((id) => {
           const u = userMap.get(id) as any
@@ -168,49 +171,49 @@ export async function getClient(id: number): Promise<ClientDetails | null> {
   const c = await res.json()
 
   const workPoints: any[] = c.workPoints ?? []
-  const earliestDeLa = workPoints.map((p: any) => p.deLa).filter(Boolean).sort()[0]
-  const latestPanaLa = workPoints.map((p: any) => p.panaLa).filter(Boolean).sort().at(-1)
+  const earliestValidFrom = workPoints.map((p: any) => p.validFrom).filter(Boolean).sort()[0]
+  const latestValidTo = workPoints.map((p: any) => p.validTo).filter(Boolean).sort().at(-1)
 
   const details = c.details ?? {}
   const problems: string[] = []
-  if (!details.manualPoliticiContabile) problems.push("Manual pol. contabile")
-  if (!details.regulamentOrdineInterioara) problems.push("Regulament OI")
-  if (!details.ofSpalareBani) problems.push("Of spalare bani")
-  if (!details.registruUC) problems.push("Registru UC")
+  if (!details.accountingPoliciesManual) problems.push("Manual pol. contabile")
+  if (!details.internalRules) problems.push("Regulament OI")
+  if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
+  if (!details.ucRegistry) problems.push("Registru UC")
 
   return {
     id: c.id,
-    name: c.denumire ?? c.name,
-    tip: c.tip ?? c.type,
-    deLa: toISODate(earliestDeLa ?? c.dataVerificarii ?? c.verificationDate),
-    panaLa: toISODate(latestPanaLa),
-    denumire: c.denumire ?? c.name,
-    cui: c.cui ?? c.taxId,
-    activa: c.activa ?? c.active ?? true,
-    dataVerificarii: toISODate(c.dataVerificarii ?? c.verificationDate),
-    adresa: c.adresa ?? c.address,
-    administratie: c.administratie ?? c.administration,
-    impozit: c.impozit ?? c.taxType ?? null,
-    platitorTVA: c.platitorTVA ?? c.vatPayer,
-    tvaLaIncasare: c.tvaLaIncasare ?? c.vatOnCollection ?? null,
-    areCodTVAUE: c.areCodTVAUE ?? c.hasEuVatCode ?? null,
-    codTVAUE: c.codTVAUE ?? c.euVatCode ?? undefined,
-    operatiuneUE: c.operatiuneUE ?? c.euOperation ?? null,
-    dividende: c.dividende ?? c.dividends ?? null,
-    salariati: c.salariati ?? c.employees ?? null,
-    casaDeMarcat: c.casaDeMarcat ?? c.cashRegister ?? null,
-    dataExpSediuSocial: toISODate(c.dataExpSediuSocial ?? c.hqExpirationDate),
-    dataExpMandatAdmin: toISODate(c.dataExpMandatAdmin ?? c.adminMandateExpiration),
-    dataCertificatFiscal: toISODate(c.dataCertificatFiscal ?? c.fiscalCertificateDate),
-    dataFisaPlatitor: toISODate(c.dataFisaPlatitor ?? c.payerSheetDate),
-    dataVectFiscal: toISODate(c.dataVectFiscal ?? c.fiscalVectorDate),
+    name: c.name,
+    tip: c.type,
+    deLa: toISODate(earliestValidFrom ?? c.verificationDate),
+    panaLa: toISODate(latestValidTo),
+    denumire: c.name,
+    cui: c.taxId,
+    activa: c.active ?? true,
+    dataVerificarii: toISODate(c.verificationDate),
+    adresa: c.address,
+    administratie: c.administration,
+    impozit: c.taxType ?? null,
+    platitorTVA: c.vatPayer,
+    tvaLaIncasare: c.vatOnCollection ?? null,
+    areCodTVAUE: c.hasEuVatCode ?? null,
+    codTVAUE: c.euVatCode ?? undefined,
+    operatiuneUE: c.euOperation ?? null,
+    dividende: c.dividends ?? null,
+    salariati: c.employees ?? null,
+    casaDeMarcat: c.cashRegister ?? null,
+    dataExpSediuSocial: toISODate(c.hqExpirationDate),
+    dataExpMandatAdmin: toISODate(c.adminMandateExpiration),
+    dataCertificatFiscal: toISODate(c.fiscalCertificateDate),
+    dataFisaPlatitor: toISODate(c.payerSheetDate),
+    dataVectFiscal: toISODate(c.fiscalVectorDate),
     probleme: problems.length ? problems : undefined,
     detalii: details.id
       ? {
-          manualPoliticiContabile: !!details.manualPoliticiContabile,
-          regulamentOrdineInterioara: !!details.regulamentOrdineInterioara,
-          ofSpalareBani: !!details.ofSpalareBani,
-          registruUC: !!details.registruUC,
+          manualPoliticiContabile: !!details.accountingPoliciesManual,
+          regulamentOrdineInterioara: !!details.internalRules,
+          ofSpalareBani: !!details.moneyLaunderingOffice,
+          registruUC: !!details.ucRegistry,
         }
       : undefined,
   }
@@ -225,27 +228,27 @@ export async function getClientTemplateSource(id: number): Promise<Record<string
 export async function createClient(formData: FormData) {
   "use server"
   const body = {
-    denumire: formData.get("denumire"),
-    tip: formData.get("tip"),
-    cui: formData.get("cui"),
-    activa: formData.get("activa") === "on" || formData.get("activa") === "true",
-    dataVerificarii: formData.get("dataVerificarii") || null,
-    adresa: formData.get("adresa") || null,
-    administratie: formData.get("administratie"),
-    impozit: formData.get("impozit") || null,
-    platitorTVA: formData.get("platitorTVA"),
-    tvaLaIncasare: formData.get("tvaLaIncasare") === "on" || formData.get("tvaLaIncasare") === "true",
-    areCodTVAUE: formData.get("areCodTVAUE") === "on" || formData.get("areCodTVAUE") === "true",
-    codTVAUE: formData.get("codTVAUE") || null,
-    operatiuneUE: formData.get("operatiuneUE") === "on" || formData.get("operatiuneUE") === "true",
-    dividende: formData.get("dividende") === "on" || formData.get("dividende") === "true",
-    salariati: formData.get("salariati") || null,
-    casaDeMarcat: formData.get("casaDeMarcat") === "on" || formData.get("casaDeMarcat") === "true",
-    dataExpSediuSocial: formData.get("dataExpSediuSocial") || null,
-    dataExpMandatAdmin: formData.get("dataExpMandatAdmin") || null,
-    dataCertificatFiscal: formData.get("dataCertificatFiscal") || null,
-    dataFisaPlatitor: formData.get("dataFisaPlatitor") || null,
-    dataVectFiscal: formData.get("dataVectFiscal") || null,
+    name: formData.get("denumire"),
+    type: formData.get("tip"),
+    taxId: formData.get("cui"),
+    active: formData.get("activa") === "on" || formData.get("activa") === "true",
+    verificationDate: formData.get("dataVerificarii") || null,
+    address: formData.get("adresa") || null,
+    administration: formData.get("administratie"),
+    taxType: formData.get("impozit") || null,
+    vatPayer: formData.get("platitorTVA"),
+    vatOnCollection: formData.get("tvaLaIncasare") === "on" || formData.get("tvaLaIncasare") === "true",
+    hasEuVatCode: formData.get("areCodTVAUE") === "on" || formData.get("areCodTVAUE") === "true",
+    euVatCode: formData.get("codTVAUE") || null,
+    euOperation: formData.get("operatiuneUE") === "on" || formData.get("operatiuneUE") === "true",
+    dividends: formData.get("dividende") === "on" || formData.get("dividende") === "true",
+    employees: formData.get("salariati") || null,
+    cashRegister: formData.get("casaDeMarcat") === "on" || formData.get("casaDeMarcat") === "true",
+    hqExpirationDate: formData.get("dataExpSediuSocial") || null,
+    adminMandateExpiration: formData.get("dataExpMandatAdmin") || null,
+    fiscalCertificateDate: formData.get("dataCertificatFiscal") || null,
+    payerSheetDate: formData.get("dataFisaPlatitor") || null,
+    fiscalVectorDate: formData.get("dataVectFiscal") || null,
   }
 
   const res = await clientServiceFetch("/api/clients", {
@@ -268,31 +271,38 @@ export async function updateClient(id: number, formData: FormData) {
   const body: Record<string, any> = {}
 
   const fields: Array<[string, string]> = [
-    ["denumire", "denumire"],
-    ["tip", "tip"],
-    ["cui", "cui"],
-    ["adresa", "adresa"],
-    ["administratie", "administratie"],
-    ["impozit", "impozit"],
-    ["platitorTVA", "platitorTVA"],
-    ["codTVAUE", "codTVAUE"],
-    ["salariati", "salariati"],
-    ["dataVerificarii", "dataVerificarii"],
-    ["dataExpSediuSocial", "dataExpSediuSocial"],
-    ["dataExpMandatAdmin", "dataExpMandatAdmin"],
-    ["dataCertificatFiscal", "dataCertificatFiscal"],
-    ["dataFisaPlatitor", "dataFisaPlatitor"],
-    ["dataVectFiscal", "dataVectFiscal"],
+    ["denumire", "name"],
+    ["tip", "type"],
+    ["cui", "taxId"],
+    ["adresa", "address"],
+    ["administratie", "administration"],
+    ["impozit", "taxType"],
+    ["platitorTVA", "vatPayer"],
+    ["codTVAUE", "euVatCode"],
+    ["salariati", "employees"],
+    ["dataVerificarii", "verificationDate"],
+    ["dataExpSediuSocial", "hqExpirationDate"],
+    ["dataExpMandatAdmin", "adminMandateExpiration"],
+    ["dataCertificatFiscal", "fiscalCertificateDate"],
+    ["dataFisaPlatitor", "payerSheetDate"],
+    ["dataVectFiscal", "fiscalVectorDate"],
   ]
   for (const [key, field] of fields) {
     const v = formData.get(key)
     if (v !== null) body[field] = v === "" ? null : v
   }
 
-  const boolFields = ["activa", "tvaLaIncasare", "areCodTVAUE", "operatiuneUE", "dividende", "casaDeMarcat"]
-  for (const key of boolFields) {
+  const boolFields: Array<[string, string]> = [
+    ["activa", "active"],
+    ["tvaLaIncasare", "vatOnCollection"],
+    ["areCodTVAUE", "hasEuVatCode"],
+    ["operatiuneUE", "euOperation"],
+    ["dividende", "dividends"],
+    ["casaDeMarcat", "cashRegister"],
+  ]
+  for (const [key, field] of boolFields) {
     const v = formData.get(key)
-    if (v !== null) body[key] = v === "on" || v === "true" || v === "1"
+    if (v !== null) body[field] = v === "on" || v === "true" || v === "1"
   }
 
   const res = await clientServiceFetch(`/api/clients/${id}`, {
@@ -309,26 +319,26 @@ export async function updateClient(id: number, formData: FormData) {
   const updated = await res.json()
   return {
     id: updated.id,
-    denumire: updated.denumire ?? updated.name,
-    tip: updated.tip ?? updated.type,
-    cui: updated.cui ?? updated.taxId,
-    activa: updated.activa ?? updated.active,
-    dataVerificarii: toISODate(updated.dataVerificarii ?? updated.verificationDate),
-    adresa: updated.adresa ?? updated.address,
-    administratie: updated.administratie ?? updated.administration,
-    impozit: updated.impozit ?? updated.taxType ?? null,
-    platitorTVA: updated.platitorTVA ?? updated.vatPayer,
-    tvaLaIncasare: updated.tvaLaIncasare ?? updated.vatOnCollection ?? null,
-    areCodTVAUE: updated.areCodTVAUE ?? updated.hasEuVatCode ?? null,
-    codTVAUE: updated.codTVAUE ?? updated.euVatCode ?? undefined,
-    operatiuneUE: updated.operatiuneUE ?? updated.euOperation ?? null,
-    dividende: updated.dividende ?? updated.dividends ?? null,
-    salariati: updated.salariati ?? updated.employees ?? null,
-    casaDeMarcat: updated.casaDeMarcat ?? updated.cashRegister ?? null,
-    dataExpSediuSocial: toISODate(updated.dataExpSediuSocial ?? updated.hqExpirationDate),
-    dataExpMandatAdmin: toISODate(updated.dataExpMandatAdmin ?? updated.adminMandateExpiration),
-    dataCertificatFiscal: toISODate(updated.dataCertificatFiscal ?? updated.fiscalCertificateDate),
-    dataFisaPlatitor: toISODate(updated.dataFisaPlatitor ?? updated.payerSheetDate),
-    dataVectFiscal: toISODate(updated.dataVectFiscal ?? updated.fiscalVectorDate),
+    denumire: updated.name,
+    tip: updated.type,
+    cui: updated.taxId,
+    activa: updated.active,
+    dataVerificarii: toISODate(updated.verificationDate),
+    adresa: updated.address,
+    administratie: updated.administration,
+    impozit: updated.taxType ?? null,
+    platitorTVA: updated.vatPayer,
+    tvaLaIncasare: updated.vatOnCollection ?? null,
+    areCodTVAUE: updated.hasEuVatCode ?? null,
+    codTVAUE: updated.euVatCode ?? undefined,
+    operatiuneUE: updated.euOperation ?? null,
+    dividende: updated.dividends ?? null,
+    salariati: updated.employees ?? null,
+    casaDeMarcat: updated.cashRegister ?? null,
+    dataExpSediuSocial: toISODate(updated.hqExpirationDate),
+    dataExpMandatAdmin: toISODate(updated.adminMandateExpiration),
+    dataCertificatFiscal: toISODate(updated.fiscalCertificateDate),
+    dataFisaPlatitor: toISODate(updated.payerSheetDate),
+    dataVectFiscal: toISODate(updated.fiscalVectorDate),
   }
 }

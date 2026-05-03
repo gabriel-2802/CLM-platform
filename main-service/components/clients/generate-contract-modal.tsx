@@ -145,6 +145,13 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
   const handleGenerate = async () => {
     setGenerating(true)
     try {
+      const contractBalance = toNumberOrNull(clientSource.tarifBilant)
+      if (contractBalance === null) {
+        toast.error("Tarif bilanț este obligatoriu pentru generare contract")
+        setGenerating(false)
+        return
+      }
+
       const payload = {
         templateId: Number(selectedTemplate),
         clientId: client.id,
@@ -152,6 +159,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
         endDate: String(clientSource.panaLa || ""),
         mappings: buildMappings(),
         autoRenew: true,
+        contractBalance,
         value: toNumberOrNull(clientSource.tarifConta),
         notes: notes || null,
       }

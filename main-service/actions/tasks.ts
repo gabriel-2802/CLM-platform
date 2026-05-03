@@ -253,9 +253,13 @@ export async function getTaskFormOptions() {
   const session = await getSession()
   const token = (session?.user as unknown as SessionUserWithServiceToken | undefined)?.serviceToken ?? ""
 
+  const params = new URLSearchParams()
+  params.append("request.page", "0")
+  params.append("request.size", "1000")
+
   const [usersRes, clientsRes] = await Promise.all([
     getUsers(token),
-    clientServiceFetch("/api/clients?size=1000&page=0&sort=denumire,asc", { cache: "no-store" }),
+    clientServiceFetch(`/api/clients?${params}`, { cache: "no-store" }),
   ])
 
   const clientsData = clientsRes.ok ? ((await clientsRes.json()) as ClientsApiResponse | ClientApiResponse[]) : { content: [] }
@@ -263,6 +267,6 @@ export async function getTaskFormOptions() {
 
   return {
     users: usersRes.map((u) => ({ id: u.id, label: userLabel(u) })),
-    clients: clients.map((c) => ({ id: c.id, label: c.denumire ?? c.name ?? String(c.id) })),
+    clients: clients.map((c) => ({ id: c.id, label: c.name ?? String(c.id) })),
   }
 }

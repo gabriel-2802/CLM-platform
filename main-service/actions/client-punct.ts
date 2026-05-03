@@ -37,19 +37,19 @@ function toDateTime(value: FormDataEntryValue | null): string | null {
 function mapPoint(p: any): PunctDeLucruValues {
   return {
     id: p.id,
-    denumire: p.denumire ?? p.name,
-    deLa: toISODate(p.deLa ?? p.startDate)!,
-    panaLa: toISODate(p.panaLa ?? p.endDate),
-    administratie: p.administratie ?? p.administration,
-    registruUC: !!p.registruUC,
-    salariati: p.salariati ?? p.employees ?? 0,
-    cui: p.cui ?? p.taxId ?? undefined,
-    casaDeMarcat: !!p.casaDeMarcat ?? !!p.cashRegister,
+    denumire: p.name,
+    deLa: toISODate(p.validFrom)!,
+    panaLa: toISODate(p.validTo),
+    administratie: p.administration,
+    registruUC: !!p.ucRegistry,
+    salariati: p.employeeCount ?? 0,
+    cui: p.taxId ?? undefined,
+    casaDeMarcat: !!p.cashRegister,
   }
 }
 
 export async function getClientPunctDeLucru(clientId: number): Promise<PunctDeLucruValues | null> {
-  const res = await clientServiceFetch(`/api/clients/${clientId}/puncte-de-lucru`, { cache: "no-store" })
+  const res = await clientServiceFetch(`/api/clients/${clientId}/work-points`, { cache: "no-store" })
   if (!res.ok) return null
   const list = await res.json()
   if (!list || list.length === 0) return null
@@ -57,7 +57,7 @@ export async function getClientPunctDeLucru(clientId: number): Promise<PunctDeLu
 }
 
 export async function getClientPuncteDeLucru(clientId: number): Promise<PunctDeLucruValues[]> {
-  const res = await clientServiceFetch(`/api/clients/${clientId}/puncte-de-lucru`, { cache: "no-store" })
+  const res = await clientServiceFetch(`/api/clients/${clientId}/work-points`, { cache: "no-store" })
   if (!res.ok) return []
   const list = await res.json()
   return (list ?? []).map(mapPoint)
@@ -69,25 +69,25 @@ export async function upsertClientPunctDeLucru(clientId: number, formData: FormD
   const id = typeof idRaw === "string" && idRaw.trim() !== "" ? Number(idRaw) : 0
 
   const body = {
-    denumire: (formData.get("denumire") as string)?.trim() || "",
-    deLa: toDateTime(formData.get("deLa")),
-    panaLa: toDateTime(formData.get("panaLa")),
-    administratie: formData.get("administratie") ?? "SECTOR_1",
-    registruUC: formData.get("registruUC") === "on" || formData.get("registruUC") === "true",
-    salariati: parseInt(formData.get("salariati") as string ?? "0", 10) || 0,
-    cui: formData.get("cui") || null,
-    casaDeMarcat: formData.get("casaDeMarcat") === "on" || formData.get("casaDeMarcat") === "true",
+    name: (formData.get("denumire") as string)?.trim() || "",
+    validFrom: toDateTime(formData.get("deLa")),
+    validTo: toDateTime(formData.get("panaLa")),
+    administration: formData.get("administratie") ?? "SECTOR_1",
+    ucRegistry: formData.get("registruUC") === "on" || formData.get("registruUC") === "true",
+    employeeCount: parseInt(formData.get("salariati") as string ?? "0", 10) || 0,
+    taxId: formData.get("cui") || null,
+    cashRegister: formData.get("casaDeMarcat") === "on" || formData.get("casaDeMarcat") === "true",
   }
 
   let res: Response
   if (id > 0) {
-    res = await clientServiceFetch(`/api/clients/${clientId}/puncte-de-lucru/${id}`, {
+    res = await clientServiceFetch(`/api/clients/${clientId}/work-points/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
   } else {
-    res = await clientServiceFetch(`/api/clients/${clientId}/puncte-de-lucru`, {
+    res = await clientServiceFetch(`/api/clients/${clientId}/work-points`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -104,7 +104,7 @@ export async function upsertClientPunctDeLucru(clientId: number, formData: FormD
 
 export async function deleteClientPunctDeLucru(clientId: number, id: number): Promise<{ id: number }> {
   "use server";
-  const res = await clientServiceFetch(`/api/clients/${clientId}/puncte-de-lucru/${id}`, {
+  const res = await clientServiceFetch(`/api/clients/${clientId}/work-points/${id}`, {
     method: "DELETE",
   })
   if (!res.ok && res.status !== 404) {

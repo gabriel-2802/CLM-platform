@@ -45,8 +45,8 @@ export async function POST(request: Request) {
   const usersRes = await fetch(`${CLIENT_SERVICE_URL}/api/clients/${clientId}/users`, { headers: { Authorization: `Bearer ${auth.token}` } });
   if (!usersRes.ok) return NextResponse.json({ error: 'Failed to fetch user assignments' }, { status: 500 });
 
-  const userLinks: any[] = await usersRes.json();
-  const userIds = userLinks.map((u: any) => u.userId ?? u.id);
+  const userLinks: any = await usersRes.json();
+  const userIds = userLinks.userIds ?? [];
   const assignedUser = findAssignedUser(userIds, allUsers);
   if (!assignedUser) return NextResponse.json({ error: 'No USER or MANAGER assigned' }, { status: 400 });
 

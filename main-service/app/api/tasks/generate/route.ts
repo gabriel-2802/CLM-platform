@@ -33,8 +33,12 @@ export async function POST(request: Request) {
 
   const taskDate = new Date(Date.UTC(year, month - 1, 1)).toISOString();
 
+  const params = new URLSearchParams();
+  params.append('request.page', '0');
+  params.append('request.size', '1000');
+
   const [clientsRes, allUsers] = await Promise.all([
-    fetch(`${CLIENT_SERVICE_URL}/api/clients?size=1000&page=0`, { headers: { Authorization: `Bearer ${auth.token}` } }),
+    fetch(`${CLIENT_SERVICE_URL}/api/clients?${params}`, { headers: { Authorization: `Bearer ${auth.token}` } }),
     getUsers(auth.token),
   ]);
 
@@ -46,8 +50,8 @@ export async function POST(request: Request) {
   for (const client of clients) {
     const usersRes = await fetch(`${CLIENT_SERVICE_URL}/api/clients/${client.id}/users`, { headers: { Authorization: `Bearer ${auth.token}` } });
     if (!usersRes.ok) continue;
-    const userLinks: any[] = await usersRes.json();
-    const userIds = userLinks.map((u: any) => u.userId ?? u.id);
+    const userLinks: any = await usersRes.json();
+    const userIds = userLinks.userIds ?? [];
     const assignedUser = findAssignedUser(userIds, allUsers);
     if (!assignedUser) continue;
 

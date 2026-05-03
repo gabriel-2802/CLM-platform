@@ -15,19 +15,19 @@ export type DetaliiValues = {
 }
 
 export async function getClientDetalii(clientId: number): Promise<DetaliiValues | null> {
-  const res = await clientServiceFetch(`/api/clients/${clientId}/detalii`, { cache: "no-store" })
+  const res = await clientServiceFetch(`/api/clients/${clientId}/details`, { cache: "no-store" })
   if (!res.ok) return null
   const d = await res.json()
   return {
-    registruUC: !!d.registruUC,
-    registruEvFiscala: d.registruEvFiscala ?? "NU_E_CAZUL",
-    ofSpalareBani: !!d.ofSpalareBani,
-    regulamentOrdineInterioara: !!d.regulamentOrdineInterioara,
-    manualPoliticiContabile: !!d.manualPoliticiContabile,
-    adresaRevisal: !!d.adresaRevisal,
-    parolaITM: d.parolaITM ?? undefined,
-    depunereDeclaratiiOnline: !!d.depunereDeclaratiiOnline,
-    accesDosarFiscal: d.accesDosarFiscal ?? "NU_E_CAZUL",
+    registruUC: !!d.ucRegistry,
+    registruEvFiscala: d.fiscalEvidenceRegistry ?? "NU_E_CAZUL",
+    ofSpalareBani: !!d.moneyLaunderingOffice,
+    regulamentOrdineInterioara: !!d.internalRules,
+    manualPoliticiContabile: !!d.accountingPoliciesManual,
+    adresaRevisal: !!d.revisalAddress,
+    parolaITM: d.itmPassword ?? undefined,
+    depunereDeclaratiiOnline: !!d.onlineDeclarations,
+    accesDosarFiscal: d.fiscalFileAccess ?? "NU_E_CAZUL",
   }
 }
 
@@ -38,18 +38,18 @@ export async function upsertClientDetalii(clientId: number, formData: FormData):
     typeof v === "string" && v.trim() !== "" ? v : undefined
 
   const body = {
-    registruUC: bool(formData.get("registruUC")),
-    registruEvFiscala: formData.get("registruEvFiscala") ?? "NU_E_CAZUL",
-    ofSpalareBani: bool(formData.get("ofSpalareBani")),
-    regulamentOrdineInterioara: bool(formData.get("regulamentOrdineInterioara")),
-    manualPoliticiContabile: bool(formData.get("manualPoliticiContabile")),
-    adresaRevisal: bool(formData.get("adresaRevisal")),
-    parolaITM: str(formData.get("parolaITM")) ?? null,
-    depunereDeclaratiiOnline: bool(formData.get("depunereDeclaratiiOnline")),
-    accesDosarFiscal: formData.get("accesDosarFiscal") ?? "NU_E_CAZUL",
+    ucRegistry: bool(formData.get("registruUC")),
+    fiscalEvidenceRegistry: formData.get("registruEvFiscala") ?? "NU_E_CAZUL",
+    moneyLaunderingOffice: bool(formData.get("ofSpalareBani")),
+    internalRules: bool(formData.get("regulamentOrdineInterioara")),
+    accountingPoliciesManual: bool(formData.get("manualPoliticiContabile")),
+    revisalAddress: bool(formData.get("adresaRevisal")),
+    itmPassword: str(formData.get("parolaITM")) ?? null,
+    onlineDeclarations: bool(formData.get("depunereDeclaratiiOnline")),
+    fiscalFileAccess: formData.get("accesDosarFiscal") ?? "NU_E_CAZUL",
   }
 
-  const res = await clientServiceFetch(`/api/clients/${clientId}/detalii`, {
+  const res = await clientServiceFetch(`/api/clients/${clientId}/details`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -62,14 +62,14 @@ export async function upsertClientDetalii(clientId: number, formData: FormData):
 
   const d = await res.json()
   return {
-    registruUC: !!d.registruUC,
-    registruEvFiscala: d.registruEvFiscala ?? "NU_E_CAZUL",
-    ofSpalareBani: !!d.ofSpalareBani,
-    regulamentOrdineInterioara: !!d.regulamentOrdineInterioara,
-    manualPoliticiContabile: !!d.manualPoliticiContabile,
-    adresaRevisal: !!d.adresaRevisal,
-    parolaITM: d.parolaITM ?? undefined,
-    depunereDeclaratiiOnline: !!d.depunereDeclaratiiOnline,
-    accesDosarFiscal: d.accesDosarFiscal ?? "NU_E_CAZUL",
+    registruUC: !!d.ucRegistry,
+    registruEvFiscala: d.fiscalEvidenceRegistry ?? "NU_E_CAZUL",
+    ofSpalareBani: !!d.moneyLaunderingOffice,
+    regulamentOrdineInterioara: !!d.internalRules,
+    manualPoliticiContabile: !!d.accountingPoliciesManual,
+    adresaRevisal: !!d.revisalAddress,
+    parolaITM: d.itmPassword ?? undefined,
+    depunereDeclaratiiOnline: !!d.onlineDeclarations,
+    accesDosarFiscal: d.fiscalFileAccess ?? "NU_E_CAZUL",
   }
 }
