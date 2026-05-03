@@ -9,41 +9,39 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 public record ClientRequest(
-    @NotBlank(groups = ValidationGroups.Create.class)
-    @Size(max = 255)
-    String denumire,
-    @NotNull(groups = ValidationGroups.Create.class)
-    CompanyType tip,
-    @NotBlank(groups = ValidationGroups.Create.class)
-    @Size(max = 64)
-    String cui,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean activa,
-    LocalDateTime dataVerificarii,
-    @Size(max = 255)
-    String adresa,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Administration administratie,
-    TaxType impozit,
-    @NotNull(groups = ValidationGroups.Create.class)
-    TaxFrequency platitorTVA,
-    Boolean tvaLaIncasare,
-    Boolean areCodTVAUE,
-    @Size(max = 64)
-    String codTVAUE,
-    Boolean operatiuneUE,
-    Boolean dividende,
-    @Size(max = 32)
-    String salariati,
-    Boolean casaDeMarcat,
-    LocalDateTime dataExpSediuSocial,
-    LocalDateTime dataExpMandatAdmin,
-    LocalDateTime dataCertificatFiscal,
-    LocalDateTime dataFisaPlatitor,
-    LocalDateTime dataVectFiscal
-) {
-}
-
+        @NotBlank(groups = ValidationGroups.Create.class)
+        @Size(max = 255)
+        String name,
+        @NotNull(groups = ValidationGroups.Create.class)
+        CompanyType type,
+        @NotBlank(groups = ValidationGroups.Create.class)
+        @Size(max = 64)
+        String taxId,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean active,
+        LocalDate verificationDate,
+        @Size(max = 255)
+        String address,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Administration administration,
+        TaxType taxType,
+        @NotNull(groups = ValidationGroups.Create.class)
+        TaxFrequency vatPayer,
+        Boolean vatOnCollection,
+        Boolean hasEuVatCode,
+        @Size(max = 64)
+        String euVatCode,
+        Boolean euOperation,
+        Boolean dividends,
+        @Size(max = 32)
+        String employees,
+        Boolean cashRegister,
+        LocalDate hqExpirationDate,
+        LocalDate adminMandateExpiration,
+        LocalDate fiscalCertificateDate,
+        LocalDate payerSheetDate,
+        LocalDate fiscalVectorDate
+) {}

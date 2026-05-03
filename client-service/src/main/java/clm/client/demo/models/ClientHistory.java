@@ -10,9 +10,9 @@ import java.math.BigDecimal;
 
 @Entity
 @Table(
-        name = "istorice",
+        name = "client_histories",
         uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"client_id", "anul"})
+                @UniqueConstraint(columnNames = {"client_id", "year"})
         }
 )
 @Getter
@@ -28,20 +28,20 @@ public class ClientHistory {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
-    @Column(name = "anul", nullable = false)
+    @Column(name = "year", nullable = false)
     private int year;
 
-    @Column(name = "cifra_afaceri", nullable = false)
-        private BigDecimal turnover;
+    @Column(name = "turnover", nullable = false)
+    private BigDecimal turnover;
 
-    @Column(name = "inventar", nullable = false)
+    @Column(name = "inventory", nullable = false)
     private boolean inventory;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "bilant_sem_iun", nullable = false)
+    @Column(name = "june_semester_balance", nullable = false)
     private YesNoNa juneSemesterBalance;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "bilant_anual", nullable = false)
+    @Column(name = "annual_balance", nullable = false)
     private YesNoNa annualBalance;
 }

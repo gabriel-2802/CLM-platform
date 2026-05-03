@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -21,9 +20,9 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/clients/{clientId}/detalii")
+@RequestMapping("/api/clients/{clientId}/details")
 @RequiredArgsConstructor
-@Tag(name = "Details", description = "Client details (Detalii) management - additional compliance and audit information")
+@Tag(name = "Details", description = "Client details management — compliance and audit information.")
 @SecurityRequirement(name = "bearerAuth")
 public class DetailsController {
 
@@ -33,15 +32,15 @@ public class DetailsController {
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
     @Operation(
             summary = "Get client details",
-            description = "Retrieves detailed compliance and audit information for a specific client. One details record per client."
+            description = "Retrieves compliance and audit information for a specific client.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "details retrieved",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client or details not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Details retrieved successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - USER not assigned to this client or insufficient role"),
-            @ApiResponse(responseCode = "404", description = "Client or details not found")
-    })
     public ResponseEntity<DetailsResponse> getDetails(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId) {
@@ -52,24 +51,19 @@ public class DetailsController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(
             summary = "Create or replace client details",
-            description = "Creates or completely replaces the details record for a client. If details already exist, they are replaced. Requires MANAGER or ADMIN role."
+            description = "Creates or fully replaces the details record for a client.",
+            responses = {
+                    @ApiResponse(responseCode = "201", description = "details created or replaced",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
+                    @ApiResponse(responseCode = "400", description = "validation failed", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Details created or replaced successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request body or validation failed"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient permissions (requires MANAGER or ADMIN)"),
-            @ApiResponse(responseCode = "404", description = "Client not found")
-    })
     public ResponseEntity<DetailsResponse> createOrReplaceDetails(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Details request (full replacement)",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = DetailsRequest.class))
-            )
             @Validated(ValidationGroups.Create.class) @RequestBody DetailsRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(detailsService.upsertDetails(clientId, request));
     }
@@ -78,24 +72,19 @@ public class DetailsController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(
             summary = "Partially update client details",
-            description = "Performs a partial update of client details. Only provided fields are updated. Requires MANAGER or ADMIN role."
+            description = "Updates only the provided fields of the client details record.",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "details partially updated",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
+                    @ApiResponse(responseCode = "400", description = "validation failed", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client or details not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Details partially updated successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = DetailsResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request body or validation failed"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient permissions (requires MANAGER or ADMIN)"),
-            @ApiResponse(responseCode = "404", description = "Client or details not found")
-    })
     public ResponseEntity<DetailsResponse> partialUpdateDetails(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Details partial update request",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = DetailsRequest.class))
-            )
             @Valid @RequestBody DetailsRequest request) {
         return ResponseEntity.ok(detailsService.patchDetails(clientId, request));
     }

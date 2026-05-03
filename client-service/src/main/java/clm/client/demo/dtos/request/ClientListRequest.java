@@ -5,10 +5,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
 public record ClientListRequest(
-    Boolean activa,
-    CompanyType tip,
-    Long userId,
-    @Min(0) Integer page,
-    @Min(1) @Max(200) Integer size
-) {
-}
+        Boolean active,
+        CompanyType type,
+        Long userId,
+        @Min(0) Integer page,
+        @Min(1) @Max(200) Integer size
+) {}

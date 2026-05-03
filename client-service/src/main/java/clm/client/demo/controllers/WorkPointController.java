@@ -9,7 +9,6 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +21,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/clients/{clientId}/puncte-de-lucru")
+@RequestMapping("/api/clients/{clientId}/work-points")
 @RequiredArgsConstructor
-@Tag(name = "Work Points", description = "Work points (Puncte de Lucru) management - additional work locations for clients")
+@Tag(name = "Work Points", description = "Work point management — additional work locations for clients.")
 @SecurityRequirement(name = "bearerAuth")
 public class WorkPointController {
 
@@ -34,15 +33,14 @@ public class WorkPointController {
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
     @Operation(
             summary = "List all work points for a client",
-            description = "Retrieves all work points (secondary locations) associated with a specific client."
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "work points retrieved",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = List.class))),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Work points retrieved successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = List.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - USER not assigned to this client or insufficient role"),
-            @ApiResponse(responseCode = "404", description = "Client not found")
-    })
     public ResponseEntity<List<WorkPointResponse>> listWorkPoints(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId) {
@@ -53,15 +51,14 @@ public class WorkPointController {
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
     @Operation(
             summary = "Get a specific work point",
-            description = "Retrieves a specific work point by ID for a client."
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "work point retrieved",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client or work point not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Work point retrieved successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - USER not assigned to this client or insufficient role"),
-            @ApiResponse(responseCode = "404", description = "Client or work point not found")
-    })
     public ResponseEntity<WorkPointResponse> getWorkPoint(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,
@@ -74,24 +71,18 @@ public class WorkPointController {
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(
             summary = "Create a new work point",
-            description = "Creates a new work point (secondary location) for a client. Requires MANAGER or ADMIN role."
+            responses = {
+                    @ApiResponse(responseCode = "201", description = "work point created",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
+                    @ApiResponse(responseCode = "400", description = "validation failed", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Work point created successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request body or validation failed"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient permissions (requires MANAGER or ADMIN)"),
-            @ApiResponse(responseCode = "404", description = "Client not found")
-    })
     public ResponseEntity<WorkPointResponse> createWorkPoint(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Work point creation request",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = WorkPointRequest.class))
-            )
             @Validated(ValidationGroups.Create.class) @RequestBody WorkPointRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(workPointService.createWorkPoint(clientId, request));
     }
@@ -99,27 +90,21 @@ public class WorkPointController {
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(
-            summary = "Update a work point",
-            description = "Updates an existing work point with full replacement. Requires MANAGER or ADMIN role."
+            summary = "Full update of a work point",
+            responses = {
+                    @ApiResponse(responseCode = "200", description = "work point updated",
+                            content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
+                    @ApiResponse(responseCode = "400", description = "validation failed", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client or work point not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Work point updated successfully",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = WorkPointResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Invalid request body or validation failed"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient permissions (requires MANAGER or ADMIN)"),
-            @ApiResponse(responseCode = "404", description = "Client or work point not found")
-    })
     public ResponseEntity<WorkPointResponse> updateWorkPoint(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,
             @Parameter(description = "Work point ID", required = true, example = "1")
             @PathVariable Long id,
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Work point update request",
-                    required = true,
-                    content = @Content(schema = @Schema(implementation = WorkPointRequest.class))
-            )
             @Validated(ValidationGroups.Create.class) @RequestBody WorkPointRequest request) {
         return ResponseEntity.ok(workPointService.updateWorkPoint(clientId, id, request));
     }
@@ -128,14 +113,13 @@ public class WorkPointController {
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(
             summary = "Delete a work point",
-            description = "Deletes a specific work point for a client. Requires ADMIN role."
+            responses = {
+                    @ApiResponse(responseCode = "204", description = "work point deleted", content = @Content),
+                    @ApiResponse(responseCode = "401", description = "unauthorized", content = @Content),
+                    @ApiResponse(responseCode = "403", description = "forbidden", content = @Content),
+                    @ApiResponse(responseCode = "404", description = "client or work point not found", content = @Content)
+            }
     )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Work point deleted successfully"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - missing or invalid JWT token"),
-            @ApiResponse(responseCode = "403", description = "Forbidden - insufficient permissions (requires ADMIN)"),
-            @ApiResponse(responseCode = "404", description = "Client or work point not found")
-    })
     public ResponseEntity<Void> deleteWorkPoint(
             @Parameter(description = "Client ID", required = true, example = "1")
             @PathVariable Long clientId,

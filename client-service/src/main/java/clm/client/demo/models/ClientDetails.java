@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "detalii")
+@Table(name = "client_details")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,32 +21,32 @@ public class ClientDetails {
     @JoinColumn(name = "client_id", nullable = false, unique = true)
     private Client client;
 
-    @Column(name = "registru_uc", nullable = false)
+    @Column(name = "uc_registry", nullable = false)
     private boolean ucRegistry;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "registru_ev_fiscala", nullable = false)
+    @Column(name = "fiscal_evidence_registry", nullable = false)
     private YesNoNa fiscalEvidenceRegistry;
 
-    @Column(name = "of_spalare_bani", nullable = false)
+    @Column(name = "money_laundering_office", nullable = false)
     private boolean moneyLaunderingOffice;
 
-    @Column(name = "regulament_ordine_interioara", nullable = false)
+    @Column(name = "internal_rules", nullable = false)
     private boolean internalRules;
 
-    @Column(name = "manual_politici_contabile", nullable = false)
+    @Column(name = "accounting_policies_manual", nullable = false)
     private boolean accountingPoliciesManual;
 
-    @Column(name = "adresa_revisal", nullable = false)
+    @Column(name = "revisal_address", nullable = false)
     private boolean revisalAddress;
 
-    @Column(name = "parola_itm")
+    @Column(name = "itm_password")
     private String itmPassword;
 
-    @Column(name = "depunere_declaratii_online", nullable = false)
+    @Column(name = "online_declarations", nullable = false)
     private boolean onlineDeclarations;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "acces_dosar_fiscal", nullable = false)
+    @Column(name = "fiscal_file_access", nullable = false)
     private YesNoNa fiscalFileAccess;
 }

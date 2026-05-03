@@ -32,7 +32,7 @@ public class ClientAssignmentService {
         List<Long> userIds = userClientRepository.findAllByClientId(clientId).stream()
                 .map(UserClient::getUserId)
                 .toList();
-        return new AssignmentResponse(clientId, List.copyOf(userIds));
+        return new AssignmentResponse(clientId, userIds);
     }
 
     @Transactional
@@ -43,11 +43,14 @@ public class ClientAssignmentService {
         Set<Long> distinctUserIds = request.userIds().stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        List<UserClient> assignments = distinctUserIds.stream()
-                .map(userId -> buildAssignment(client, userId))
-                .toList();
-        userClientRepository.saveAll(assignments);
-        log.info("Replaced assignments for client {} with {} users", clientId, distinctUserIds.size());
+
+        userClientRepository.saveAll(
+                distinctUserIds.stream()
+                        .map(userId -> buildAssignment(client, userId))
+                        .toList()
+        );
+
+        log.info("replaced assignments for client {} with {} users", clientId, distinctUserIds.size());
         return new AssignmentResponse(clientId, List.copyOf(distinctUserIds));
     }
 
@@ -56,9 +59,9 @@ public class ClientAssignmentService {
         Client client = findClient(clientId);
         try {
             userClientRepository.save(buildAssignment(client, userId));
-            log.info("Assigned user {} to client {}", userId, clientId);
+            log.info("assigned user {} to client {}", userId, clientId);
         } catch (DataIntegrityViolationException ignored) {
-            log.debug("User {} already assigned to client {} — skipping duplicate", userId, clientId);
+            log.debug("user {} already assigned to client {} — skipping duplicate", userId, clientId);
         }
     }
 
@@ -66,18 +69,18 @@ public class ClientAssignmentService {
     public void removeUser(Long clientId, Long userId) {
         ensureClientExists(clientId);
         userClientRepository.deleteByClientIdAndUserId(clientId, userId);
-        log.info("Removed user {} from client {}", userId, clientId);
+        log.info("removed user {} from client {}", userId, clientId);
     }
 
     @Transactional(readOnly = true)
     public List<Long> getClientsForUser(Long userId) {
         return userClientRepository.findAllByUserId(userId).stream()
-                .map(userClient -> userClient.getClient().getId())
+                .map(uc -> uc.getClient().getId())
                 .toList();
     }
 
     private UserClient buildAssignment(Client client, Long userId) {
-        UserClient assignment = new UserClient();
+        var assignment = new UserClient();
         assignment.setClient(client);
         assignment.setUserId(userId);
         return assignment;

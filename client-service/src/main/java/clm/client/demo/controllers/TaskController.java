@@ -2,14 +2,17 @@ package clm.client.demo.controllers;
 
 import clm.client.demo.dtos.request.TaskRequest;
 import clm.client.demo.dtos.response.TaskResponse;
+import clm.client.demo.security.SecurityUtils;
 import clm.client.demo.services.TaskService;
 import clm.client.demo.validation.ValidationGroups;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -19,7 +22,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
-@Tag(name = "Tasks", description = "Task management endpoints")
+@Tag(name = "Tasks", description = "Task management endpoints.")
 @SecurityRequirement(name = "bearerAuth")
 public class TaskController {
 
@@ -27,22 +30,31 @@ public class TaskController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
-    @Operation(summary = "List tasks (role-filtered)")
+    @Operation(summary = "List tasks — USER sees only their own, MANAGER/ADMIN see all")
     public ResponseEntity<List<TaskResponse>> listTasks() {
-        return ResponseEntity.ok(taskService.listTasks());
+        if (SecurityUtils.isUserOnly()) {
+            Long userId = SecurityUtils.getCurrentUserId()
+                    .orElseThrow(() -> new AccessDeniedException("Missing authenticated user id"));
+            return ResponseEntity.ok(taskService.listTasksByUser(userId));
+        }
+        return ResponseEntity.ok(taskService.listAllTasks());
     }
 
     @GetMapping("/by-client/{clientId}")
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
     @Operation(summary = "List tasks for a specific client")
-    public ResponseEntity<List<TaskResponse>> listByClient(@PathVariable Long clientId) {
+    public ResponseEntity<List<TaskResponse>> listByClient(
+            @Parameter(description = "Client ID", required = true, example = "1")
+            @PathVariable Long clientId) {
         return ResponseEntity.ok(taskService.listTasksByClient(clientId));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
     @Operation(summary = "Get task by ID")
-    public ResponseEntity<TaskResponse> getTask(@PathVariable Long id) {
+    public ResponseEntity<TaskResponse> getTask(
+            @Parameter(description = "Task ID", required = true, example = "1")
+            @PathVariable Long id) {
         return ResponseEntity.ok(taskService.getTask(id));
     }
 
@@ -56,8 +68,9 @@ public class TaskController {
 
     @PatchMapping("/{id}")
     @PreAuthorize("hasAnyRole('USER', 'MANAGER', 'ADMIN')")
-    @Operation(summary = "Update a task")
+    @Operation(summary = "Partially update a task")
     public ResponseEntity<TaskResponse> updateTask(
+            @Parameter(description = "Task ID", required = true, example = "1")
             @PathVariable Long id,
             @RequestBody TaskRequest request) {
         return ResponseEntity.ok(taskService.updateTask(id, request));
@@ -66,7 +79,9 @@ public class TaskController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('MANAGER', 'ADMIN')")
     @Operation(summary = "Delete a task")
-    public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteTask(
+            @Parameter(description = "Task ID", required = true, example = "1")
+            @PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
     }

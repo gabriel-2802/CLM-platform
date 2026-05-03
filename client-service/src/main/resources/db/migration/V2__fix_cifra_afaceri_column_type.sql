@@ -1,6 +1,3 @@
--- Fix cifra_afaceri column type from DOUBLE PRECISION to NUMERIC(19,2)
--- This aligns the database schema with the Hibernate entity definition
-
-ALTER TABLE clients.istorice
-ALTER COLUMN cifra_afaceri TYPE NUMERIC(19, 2);
-
+-- fix turnover column type from double precision to numeric(19,2)
+ALTER TABLE clients.client_histories
+ALTER COLUMN turnover TYPE NUMERIC(19, 2);

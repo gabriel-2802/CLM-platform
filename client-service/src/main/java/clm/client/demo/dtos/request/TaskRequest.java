@@ -4,7 +4,7 @@ import clm.client.demo.validation.ValidationGroups;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 public record TaskRequest(
     Boolean done,
@@ -14,7 +14,7 @@ public record TaskRequest(
     String blocked,
     String objective,
     @NotNull(groups = ValidationGroups.Create.class)
-    LocalDateTime date,
+    LocalDate date,
     @NotNull(groups = ValidationGroups.Create.class)
     Long userId,
     @NotNull(groups = ValidationGroups.Create.class)

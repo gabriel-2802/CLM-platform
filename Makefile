@@ -76,7 +76,7 @@ test: check-docker
 	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5434  (user: clm_user / db: clm_users)"
 	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5435  (user: clm_user / db: clm_clients)"
 	@echo ""
-	@echo "  $(GREEN) All endpoints docs can be accessed at =>$(NC)  http://localhost:8090"`
+	@echo "  $(GREEN) All endpoints docs can be accessed at =>$(NC)  http://localhost:8090"
 	@echo "  
 	@echo ""
 	@echo ""

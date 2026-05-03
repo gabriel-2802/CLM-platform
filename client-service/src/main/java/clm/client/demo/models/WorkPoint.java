@@ -6,10 +6,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
-@Table(name = "puncte_de_lucru")
+@Table(name = "work_points", schema = "clients")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -23,28 +23,28 @@ public class WorkPoint {
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 
-    @Column(name = "denumire", nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "de_la", nullable = false)
-    private LocalDateTime validFrom;
+    @Column(name = "valid_from", nullable = false)
+    private LocalDate validFrom;
 
-    @Column(name = "pana_la")
-    private LocalDateTime validTo;
+    @Column(name = "valid_to")
+    private LocalDate validTo;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "administratie", nullable = false)
+    @Column(name = "administration", nullable = false)
     private Administration administration;
 
-    @Column(name = "registru_uc", nullable = false)
+    @Column(name = "uc_registry", nullable = false)
     private boolean ucRegistry;
 
-    @Column(name = "salariati", nullable = false)
+    @Column(name = "employee_count", nullable = false)
     private int employeeCount;
 
-    @Column(name = "cui")
+    @Column(name = "tax_id")
     private String taxId;
 
-    @Column(name = "casa_de_marcat", nullable = false)
+    @Column(name = "cash_register", nullable = false)
     private boolean cashRegister;
 }

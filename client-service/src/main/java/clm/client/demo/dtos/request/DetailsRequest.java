@@ -5,22 +5,21 @@ import clm.client.demo.validation.ValidationGroups;
 import jakarta.validation.constraints.NotNull;
 
 public record DetailsRequest(
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean registruUC,
-    @NotNull(groups = ValidationGroups.Create.class)
-    YesNoNa registruEvFiscala,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean ofSpalareBani,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean regulamentOrdineInterioara,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean manualPoliticiContabile,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean adresaRevisal,
-    String parolaITM,
-    @NotNull(groups = ValidationGroups.Create.class)
-    Boolean depunereDeclaratiiOnline,
-    @NotNull(groups = ValidationGroups.Create.class)
-    YesNoNa accesDosarFiscal
-) {
-}
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean ucRegistry,
+        @NotNull(groups = ValidationGroups.Create.class)
+        YesNoNa fiscalEvidenceRegistry,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean moneyLaunderingOffice,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean internalRules,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean accountingPoliciesManual,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean revisalAddress,
+        String itmPassword,
+        @NotNull(groups = ValidationGroups.Create.class)
+        Boolean onlineDeclarations,
+        @NotNull(groups = ValidationGroups.Create.class)
+        YesNoNa fiscalFileAccess
+) {}

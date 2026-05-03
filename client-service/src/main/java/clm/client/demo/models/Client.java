@@ -9,6 +9,7 @@ import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Objects;
@@ -25,72 +26,72 @@ public class Client {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "denumire", nullable = false)
+    @Column(name = "name", nullable = false)
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "tip", nullable = false)
+    @Column(name = "company_type", nullable = false)
     private CompanyType type;
 
-    @Column(name = "cui", nullable = false, unique = true)
+    @Column(name = "tax_id", nullable = false, unique = true)
     private String taxId;
 
-    @Column(name = "activa", nullable = false)
+    @Column(name = "active", nullable = false)
     private boolean active;
 
-    @Column(name = "data_verificarii")
-    private LocalDateTime verificationDate;
+    @Column(name = "verification_date")
+    private LocalDate verificationDate;
 
-    @Column(name = "adresa")
+    @Column(name = "address")
     private String address;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "administratie", nullable = false)
+    @Column(name = "administration", nullable = false)
     private Administration administration;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "impozit")
+    @Column(name = "tax_type")
     private TaxType taxType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "platitor_tva", nullable = false)
+    @Column(name = "vat_payer", nullable = false)
     private TaxFrequency vatPayer;
 
-    @Column(name = "tva_la_incasare")
+    @Column(name = "vat_on_collection")
     private Boolean vatOnCollection;
 
-    @Column(name = "are_cod_tva_ue")
+    @Column(name = "has_eu_vat_code")
     private Boolean hasEuVatCode;
 
-    @Column(name = "cod_tva_ue")
+    @Column(name = "eu_vat_code")
     private String euVatCode;
 
-    @Column(name = "operatiune_ue")
+    @Column(name = "eu_operation")
     private Boolean euOperation;
 
-    @Column(name = "dividende")
+    @Column(name = "dividends")
     private Boolean dividends;
 
-    @Column(name = "salariati")
+    @Column(name = "employees")
     private String employees;
 
-    @Column(name = "casa_de_marcat")
+    @Column(name = "cash_register")
     private Boolean cashRegister;
 
-    @Column(name = "data_exp_sediu_social")
-    private LocalDateTime hqExpirationDate;
+    @Column(name = "hq_expiration_date")
+    private LocalDate hqExpirationDate;
 
-    @Column(name = "data_exp_mandat_admin")
-    private LocalDateTime adminMandateExpiration;
+    @Column(name = "admin_mandate_expiration")
+    private LocalDate adminMandateExpiration;
 
-    @Column(name = "data_certificat_fiscal")
-    private LocalDateTime fiscalCertificateDate;
+    @Column(name = "fiscal_certificate_date")
+    private LocalDate fiscalCertificateDate;
 
-    @Column(name = "data_fisa_platitor")
-    private LocalDateTime payerSheetDate;
+    @Column(name = "payer_sheet_date")
+    private LocalDate payerSheetDate;
 
-    @Column(name = "data_vect_fiscal")
-    private LocalDateTime fiscalVectorDate;
+    @Column(name = "fiscal_vector_date")
+    private LocalDate fiscalVectorDate;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -100,7 +101,7 @@ public class Client {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
-    // ─── Relationships ────────────────────────────────────────────────────────
+    // relationships 
 
     @OneToOne(mappedBy = "client", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     private ClientDetails details;
@@ -117,7 +118,7 @@ public class Client {
     @BatchSize(size = 50)
     private Set<UserClient> userClients = new HashSet<>();
 
-    // ─── Bidirectional Sync Helpers ───────────────────────────────────────────
+    // bidirectional sync helpers 
 
     public void setDetails(ClientDetails details) {
         if (Objects.nonNull(details)) {
