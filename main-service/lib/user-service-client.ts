@@ -77,7 +77,8 @@ export async function getUsers(token: string | null | undefined): Promise<Servic
       cache: "no-store",
     });
     if (!res.ok) return [];
-    return res.json();
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.content ?? []);
   } catch {
     return [];
   }
