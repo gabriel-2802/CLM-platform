@@ -7,6 +7,7 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Contact;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.tags.Tag;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,6 +42,9 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI clmOpenAPI() {
         return new OpenAPI()
+                .addServersItem(new Server()
+                        .url("https://localhost")
+                        .description("CLM Platform — via Nginx (use this for Try-it-out)"))
                 // apply the bearerAuth scheme to every endpoint globally
                 .addSecurityItem(new SecurityRequirement().addList("bearerAuth"))
                 .info(new Info()

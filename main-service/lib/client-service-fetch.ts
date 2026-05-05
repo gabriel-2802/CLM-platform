@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 import { authOptions } from "@/lib/auth/config";
 
-const CLIENT_SERVICE_URL = process.env.CLIENT_SERVICE_URL || "http://client-service:8084";
+import { CLIENT_SERVICE_URL } from "@/lib/config/server"
 
 async function getServiceToken(): Promise<string | null> {
   const cookieStore = await cookies();

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { loginUser, getUsers, primaryRole, ServiceUser } from '@/lib/user-service-client';
 
-const CLIENT_SERVICE_URL = process.env.CLIENT_SERVICE_URL || "http://client-service:8084";
+import { CLIENT_SERVICE_URL } from "@/lib/config/server"
 
 async function checkBasicAuth(request: Request): Promise<{ ok: boolean; token?: string }> {
   const authHeader = request.headers.get('authorization');

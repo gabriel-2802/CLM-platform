@@ -1,0 +1,19 @@
+# ── TLS certificates ──────────────────────────────────────────────────────────
+# Private key must NEVER be committed. Certs are generated locally via `make certs`.
+nginx/certs/
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ── Environment files (real secrets) ─────────────────────────────────────────
+# .env.testing is intentionally committed (safe dev defaults only).
+# Any other .env variants with real credentials must stay local.
+.env
+.env.local
+.env.production
+.env.*.local

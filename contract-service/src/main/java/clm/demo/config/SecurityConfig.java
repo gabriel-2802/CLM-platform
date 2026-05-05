@@ -32,11 +32,16 @@ public class SecurityConfig {
     private static final long   CORS_MAX_AGE               = 3600L;
 
     private static final String[] PUBLIC_ENDPOINTS = {
+            // Default springdoc paths (direct/internal access)
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/swagger-resources/**",
             "/webjars/**",
+            // Nginx-prefixed paths (browser access via https://localhost/api/contracts/…)
+            "/api/contracts/v3/api-docs/**",
+            "/api/contracts/swagger-ui/**",
+            "/api/contracts/swagger-ui.html",
             "/actuator/**"
     };
 

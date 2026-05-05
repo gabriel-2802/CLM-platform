@@ -1,4 +1,4 @@
-const USER_SERVICE_URL = process.env.USER_SERVICE_URL!;
+import { USER_SERVICE_URL } from "@/lib/config/server";
 
 export interface ServiceUser {
   id: number;

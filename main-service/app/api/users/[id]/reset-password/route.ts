@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAdminSession } from "@/lib/auth";
 import { resetPassword } from "@/lib/user-service-client";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }

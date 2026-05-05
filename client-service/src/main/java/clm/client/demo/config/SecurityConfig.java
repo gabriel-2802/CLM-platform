@@ -47,11 +47,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         // Swagger / OpenAPI — must be accessible without a token
                         .requestMatchers(
+                                // Default springdoc paths (direct/internal access)
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/swagger-resources/**",
                                 "/webjars/**",
+                                // Nginx-prefixed paths (browser access via https://localhost/api/clients/…)
+                                "/api/clients/v3/api-docs/**",
+                                "/api/clients/swagger-ui/**",
+                                "/api/clients/swagger-ui.html",
                                 "/api/enums",
                                 "/actuator/**"
                         ).permitAll()

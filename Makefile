@@ -9,10 +9,12 @@ NC     := \033[0m
 
 .PHONY: help \
         check-docker \
+        certs trust-cert \
         test test-up test-down test-restart test-logs test-ps test-rebuild test-rebuild-service \
         db-test db-users-test db-clients-test \
         test-init \
         monitoring-logs prometheus-reload \
+        nginx-logs nginx-reload \
         clean nuke-test
 
 # ─── help ─────────────────────────────────────────────────────────────────────
@@ -25,8 +27,10 @@ help:
 	@echo ""
 	@echo "$(BOLD)PRE-REQUISITES$(NC)"
 	@echo "  $(YELLOW)make check-docker$(NC)         Verify Docker daemon is running"
+	@echo "  $(YELLOW)make certs$(NC)                Generate self-signed TLS certs for Nginx (run once)"
+	@echo "  $(YELLOW)make trust-cert$(NC)           Trust the cert in macOS Keychain (run once, needs sudo)"
 	@echo ""
-	@echo "$(BOLD)TESTING STACK$(NC)  (all services exposed on host, verbose logging)"
+	@echo "$(BOLD)TESTING STACK$(NC)  (all traffic via Nginx at https://localhost)"
 	@echo "  $(YELLOW)make test$(NC)                 Build images and start all services"
 	@echo "  $(YELLOW)make test-up$(NC)              Start testing stack (images must already exist)"
 	@echo "  $(YELLOW)make test-down$(NC)            Stop and remove testing containers"
@@ -46,10 +50,45 @@ help:
 	@echo "  $(YELLOW)make monitoring-logs$(NC)      Follow logs for Prometheus and Grafana only"
 	@echo "  $(YELLOW)make prometheus-reload$(NC)    Hot-reload prometheus.yml without restarting"
 	@echo ""
+	@echo "$(BOLD)NGINX$(NC)"
+	@echo "  $(YELLOW)make nginx-logs$(NC)           Follow Nginx access + error logs"
+	@echo "  $(YELLOW)make nginx-reload$(NC)         Hot-reload Nginx config without downtime"
+	@echo ""
 	@echo "$(BOLD)CLEANUP$(NC)"
 	@echo "  $(YELLOW)make clean$(NC)                Remove node_modules, .next, and build artifacts"
 	@echo "  $(YELLOW)make nuke-test$(NC)            Stop testing stack and delete its volumes (data loss!)"
 	@echo ""
+
+# ─── certs ────────────────────────────────────────────────────────────────────
+
+# Generates a self-signed certificate valid for 825 days (macOS/Linux).
+# The output files are git-ignored — never commit the private key.
+certs:
+	@mkdir -p nginx/certs
+	@echo "$(BLUE)Generating self-signed TLS certificate for localhost...$(NC)"
+	@openssl req -x509 -nodes -days 825 \
+		-newkey rsa:2048 \
+		-keyout nginx/certs/clm.key \
+		-out    nginx/certs/clm.crt \
+		-subj   "/CN=localhost/O=CLM-Platform/C=US" \
+		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+	@chmod 600 nginx/certs/clm.key
+	@echo "$(GREEN)✓ Certificates written to nginx/certs/$(NC)"
+	@echo "  $(YELLOW)clm.crt$(NC) — certificate (add to your browser/OS trust store to silence warnings)"
+	@echo "  $(YELLOW)clm.key$(NC) — private key  (git-ignored, never commit)"
+
+# Adds the cert to the macOS System Keychain and marks it Always Trust for SSL.
+# Requires sudo — you will be prompted for your password.
+# After running, restart your browser for the change to take effect.
+trust-cert:
+	@[ -f nginx/certs/clm.crt ] || { \
+		echo "$(RED)✗ nginx/certs/clm.crt not found — run make certs first$(NC)"; exit 1; }
+	@echo "$(BLUE)Trusting nginx/certs/clm.crt in macOS System Keychain (sudo required)...$(NC)"
+	@sudo security add-trusted-cert -d -r trustRoot \
+		-k /Library/Keychains/System.keychain \
+		nginx/certs/clm.crt
+	@echo "$(GREEN)✓ Certificate trusted$(NC)"
+	@echo "  Restart Chrome / Safari / Firefox for the change to take effect."
 
 # ─── guards ───────────────────────────────────────────────────────────────────
 
@@ -69,27 +108,29 @@ test: check-docker
 	@echo "$(BLUE)Building and starting testing stack...$(NC)"
 	$(COMPOSE_TEST) up -d --build
 	@echo ""
-	@echo "$(GREEN)$(BOLD)╔══════════════════════════════════════════════════╗$(NC)"
-	@echo "$(GREEN)$(BOLD)║       Testing stack is up — service endpoints     ║$(NC)"
-	@echo "$(GREEN)$(BOLD)╚══════════════════════════════════════════════════╝$(NC)"
+	@echo "$(GREEN)$(BOLD)╔═══════════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)$(BOLD)║      Testing stack is up — all traffic via Nginx  ║$(NC)"
+	@echo "$(GREEN)$(BOLD)╚═══════════════════════════════════════════════════╝$(NC)"
 	@echo ""
-	@echo "  $(YELLOW)Client        =>$(NC)  http://localhost:3000"
-	@echo "  $(YELLOW)Contracts API =>$(NC)  http://localhost:8081"
-	@echo "  $(YELLOW)Notifications =>$(NC)  http://localhost:8082"
-	@echo "  $(YELLOW)User Service  =>$(NC)  http://localhost:8083"
-	@echo "  $(YELLOW)Client Svc    =>$(NC)  http://localhost:8084"
-	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5433  (user: clm_user / db: clm_platform)"
-	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5434  (user: clm_user / db: clm_users)"
-	@echo "  $(YELLOW)PostgreSQL    =>$(NC)  localhost:5435  (user: clm_user / db: clm_clients)"
-	@echo "  $(YELLOW)Prometheus    =>$(NC)  http://localhost:9090"
-	@echo "  $(YELLOW)Grafana       =>$(NC)  http://localhost:3001  (admin / see GRAFANA_PASSWORD in .env.testing)"
-	@echo ""
-	@echo "  $(GREEN)All API docs =>$(NC)  http://localhost:8090"
+	@echo "  $(YELLOW)Frontend           =>$(NC)  https://localhost"
+	@echo "  $(YELLOW)Auth               =>$(NC)  https://localhost/api/auth/"
+	@echo "  $(YELLOW)User Service       =>$(NC)  https://localhost/api/users/"
+	@echo "  $(YELLOW)Contracts API      =>$(NC)  https://localhost/api/contracts/"
+	@echo "  $(YELLOW)Client Service     =>$(NC)  https://localhost/api/clients/"
+	@echo "  $(YELLOW)Notifications API  =>$(NC)  https://localhost/api/notifications/  $(RED)(testing only)$(NC)"
+	@echo "  $(YELLOW)API Docs           =>$(NC)  https://localhost/docs/"
+	@echo "  $(YELLOW)Grafana            =>$(NC)  https://localhost/grafana/"
+	@echo "  $(YELLOW)PostgreSQL (main)  =>$(NC)  localhost:5433  (clm_user / clm_platform)"
+	@echo "  $(YELLOW)PostgreSQL (users) =>$(NC)  localhost:5434  (clm_user / clm_users)"
+	@echo "  $(YELLOW)PostgreSQL (clnts) =>$(NC)  localhost:5435  (clm_user / clm_clients)"
 	@echo ""
 	@echo "  $(BLUE)Logs:             make test-logs$(NC)"
 	@echo "  $(BLUE)Status:           make test-ps$(NC)"
+	@echo "  $(BLUE)Nginx logs:       make nginx-logs$(NC)"
 	@echo "  $(BLUE)Monitoring logs:  make monitoring-logs$(NC)"
 	@echo "  $(BLUE)Stop:             make test-down$(NC)"
+	@echo ""
+	@echo "  $(RED)TLS:$(NC) browser will warn about self-signed cert — run $(YELLOW)make certs$(NC) first"
 	@echo ""
 
 test-up: check-docker
@@ -157,6 +198,19 @@ prometheus-reload:
 		echo "$(GREEN)✓ Prometheus configuration reloaded$(NC)" || \
 		echo "$(RED)✗ Reload failed — is the container running?$(NC)"
 
+# ─── nginx ────────────────────────────────────────────────────────────────────
+
+nginx-logs:
+	@echo "$(BLUE)Following Nginx logs (Ctrl+C to stop)...$(NC)"
+	$(COMPOSE_TEST) logs -f nginx
+
+# Sends SIGHUP to Nginx inside the container — reloads config with zero downtime.
+nginx-reload:
+	@echo "$(BLUE)Reloading Nginx configuration...$(NC)"
+	@docker exec clm-nginx-test nginx -s reload && \
+		echo "$(GREEN)✓ Nginx configuration reloaded$(NC)" || \
+		echo "$(RED)✗ Reload failed — is the container running?$(NC)"
+
 # ─── cleanup ──────────────────────────────────────────────────────────────────
 
 clean:
@@ -172,5 +226,5 @@ nuke-test:
 	docker rm -f clm-postgres-test clm-postgres-users-test clm-postgres-clients-test \
 	             clm-user-service-test clm-contracts-test clm-notifications-test \
 	             clm-client-service-test clm-client-test \
-	             clm-prometheus-test clm-grafana-test 2>/dev/null || true; \
+	             clm-prometheus-test clm-grafana-test clm-nginx-test 2>/dev/null || true; \
 	echo "$(GREEN)✓ Testing stack and volumes removed$(NC)"

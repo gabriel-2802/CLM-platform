@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/lib/config/public";
 
 export type ClientEnums = {
   companyTypes: string[];
@@ -28,7 +29,7 @@ export function useEnums(): ClientEnums {
       setEnums(cached);
       return;
     }
-    const url = `${process.env.NEXT_PUBLIC_CLIENT_SERVICE_URL ?? "http://localhost:8084"}/api/enums`;
+    const url = `${API_BASE_URL}/api/enums`;
     fetch(url)
       .then((r) => r.json())
       .then((data) => {

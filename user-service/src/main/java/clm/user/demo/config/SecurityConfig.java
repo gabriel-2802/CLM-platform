@@ -38,9 +38,16 @@ public class SecurityConfig {
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/api/auth/**",
+            // Default springdoc paths (direct/internal access)
             "/v3/api-docs/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
+            "/swagger-resources/**",
+            "/webjars/**",
+            // Nginx-prefixed paths (browser access via https://localhost/api/users/…)
+            "/api/users/v3/api-docs/**",
+            "/api/users/swagger-ui/**",
+            "/api/users/swagger-ui.html",
             "/actuator/**"
     };
 

@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { getToken } from "next-auth/jwt";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://contracts:8081";
+import { CONTRACTS_SERVICE_URL } from "@/lib/config/server"
 
 /**
  * Extracts the raw HS256 JWT from the NextAuth session cookie so it can be
@@ -40,7 +40,7 @@ export async function contractsFetch(
 ): Promise<Response> {
   const token = await getContractsToken();
 
-  return fetch(`${API_BASE_URL}${path}`, {
+  return fetch(`${CONTRACTS_SERVICE_URL}${path}`, {
     ...init,
     headers: {
       ...(init?.headers ?? {}),

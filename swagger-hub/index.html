@@ -18,12 +18,6 @@
       background: #2a2a2a; color: #ccc; cursor: pointer;
       font-size: 13px; font-weight: 500; transition: all .15s;
     }
-    .doc-link {
-      padding: 7px 10px; border-radius: 6px; border: 1px solid #444;
-      background: #1f1f1f; color: #7fc8ff; text-decoration: none;
-      font-size: 12px; font-weight: 600; transition: all .15s;
-    }
-    .doc-link:hover { border-color: #7fc8ff; color: #cfeaff; }
     .tab:hover { border-color: #888; color: #fff; }
     .tab.active { background: #2d7d46; border-color: #2d7d46; color: #fff; }
     #swagger-ui { background: #fff; }
@@ -33,28 +27,28 @@
 <body>
   <div id="nav">
     <span>Service:</span>
-    <button class="tab active" onclick="load('contracts')">Contracts :8081</button>
-    <a class="doc-link" href="http://localhost:8081/v3/api-docs" target="_blank" rel="noreferrer">JSON</a>
-    <button class="tab"        onclick="load('user')">User :8083</button>
-    <a class="doc-link" href="http://localhost:8083/v3/api-docs" target="_blank" rel="noreferrer">JSON</a>
-    <button class="tab"        onclick="load('client')">Client :8084</button>
-    <a class="doc-link" href="http://localhost:8084/v3/api-docs" target="_blank" rel="noreferrer">JSON</a>
+    <button class="tab active" onclick="load('contracts', this)">Contracts</button>
+    <button class="tab"        onclick="load('user', this)">User</button>
+    <button class="tab"        onclick="load('client', this)">Client</button>
   </div>
   <div id="swagger-ui"></div>
 
   <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
   <script>
+    // Relative URLs — resolves to /docs/proxy/* via Nginx, which forwards to
+    // the swagger-hub server.py proxy. Using absolute /proxy/* would bypass
+    // Nginx and land on Next.js (404).
     const urls = {
-      contracts: '/proxy/contracts',
-      user:      '/proxy/user',
-      client:    '/proxy/client',
+      contracts: './proxy/contracts',
+      user:      './proxy/user',
+      client:    './proxy/client',
     };
 
     let ui;
-    function load(service) {
+    function load(service, btn) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
-      if (ui) { ui = null; document.getElementById('swagger-ui').innerHTML = ''; }
+      btn.classList.add('active');
+      document.getElementById('swagger-ui').innerHTML = '';
       ui = SwaggerUIBundle({
         url: urls[service],
         dom_id: '#swagger-ui',

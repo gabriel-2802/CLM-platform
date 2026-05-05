@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://contracts:8081";
+import { CONTRACTS_SERVICE_URL } from "@/lib/config/server"
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -12,7 +12,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   const token = await getToken({ req: request, raw: true, secret: process.env.NEXTAUTH_SECRET! });
 
-  const res = await fetch(`${API_BASE_URL}/api/templates/download/${id}/docx`, {
+  const res = await fetch(`${CONTRACTS_SERVICE_URL}/api/templates/download/${id}/docx`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-const API_BASE_URL = process.env.API_BASE_URL || "http://contracts:8081";
+import { CONTRACTS_SERVICE_URL } from "@/lib/config/server"
 
 /**
  * Proxy for contract PDF downloads.
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
   const token = await getToken({ req: request, raw: true, secret: process.env.NEXTAUTH_SECRET! });
 
-  const res = await fetch(`${API_BASE_URL}/api/contracts/download/${id}/${type}/pdf`, {
+  const res = await fetch(`${CONTRACTS_SERVICE_URL}/api/contracts/download/${id}/${type}/pdf`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
