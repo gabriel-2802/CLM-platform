@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { API } from "@/lib/endpoints";
 
 type AppRole = 'USER' | 'ADMIN' | 'MANAGER';
 
@@ -47,7 +48,7 @@ const UserManagement: React.FC = () => {
     setSuccess(null);
     setResetLoading(true);
     try {
-      const res = await fetch(`/api/users/${showReset}/reset-password`, {
+      const res = await fetch(API.users.resetPassword(showReset), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: resetPassword }),
@@ -68,7 +69,7 @@ const UserManagement: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/users', { cache: 'no-store' });
+      const response = await fetch(API.users.list, { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to fetch users');
       const data = await response.json();
       setUsers(data);
@@ -86,7 +87,7 @@ const UserManagement: React.FC = () => {
 
     try {
       setSaving(true);
-      const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
+      const url = editingUser ? API.users.byId(editingUser.id) : API.users.list;
       const method = editingUser ? 'PUT' : 'POST';
 
       const payload: UserFormData = { ...formData };
@@ -118,7 +119,7 @@ const UserManagement: React.FC = () => {
     if (!confirm('Are you sure you want to delete this user?')) return;
 
     try {
-      const response = await fetch(`/api/users/${id}`, { method: 'DELETE' });
+      const response = await fetch(API.users.byId(id), { method: 'DELETE' });
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete user');

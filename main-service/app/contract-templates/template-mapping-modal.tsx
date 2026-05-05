@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
 import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
+import { API } from "@/lib/endpoints"
 import { toast } from "sonner"
 import parse, { Element, HTMLReactParserOptions } from "html-react-parser"
 
@@ -64,7 +65,7 @@ export function TemplateMappingModal({
         }
 
         // 2. Fetch the DOCX and convert with mammoth
-        const response = await fetch(`/api/templates/download/${templateId}`, { cache: "no-store" })
+        const response = await fetch(API.templates.downloadDocx(templateId), { cache: "no-store" })
         if (!response.ok) {
           const errText = await response.text()
           throw new Error(`Eroare la descărcarea fișierului (${response.status}): ${errText}`)
