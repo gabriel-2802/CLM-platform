@@ -77,19 +77,6 @@ certs:
 	@echo "  $(YELLOW)clm.crt$(NC) — certificate (add to your browser/OS trust store to silence warnings)"
 	@echo "  $(YELLOW)clm.key$(NC) — private key  (git-ignored, never commit)"
 
-# Adds the cert to the macOS System Keychain and marks it Always Trust for SSL.
-# Requires sudo — you will be prompted for your password.
-# After running, restart your browser for the change to take effect.
-trust-cert:
-	@[ -f nginx/certs/clm.crt ] || { \
-		echo "$(RED)✗ nginx/certs/clm.crt not found — run make certs first$(NC)"; exit 1; }
-	@echo "$(BLUE)Trusting nginx/certs/clm.crt in macOS System Keychain (sudo required)...$(NC)"
-	@sudo security add-trusted-cert -d -r trustRoot \
-		-k /Library/Keychains/System.keychain \
-		nginx/certs/clm.crt
-	@echo "$(GREEN)✓ Certificate trusted$(NC)"
-	@echo "  Restart Chrome / Safari / Firefox for the change to take effect."
-
 # ─── guards ───────────────────────────────────────────────────────────────────
 
 check-docker:
@@ -118,9 +105,9 @@ test: check-docker
 	@echo "  $(YELLOW)Contracts API      =>$(NC)  https://localhost/api/contracts/"
 	@echo "  $(YELLOW)Client Service     =>$(NC)  https://localhost/api/clients/"
 	@echo "  $(YELLOW)Notifications API  =>$(NC)  https://localhost/api/notifications/  $(RED)(testing only)$(NC)"
-	@echo "  $(YELLOW)API Docs           =>$(NC)  https://localhost/docs/"
+	@echo "  $(YELLOW)API Docs           =>$(NC)  https://localhost/docs/  $(RED)(testing only)$(NC)"
 	@echo "  $(YELLOW)Grafana            =>$(NC)  https://localhost/grafana/"
-	@echo "  $(YELLOW)PostgreSQL (main)  =>$(NC)  localhost:5433  (clm_user / clm_platform)"
+	@echo "  $(YELLOW)PostgreSQL (main)  =>$(NC)  localhost:5433  (clm_user / clm_platform)" 
 	@echo "  $(YELLOW)PostgreSQL (users) =>$(NC)  localhost:5434  (clm_user / clm_users)"
 	@echo "  $(YELLOW)PostgreSQL (clnts) =>$(NC)  localhost:5435  (clm_user / clm_clients)"
 	@echo ""

@@ -30,6 +30,10 @@
     <button class="tab active" onclick="load('contracts', this)">Contracts</button>
     <button class="tab"        onclick="load('user', this)">User</button>
     <button class="tab"        onclick="load('client', this)">Client</button>
+    <span style="margin-left: 12px;">OpenAPI v3:</span>
+    <button class="tab" onclick="openV3('contracts')">Contracts JSON</button>
+    <button class="tab" onclick="openV3('user')">User JSON</button>
+    <button class="tab" onclick="openV3('client')">Client JSON</button>
   </div>
   <div id="swagger-ui"></div>
 
@@ -39,6 +43,12 @@
     // the swagger-hub server.py proxy. Using absolute /proxy/* would bypass
     // Nginx and land on Next.js (404).
     const urls = {
+      contracts: './proxy/contracts',
+      user:      './proxy/user',
+      client:    './proxy/client',
+    };
+
+    const v3Urls = {
       contracts: './proxy/contracts',
       user:      './proxy/user',
       client:    './proxy/client',
@@ -57,6 +67,10 @@
         deepLinking: true,
         tryItOutEnabled: true,
       });
+    }
+
+    function openV3(service) {
+      window.open(v3Urls[service], '_blank', 'noopener');
     }
 
     ui = SwaggerUIBundle({

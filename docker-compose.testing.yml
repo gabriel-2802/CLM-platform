@@ -20,7 +20,7 @@ services:
     build:
       context: .
       dockerfile: db/Dockerfile
-    container_name: clm-postgres
+    container_name: clm-db-contracts-test
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -46,7 +46,7 @@ services:
   # ── User-service database ──────────────────────────────────────────────────
   postgres-users:
     image: postgres:16-alpine
-    container_name: clm-postgres-users
+    container_name: clm-db-users-test
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -71,7 +71,7 @@ services:
   # ── Client-service database ────────────────────────────────────────────────
   postgres-clients:
     image: postgres:16-alpine
-    container_name: clm-db-clients
+    container_name: clm-db-clients-test
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -123,7 +123,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/users/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/users/v3/api-docs
       SERVER_PORT: 8083
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -183,7 +183,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/contracts/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/contracts/v3/api-docs
       SERVER_PORT: 8081
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -229,7 +229,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/clients/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/clients/v3/api-docs
       SERVER_PORT: 8084
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -270,7 +270,7 @@ services:
       APP_FRONTEND_URL:                ${FRONTEND_URL:-https://localhost}
       SPRING_WEB_CORS_ALLOWED_ORIGINS: https://localhost
       SERVER_PORT: 8082
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_NOTIFICATIONS:   DEBUG
@@ -292,7 +292,7 @@ services:
   # ── Swagger hub ────────────────────────────────────────────────────────────
   swagger-hub:
     build:
-      context: services/swagger-hub
+      context: swagger-hub
       dockerfile: Dockerfile
     container_name: clm-swagger-hub
     environment:
@@ -309,7 +309,7 @@ services:
       target: development
     container_name: clm-frontend
     volumes:
-        - ./frontend:/app
+      - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
@@ -438,7 +438,7 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      client:
+      frontend:
         condition: service_healthy
       user-service:
         condition: service_healthy
