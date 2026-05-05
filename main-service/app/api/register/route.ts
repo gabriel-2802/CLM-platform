@@ -3,7 +3,7 @@ import { getAdminSession } from "@/lib/auth";
 import { registerUser } from "@/lib/user-service-client";
 
 export async function POST(req: Request) {
-  const session = await getAdminSession();
+  const session = await getAdminSession(req);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

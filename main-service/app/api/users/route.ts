@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const session = await getAdminSession();
+export async function GET(request: NextRequest) {
+  const session = await getAdminSession(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -19,7 +19,7 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getAdminSession();
+  const session = await getAdminSession(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -51,8 +51,6 @@ export async function POST(request: NextRequest) {
     const user = b.user;
     if (!user) return NextResponse.json(resBody, { status: 201 });
 
-    // If MANAGER role needed, update via user service after creation
-    // (register only supports USER/ADMIN via adminCode)
     if (rol === "MANAGER" && user.id) {
       const token = session.user.serviceToken!;
       const { updateUser } = await import("@/lib/user-service-client");

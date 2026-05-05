@@ -6,10 +6,10 @@ import { revalidatePath } from "next/cache";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = await getAdminSession();
+  const session = await getAdminSession(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -35,7 +35,7 @@ export async function PUT(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = await getAdminSession();
+  const session = await getAdminSession(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -72,20 +72,16 @@ export async function PUT(
     revalidatePath("/taskuri/edit/nou");
     return NextResponse.json({ id: u.id, email: u.email, name: u.name, rol: rol ?? "USER" });
   }
-  if (status === 404) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-  if (status === 409) {
-    return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
-  }
+  if (status === 404) return NextResponse.json({ error: "User not found" }, { status: 404 });
+  if (status === 409) return NextResponse.json({ error: "A user with this email already exists" }, { status: 409 });
   return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const session = await getAdminSession();
+  const session = await getAdminSession(request);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -106,8 +102,6 @@ export async function DELETE(
     revalidatePath("/taskuri/edit/nou");
     return NextResponse.json({ message: "User deleted successfully" });
   }
-  if (status === 404) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+  if (status === 404) return NextResponse.json({ error: "User not found" }, { status: 404 });
   return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
 }
