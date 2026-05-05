@@ -1,26 +1,15 @@
 "use server";
 
-import { cookies } from "next/headers";
-import { getToken } from "next-auth/jwt";
+import { getServiceToken } from "@/lib/auth";
 
 import { CONTRACTS_SERVICE_URL } from "@/lib/config/server"
 
 /**
- * Extracts the raw HS256 JWT from the NextAuth session cookie so it can be
+ * Extracts the backend-issued JWT stored in the NextAuth session so it can be
  * forwarded as a Bearer token to the contracts service.
  */
 async function getContractsToken(): Promise<string | null> {
-  const cookieStore = await cookies();
-  // next-auth/jwt's getToken accepts a req-like object with a cookies map
-  return getToken({
-    req: {
-      cookies: Object.fromEntries(
-        cookieStore.getAll().map((c) => [c.name, c.value])
-      ),
-    } as any,
-    raw: true,
-    secret: process.env.NEXTAUTH_SECRET!,
-  });
+  return getServiceToken();
 }
 
 /**

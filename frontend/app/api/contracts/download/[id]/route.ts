@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
 
+import { getServiceToken } from "@/lib/auth";
 import { CONTRACTS_SERVICE_URL } from "@/lib/config/server"
 
 /**
  * Proxy for contract PDF downloads.
- * Forwards the session JWT as Bearer so Spring's security filter passes.
+ * Forwards the backend-issued JWT as Bearer so Spring's security filter passes.
  * Called from the browser as /api/contracts/download/{id}?type=unsigned|signed
  */
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -16,14 +16,15 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const token = await getToken({ req: request, raw: true, secret: process.env.NEXTAUTH_SECRET! });
+  const token = await getServiceToken(request);
 
   const res = await fetch(`${CONTRACTS_SERVICE_URL}/api/contracts/download/${id}/${type}/pdf`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
   if (!res.ok) {
-    return new NextResponse("Failed to download contract", { status: res.status });
+    const errorText = await res.text();
+    return new NextResponse(errorText || "Failed to download contract", { status: res.status });
   }
 
   const headers = new Headers();
