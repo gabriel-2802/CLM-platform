@@ -19,8 +19,8 @@ services:
   postgres:
     build:
       context: .
-      dockerfile: db.Dockerfile
-    container_name: clm-postgres-test
+      dockerfile: db/Dockerfile
+    container_name: clm-postgres
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -46,7 +46,7 @@ services:
   # ── User-service database ──────────────────────────────────────────────────
   postgres-users:
     image: postgres:16-alpine
-    container_name: clm-postgres-users-test
+    container_name: clm-postgres-users
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -71,7 +71,7 @@ services:
   # ── Client-service database ────────────────────────────────────────────────
   postgres-clients:
     image: postgres:16-alpine
-    container_name: clm-postgres-clients-test
+    container_name: clm-db-clients
     environment:
       POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
       POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
@@ -97,9 +97,9 @@ services:
   # data-net only — not directly reachable from the host; all traffic via Nginx.
   user-service:
     build:
-      context: user-service
+      context: services/user-service
       dockerfile: Dockerfile
-    container_name: clm-user-service-test
+    container_name: clm-user-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
       SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
@@ -123,7 +123,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/users/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/users/v3/api-docs
       SERVER_PORT: 8083
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -149,9 +149,9 @@ services:
   # ── Contract service ───────────────────────────────────────────────────────
   contracts:
     build:
-      context: contract-service
+      context: services/contract-service
       dockerfile: Dockerfile
-    container_name: clm-contracts-test
+    container_name: clm-contracts
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
       SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
@@ -183,7 +183,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/contracts/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/contracts/v3/api-docs
       SERVER_PORT: 8081
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -209,9 +209,9 @@ services:
   # ── Client service ─────────────────────────────────────────────────────────
   client-service:
     build:
-      context: client-service
+      context: services/client-service
       dockerfile: Dockerfile
-    container_name: clm-client-service-test
+    container_name: clm-client-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
       SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
@@ -229,7 +229,7 @@ services:
       SPRINGDOC_SWAGGER_UI_PATH:  /api/clients/swagger-ui.html
       SPRINGDOC_API_DOCS_PATH:    /api/clients/v3/api-docs
       SERVER_PORT: 8084
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
@@ -254,9 +254,9 @@ services:
   # ── Notification service ───────────────────────────────────────────────────
   notifications:
     build:
-      context: notification-service
+      context: services/notification-service
       dockerfile: Dockerfile
-    container_name: clm-notifications-test
+    container_name: clm-notifications
     environment:
       SPRING_MAIL_HOST:                                  ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
       SPRING_MAIL_PORT:                                  ${MAIL_PORT:-2525}
@@ -270,7 +270,7 @@ services:
       APP_FRONTEND_URL:                ${FRONTEND_URL:-https://localhost}
       SPRING_WEB_CORS_ALLOWED_ORIGINS: https://localhost
       SERVER_PORT: 8082
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:}
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_NOTIFICATIONS:   DEBUG
@@ -292,9 +292,9 @@ services:
   # ── Swagger hub ────────────────────────────────────────────────────────────
   swagger-hub:
     build:
-      context: swagger-hub
+      context: services/swagger-hub
       dockerfile: Dockerfile
-    container_name: clm-swagger-hub-test
+    container_name: clm-swagger-hub
     environment:
       PORT: "8090"
     networks:
@@ -302,14 +302,14 @@ services:
     restart: on-failure:3
 
   # ── Frontend (Next.js dev server) ──────────────────────────────────────────
-  client:
+  frontend:
     build:
-      context: main-service
+      context: frontend
       dockerfile: Dockerfile
       target: development
-    container_name: clm-client-test
+    container_name: clm-frontend
     volumes:
-      - ./main-service:/app
+        - ./frontend:/app
       - /app/node_modules
       - /app/.next
     environment:
@@ -355,9 +355,9 @@ services:
   # data-net only — never exposed externally. Grafana reads from it internally.
   prometheus:
     image: prom/prometheus:v2.51.2
-    container_name: clm-prometheus-test
+    container_name: clm-prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     environment:
       - TZ=UTC
@@ -390,9 +390,9 @@ services:
   # ── Grafana ────────────────────────────────────────────────────────────────
   grafana:
     build:
-      context: grafana
+      context: monitoring/grafana
       dockerfile: Dockerfile
-    container_name: clm-grafana-test
+    container_name: clm-grafana
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-Admin123!}
@@ -406,9 +406,9 @@ services:
       - TZ=UTC
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
-      - ./grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./monitoring/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       prometheus:
         condition: service_healthy
@@ -430,7 +430,7 @@ services:
     build:
       context: nginx
       dockerfile: Dockerfile
-    container_name: clm-nginx-test
+    container_name: clm-nginx
     volumes:
       # Certs mounted at runtime — never baked into the image.
       - ./nginx/certs:/etc/nginx/certs:ro
