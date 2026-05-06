@@ -12,6 +12,7 @@ import ClientRow from "@/components/clients/client-row";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GenerateContractModal } from "@/components/clients/generate-contract-modal";
+import { ActeAditionaleDialog } from "@/components/clients/acte-aditionale-dialog";
 import { terminateContract, toggleAutoRenewal, uploadSignedContract } from "@/actions/contracts";
 import { toast } from "sonner";
 
@@ -457,11 +458,19 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       id: "acteAditionale",
       header: "Acte aditionale",
       enableSorting: false,
-      cell: () => (
-        <Button variant="outline" size="sm">
-          Acte aditionale
-        </Button>
-      ),
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        if (!contractId) return <span className="text-muted-foreground">—</span>;
+        const id = row.original.id;
+        const enrichedClient = {
+          ...row.original,
+          deLa: getEdit(id, "deLa"),
+          panaLa: getEdit(id, "panaLa"),
+          tarifConta: getEdit(id, "tarifConta") ? parseFloat(getEdit(id, "tarifConta")) : undefined,
+          tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
+        };
+        return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} />;
+      },
     },
     {
       id: "incheie",
