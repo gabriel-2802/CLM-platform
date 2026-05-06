@@ -90,13 +90,15 @@ public class ContractController {
     public ResponseEntity<ContractResponseDTO> uploadSignedContract(
             @Parameter(description = "Contract ID", required = true, example = "88")
             @PathVariable Long contractId,
+            @Parameter(description = "User ID uploading the signed document", required = true, example = "42")
+            @RequestParam @NotNull Long userId,
             @Parameter(description = "Signed DOCX or PDF file", required = true)
             @RequestParam("file") @NotNull MultipartFile file) {
 
         if (file.isEmpty()) throw new IllegalArgumentException("File cannot be empty");
 
         try {
-            return ResponseEntity.ok(contractService.uploadSignedContract(contractId, file.getBytes()));
+            return ResponseEntity.ok(contractService.uploadSignedContract(contractId, file.getBytes(), userId.intValue()));
         } catch (IOException e) {
             throw new FileConversionException("Failed to read uploaded file: " + e.getMessage(), e);
         }

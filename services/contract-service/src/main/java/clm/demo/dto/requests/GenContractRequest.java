@@ -17,7 +17,6 @@ import java.util.Map;
  */
 public record GenContractRequest(@NotNull(message = "Template ID is required") Long templateId,
                                  @NotNull(message = "User ID is required") Long userId,
-                                 @NotBlank(message = "User email is required") @Email(message = "Invalid email format") String userMail,
                                  @NotNull(message = "Client ID is required") Long clientId,
                                  @NotNull(message = "Start date is required") LocalDate startDate,
                                  @NotNull(message = "End date is required") LocalDate endDate,

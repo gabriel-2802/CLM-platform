@@ -14,8 +14,7 @@ public interface ContractGenerationMapper {
 
     @Mapping(target = "id",                    ignore = true)
     @Mapping(source = "request.clientId",      target = "clientId")
-    @Mapping(source = "request.userId",        target = "generatedBy",      qualifiedByName = "toInteger")
-    @Mapping(source = "request.userMail",      target = "generatedByMail")
+    @Mapping(source = "request.userId",        target = "generatedByUserId",      qualifiedByName = "toInteger")
     @Mapping(source = "request.startDate",     target = "contractStartDate")
     @Mapping(source = "request.endDate",       target = "contractEndDate")
     @Mapping(source = "request.value",         target = "contractValue")
@@ -29,6 +28,11 @@ public interface ContractGenerationMapper {
     @Mapping(target = "terminationDate",       ignore = true)
     @Mapping(target = "reasonsForTermination", ignore = true)
     @Mapping(target = "appendices",            ignore = true)
+    @Mapping(target = "generatedAt",           ignore = true)
+    @Mapping(target = "terminatedAt",          ignore = true)
+    @Mapping(target = "terminatedByUserId",    ignore = true)
+    @Mapping(target = "uploadedSignedAt",      ignore = true)
+    @Mapping(target = "uploadedSignedByUserId", ignore = true)
     Contract toContractEntity(GenContractRequest request, DocumentTemplate template);
 
     /** Narrows Long userId to Integer generatedBy (contract IDs fit well within Integer range). */

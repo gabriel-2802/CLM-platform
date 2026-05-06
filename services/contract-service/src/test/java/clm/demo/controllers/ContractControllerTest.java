@@ -183,12 +183,14 @@ class ContractControllerTest {
         @Test
         void pdf_upload_returns_200_with_active_status() throws Exception {
             ContractResponseDTO dto = TestDataFactory.contractResponse(1L, "ACTIVE");
-            when(contractService.uploadSignedContract(eq(1L), any())).thenReturn(dto);
+            when(contractService.uploadSignedContract(eq(1L), any(byte[].class), eq(42))).thenReturn(dto);
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "signed.pdf", "application/pdf", TestDataFactory.pdfMagicBytes());
 
-            mockMvc.perform(multipart("/api/contracts/1/upload-signed").file(file))
+            mockMvc.perform(multipart("/api/contracts/1/upload-signed")
+                    .file(file)
+                    .param("userId", "42"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.contractStatus").value("ACTIVE"));
         }
@@ -198,32 +200,38 @@ class ContractControllerTest {
             MockMultipartFile file = new MockMultipartFile(
                     "file", "empty.pdf", "application/pdf", new byte[0]);
 
-            mockMvc.perform(multipart("/api/contracts/1/upload-signed").file(file))
+            mockMvc.perform(multipart("/api/contracts/1/upload-signed")
+                    .file(file)
+                    .param("userId", "42"))
                     .andExpect(status().isBadRequest());
         }
 
         @Test
         void contract_not_found_returns_404() throws Exception {
-            when(contractService.uploadSignedContract(eq(99L), any()))
+            when(contractService.uploadSignedContract(eq(99L), any(byte[].class), eq(42)))
                     .thenThrow(new ResourceNotFoundException("Contract not found: 99"));
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "signed.pdf", "application/pdf", TestDataFactory.pdfMagicBytes());
 
-            mockMvc.perform(multipart("/api/contracts/99/upload-signed").file(file))
+            mockMvc.perform(multipart("/api/contracts/99/upload-signed")
+                    .file(file)
+                    .param("userId", "42"))
                     .andExpect(status().isNotFound());
         }
 
         @Test
         void wrong_contract_state_returns_409() throws Exception {
-            when(contractService.uploadSignedContract(eq(1L), any()))
+            when(contractService.uploadSignedContract(eq(1L), any(byte[].class), eq(42)))
                     .thenThrow(new InvalidContractStateException(
                             "Contract is not in PENDING_SIGNATURE state"));
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "signed.pdf", "application/pdf", TestDataFactory.pdfMagicBytes());
 
-            mockMvc.perform(multipart("/api/contracts/1/upload-signed").file(file))
+            mockMvc.perform(multipart("/api/contracts/1/upload-signed")
+                    .file(file)
+                    .param("userId", "42"))
                     .andExpect(status().isConflict());
         }
     }
@@ -306,7 +314,7 @@ class ContractControllerTest {
             when(contractService.getAll(anyInt(), anyInt()))
                     .thenReturn(new PageImpl<>(List.of(dto)));
 
-            mockMvc.perform(get("/api/contracts"))
+            mockMvc.perform(get("/api/contracts/all"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].id").value(1))
                     .andExpect(jsonPath("$[0].contractStatus").value("ACTIVE"));
@@ -317,7 +325,7 @@ class ContractControllerTest {
             when(contractService.getAll(anyInt(), anyInt()))
                     .thenReturn(new PageImpl<>(List.of()));
 
-            mockMvc.perform(get("/api/contracts"))
+            mockMvc.perform(get("/api/contracts/all"))
                     .andExpect(status().isNoContent());
         }
     }

@@ -32,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -110,7 +111,7 @@ public class ContractService {
      * @return ContractResponseDTO with updated contract details
      */
     @Transactional
-    public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes) {
+    public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes, Integer userId) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Contract not found: " + contractId));
@@ -123,6 +124,8 @@ public class ContractService {
 
             contract.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
+            contract.setUploadedSignedAt(LocalDateTime.now());
+            contract.setUploadedSignedByUserId(userId);
             contract = contractRepository.save(contract);
         } catch (IOException e) {
             throw new FileConversionException(
@@ -145,6 +148,8 @@ public class ContractService {
         }
 
         contract.setContractStatus(ContractStatus.TERMINATED);
+        contract.setTerminatedByUserId(request.getUserId());
+        contract.setTerminatedAt(LocalDateTime.now());
         contract.setTerminationDate(request.getTerminationDate());
         contract.setReasonsForTermination(request.getReasons());
         contractRepository.save(contract);

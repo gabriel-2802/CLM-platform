@@ -150,7 +150,6 @@ public final class TestDataFactory {
         return new GenContractRequest(
                 1L,
                 10L,
-                "staff@company.com",
                 42L,
                 LocalDate.of(2026, 1, 1),
                 LocalDate.of(2027, 1, 1),

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { API_BASE_URL } from "@/lib/config/public";
 
 export type ClientEnums = {
@@ -22,6 +23,7 @@ const EMPTY: ClientEnums = {
 let cached: ClientEnums | null = null;
 
 export function useEnums(): ClientEnums {
+  const { data: session } = useSession();
   const [enums, setEnums] = useState<ClientEnums>(cached ?? EMPTY);
 
   useEffect(() => {
@@ -29,15 +31,18 @@ export function useEnums(): ClientEnums {
       setEnums(cached);
       return;
     }
-    const url = `${API_BASE_URL}/api/enums`;
-    fetch(url)
+    const token = (session?.user as any)?.serviceToken as string | undefined;
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/enums`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
       .then((r) => r.json())
       .then((data) => {
         cached = data;
         setEnums(data);
       })
       .catch(() => {});
-  }, []);
+  }, [session]);
 
   return enums;
 }

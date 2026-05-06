@@ -125,7 +125,7 @@ class ContractServiceTest {
         void contract_not_found_throws_resource_not_found_exception() {
             when(contractRepository.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.uploadSignedContract(99L, TestDataFactory.pdfMagicBytes()))
+            assertThatThrownBy(() -> service.uploadSignedContract(99L, TestDataFactory.pdfMagicBytes(), 42))
                     .isInstanceOf(ResourceNotFoundException.class);
         }
 
@@ -139,7 +139,7 @@ class ContractServiceTest {
             when(contractRepository.save(any())).thenReturn(contract);
             when(contractMapper.toResponseDTO(any())).thenReturn(dto);
 
-            ContractResponseDTO result = service.uploadSignedContract(1L, TestDataFactory.pdfMagicBytes());
+            ContractResponseDTO result = service.uploadSignedContract(1L, TestDataFactory.pdfMagicBytes(), 42);
 
             assertThat(result.getContractStatus()).isEqualTo("ACTIVE");
             assertThat(contract.getContractStatus()).isEqualTo(ContractStatus.ACTIVE);
@@ -157,7 +157,7 @@ class ContractServiceTest {
             when(contractRepository.save(any())).thenReturn(contract);
             when(contractMapper.toResponseDTO(any())).thenReturn(dto);
 
-            service.uploadSignedContract(1L, TestDataFactory.docxMagicBytes());
+            service.uploadSignedContract(1L, TestDataFactory.docxMagicBytes(), 42);
 
             verify(fileUtils).convert(any(), eq(DocumentFormat.DOCX), eq(DocumentFormat.PDF));
         }

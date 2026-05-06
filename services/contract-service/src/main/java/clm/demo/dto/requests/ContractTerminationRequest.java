@@ -1,16 +1,20 @@
 package clm.demo.dto.requests;
 
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 
 @Getter
-@RequiredArgsConstructor
+@NoArgsConstructor
+@AllArgsConstructor
 public class ContractTerminationRequest {
     @NotNull(message = "Termination date is required!")
-    private final LocalDate terminationDate;
+    private LocalDate terminationDate;
 
-    private final String reasons;
+    private Integer userId;
+
+    private String reasons;
 }

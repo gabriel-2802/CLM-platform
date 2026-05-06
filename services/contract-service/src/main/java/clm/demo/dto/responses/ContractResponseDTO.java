@@ -34,6 +34,14 @@ public class ContractResponseDTO {
     private Boolean autoRenew;
     private LocalDateTime createdAt;
 
+    // Audit Fields
+    private LocalDateTime generatedAt;
+    private Integer generatedByUserId;
+    private LocalDateTime terminatedAt;
+    private Integer terminatedByUserId;
+    private LocalDateTime uploadedSignedAt;
+    private Integer uploadedSignedByUserId;
+
     private List<DocumentFieldValueResponseDTO> fieldValues;
     private List<AppendixResponseDTO> appendices;
 }
