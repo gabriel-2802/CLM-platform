@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public class ContractResponseDTO {
 
     private Long id;
@@ -45,3 +45,5 @@ public class ContractResponseDTO {
     private List<DocumentFieldValueResponseDTO> fieldValues;
     private List<AppendixResponseDTO> appendices;
 }
+
+

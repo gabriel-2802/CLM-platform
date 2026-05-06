@@ -169,7 +169,7 @@ public final class TestDataFactory {
     }
 
     public static ContractTerminationRequest terminationRequest() {
-        return new ContractTerminationRequest(LocalDate.of(2026, 6, 1), "early exit");
+        return new ContractTerminationRequest(LocalDate.of(2026, 6, 1), 42, "early exit");
     }
 
     public static FieldMappingRequest fieldMappingRequest(Long templateId, Long fieldId, String label) {
