@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/clients")
 @RequiredArgsConstructor
 @Tag(name = "User-Client Assignment", description = "Manage user-to-client assignments.")
 @SecurityRequirement(name = "bearerAuth")
@@ -30,7 +30,7 @@ public class ClientAssignmentController {
 
     private final ClientAssignmentService assignmentService;
 
-    @GetMapping("/clients/{clientId}/users")
+    @GetMapping("/{clientId}/users")
     @Operation(
             summary = "Get users assigned to a client",
             responses = {
@@ -47,7 +47,7 @@ public class ClientAssignmentController {
         return ResponseEntity.ok(assignmentService.getAssignedUsers(clientId));
     }
 
-    @PutMapping("/clients/{clientId}/users")
+    @PutMapping("/{clientId}/users")
     @Operation(
             summary = "Replace all user assignments for a client",
             description = "Removes all existing assignments and replaces them with the provided list.",
@@ -67,7 +67,7 @@ public class ClientAssignmentController {
         return ResponseEntity.ok(assignmentService.replaceAssignments(clientId, request));
     }
 
-    @PostMapping("/clients/{clientId}/users/{userId}")
+    @PostMapping("/{clientId}/users/{userId}")
     @Operation(
             summary = "Assign a user to a client",
             description = "If already assigned, this is a no-op.",
@@ -87,7 +87,7 @@ public class ClientAssignmentController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    @DeleteMapping("/clients/{clientId}/users/{userId}")
+    @DeleteMapping("/{clientId}/users/{userId}")
     @Operation(
             summary = "Remove a user from a client",
             description = "If not assigned, this is a no-op.",
