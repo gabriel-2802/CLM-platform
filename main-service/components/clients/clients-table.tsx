@@ -454,6 +454,16 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       },
     },
     {
+      id: "acteAditionale",
+      header: "Acte aditionale",
+      enableSorting: false,
+      cell: () => (
+        <Button variant="outline" size="sm">
+          Acte aditionale
+        </Button>
+      ),
+    },
+    {
       id: "incheie",
       header: "Incheie",
       enableSorting: false,
