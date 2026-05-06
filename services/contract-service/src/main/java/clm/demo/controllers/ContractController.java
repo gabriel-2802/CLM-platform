@@ -145,7 +145,7 @@ public class ContractController {
     @ApiResponse(responseCode = "200", description = "Contracts returned",
         content = @Content(array = @ArraySchema(schema = @Schema(implementation = ContractResponseDTO.class))))
     @ApiResponse(responseCode = "204", description = "No contracts found", content = @Content)
-    @GetMapping
+    @GetMapping("/all")
     public ResponseEntity<List<ContractResponseDTO>> getAll(
             @Parameter(description = "Zero-based page index", example = "0")
             @RequestParam(defaultValue = "0") int page,

@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
 import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
-import { API } from "@/lib/endpoints"
 import { toast } from "sonner"
 import parse, { Element, HTMLReactParserOptions } from "html-react-parser"
 
@@ -16,10 +16,10 @@ const MANUAL_MAPPING_OPTION = { label: "Manual (Input utilizator)", value: "MANU
 const PLACEHOLDER_REGEX = /\.{4,}|…+|_{5,}/g
 
 export function TemplateMappingModal({
-  templateId,
-  templateName,
-  fullyMapped = false,
-}: {
+                                       templateId,
+                                       templateName,
+                                       fullyMapped = false,
+                                     }: {
   templateId: number
   templateName: string
   fullyMapped?: boolean
@@ -28,12 +28,17 @@ export function TemplateMappingModal({
   const [fields, setFields] = useState<TemplateField[]>([])
   const [mappingOptions, setMappingOptions] = useState<TemplateMappingOption[]>([MANUAL_MAPPING_OPTION])
   const [htmlContent, setHtmlContent] = useState<string>("")
-  const [mappings, setMappings] = useState<Record<number, string>>({})
+  // mappingTypes: fieldId → selected option ("MANUAL" or a client field key)
+  // manualLabels: fieldId → custom display name when option is "MANUAL"
+  const [mappingTypes, setMappingTypes] = useState<Record<number, string>>({})
+  const [manualLabels, setManualLabels] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
-  const mappingsRef = useRef(mappings)
-  mappingsRef.current = mappings
+  const mappingTypesRef = useRef(mappingTypes)
+  mappingTypesRef.current = mappingTypes
+  const manualLabelsRef = useRef(manualLabels)
+  manualLabelsRef.current = manualLabels
 
   useEffect(() => {
     if (!open) return
@@ -54,18 +59,28 @@ export function TemplateMappingModal({
 
         if (templateData?.fields) {
           const sorted = [...templateData.fields].sort(
-            (a, b) => (a.fieldPosition || 0) - (b.fieldPosition || 0)
+              (a, b) => (a.fieldPosition || 0) - (b.fieldPosition || 0)
           )
           setFields(sorted)
-          const initial: Record<number, string> = {}
+          const clientFieldValues = new Set(clientFields.map((cf) => cf.value))
+          const initialTypes: Record<number, string> = {}
+          const initialLabels: Record<number, string> = {}
           sorted.forEach((f) => {
-            initial[f.id] = f.fieldLabel || "MANUAL"
+            const label = f.fieldLabel || "MANUAL"
+            if (label !== "MANUAL" && clientFieldValues.has(label)) {
+              initialTypes[f.id] = label
+              initialLabels[f.id] = ""
+            } else {
+              initialTypes[f.id] = "MANUAL"
+              initialLabels[f.id] = label === "MANUAL" ? "" : label
+            }
           })
-          setMappings(initial)
+          setMappingTypes(initialTypes)
+          setManualLabels(initialLabels)
         }
 
         // 2. Fetch the DOCX and convert with mammoth
-        const response = await fetch(API.templates.downloadDocx(templateId), { cache: "no-store" })
+        const response = await fetch(`/api/templates/download/${templateId}`, { cache: "no-store" })
         if (!response.ok) {
           const errText = await response.text()
           throw new Error(`Eroare la descărcarea fișierului (${response.status}): ${errText}`)
@@ -109,7 +124,9 @@ export function TemplateMappingModal({
       const visibleFieldCount = hasRealContent && detectedCount > 0 ? detectedCount : fields.length
       const payload = fields.slice(0, visibleFieldCount).map((f) => ({
         fieldId: f.id,
-        fieldLabel: mappingsRef.current[f.id] || "MANUAL",
+        fieldLabel: mappingTypesRef.current[f.id] !== "MANUAL"
+            ? (mappingTypesRef.current[f.id] || "MANUAL")
+            : (manualLabelsRef.current[f.id]?.trim() || "MANUAL"),
       }))
 
       const res = await updateTemplateMappings(templateId, payload)
@@ -148,10 +165,10 @@ export function TemplateMappingModal({
   const hasRealContent = useMemo(() => {
     if (!htmlContent) return false
     const stripped = htmlContent
-      .replace(/<[^>]+>/g, " ")
-      .replace(PLACEHOLDER_REGEX, "")
-      .replace(/\s+/g, " ")
-      .trim()
+        .replace(/<[^>]+>/g, " ")
+        .replace(PLACEHOLDER_REGEX, "")
+        .replace(/\s+/g, " ")
+        .trim()
     return stripped.length > 50
   }, [htmlContent])
 
@@ -162,29 +179,37 @@ export function TemplateMappingModal({
 
         if (fieldId === -1) {
           return (
-            <span className="inline-block bg-red-100 text-red-600 text-xs px-1 rounded border border-red-300 align-middle mx-0.5">
+              <span className="inline-block bg-red-100 text-red-600 text-xs px-1 rounded border border-red-300 align-middle mx-0.5">
               [câmp nemapat]
             </span>
           )
         }
 
         return (
-          <span className="inline-block align-middle mx-0.5 my-0.5">
+            <span className="inline-flex flex-col align-middle mx-0.5 my-0.5 gap-0.5">
             <Select
-              value={mappings[fieldId] || "MANUAL"}
-              onValueChange={(val) => setMappings((prev) => ({ ...prev, [fieldId]: val }))}
+                value={mappingTypes[fieldId] || "MANUAL"}
+                onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
             >
               <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-amber-50 border-amber-400 px-2 focus:ring-1 focus:ring-amber-500 font-medium">
                 <SelectValue placeholder="Selectează câmp..." />
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 {mappingOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
-                    {opt.label}
-                  </SelectItem>
+                    <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
+                      {opt.label}
+                    </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+              {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" && (
+                  <Input
+                      className="h-6 text-[11px] px-1.5 min-w-[150px] max-w-[200px] border-amber-300"
+                      placeholder="Denumire câmp..."
+                      value={manualLabels[fieldId] || ""}
+                      onChange={(e) => setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value }))}
+                  />
+              )}
           </span>
         )
       }
@@ -192,84 +217,84 @@ export function TemplateMappingModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={fullyMapped
-            ? "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:text-gray-700"
-            : "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700"
-          }
-        >
-          <FileEdit className="w-4 h-4 mr-2" />
-          {fullyMapped ? "Editează Mapare" : "Mapare Vizuală"}
-        </Button>
-      </DialogTrigger>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button
+              variant="outline"
+              size="sm"
+              className={fullyMapped
+                  ? "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:text-gray-700"
+                  : "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700"
+              }
+          >
+            <FileEdit className="w-4 h-4 mr-2" />
+            {fullyMapped ? "Editează Mapare" : "Mapare Vizuală"}
+          </Button>
+        </DialogTrigger>
 
-      <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col" style={{ width: "90vw" }}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-base">
-            <FileEdit className="w-4 h-4 text-amber-600" />
-            Configurare Vizuală: {templateName}
-          </DialogTitle>
-        </DialogHeader>
+        <DialogContent className="max-w-5xl max-h-[92vh] flex flex-col" style={{ width: "90vw" }}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base">
+              <FileEdit className="w-4 h-4 text-amber-600" />
+              Configurare Vizuală: {templateName}
+            </DialogTitle>
+          </DialogHeader>
 
-        {/* Contextual info banner */}
-        <div
-          className={`border p-3 rounded-md text-sm flex gap-3 shrink-0 ${
-            hasRealContent
-              ? "bg-blue-50 border-blue-100 text-blue-700"
-              : "bg-amber-50 border-amber-200 text-amber-800"
-          }`}
-        >
-          <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-          <div>
-            {hasRealContent ? (
-              <p>
-                Documentul Word este afișat mai jos. Fiecare câmp marcat cu <strong>„....&quot;</strong>{" "}
-                a fost înlocuit cu un dropdown. Alege ce informație trebuie să apară în acel loc.
-              </p>
-            ) : (
-              <div>
-                <p className="font-medium">
-                  Template-ul nu conține textul contractului, ci doar câmpurile marcate.
-                </p>
-                <p className="mt-1 text-xs">
-                  Pentru a vedea documentul complet cu dropdown-urile integrate în text, încarcă un{" "}
-                  <strong>.docx</strong> care conține și textul real al contractului (cu{" "}
-                  <code>....</code> la locurile de completat). Poți totuși configura maparea câmpurilor mai jos.
-                </p>
-              </div>
-            )}
+          {/* Contextual info banner */}
+          <div
+              className={`border p-3 rounded-md text-sm flex gap-3 shrink-0 ${
+                  hasRealContent
+                      ? "bg-blue-50 border-blue-100 text-blue-700"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+          >
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              {hasRealContent ? (
+                  <p>
+                    Documentul Word este afișat mai jos. Fiecare câmp marcat cu <strong>„....&quot;</strong>{" "}
+                    a fost înlocuit cu un dropdown. Alege ce informație trebuie să apară în acel loc.
+                  </p>
+              ) : (
+                  <div>
+                    <p className="font-medium">
+                      Template-ul nu conține textul contractului, ci doar câmpurile marcate.
+                    </p>
+                    <p className="mt-1 text-xs">
+                      Pentru a vedea documentul complet cu dropdown-urile integrate în text, încarcă un{" "}
+                      <strong>.docx</strong> care conține și textul real al contractului (cu{" "}
+                      <code>....</code> la locurile de completat). Poți totuși configura maparea câmpurilor mai jos.
+                    </p>
+                  </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Document preview area */}
-        <div className="flex-1 overflow-y-auto border rounded-md bg-white shadow-inner">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-full py-24 gap-4">
-              <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
-              <p className="text-muted-foreground animate-pulse text-sm">
-                Se convertește documentul Word pentru editare...
-              </p>
-            </div>
-          ) : docError ? (
-            <div className="flex flex-col items-center justify-center h-full py-16 gap-3 px-8 text-center">
-              <AlertCircle className="w-10 h-10 text-red-400" />
-              <p className="text-red-600 font-medium">Nu s-a putut încărca documentul</p>
-              <p className="text-sm text-muted-foreground">{docError}</p>
-              <p className="text-xs text-muted-foreground">
-                Asigurați-vă că microserviciul Java rulează pe portul 8080 și că template-ul este
-                un fișier DOCX valid.
-              </p>
-            </div>
-          ) : processedHtml && hasRealContent ? (
-            /* Full document view with inline dropdowns */
-            <div className="contract-preview p-8 max-w-4xl mx-auto">
-              <style
-                dangerouslySetInnerHTML={{
-                  __html: `
+          {/* Document preview area */}
+          <div className="flex-1 overflow-y-auto border rounded-md bg-white shadow-inner">
+            {loading ? (
+                <div className="flex flex-col items-center justify-center h-full py-24 gap-4">
+                  <Loader2 className="w-10 h-10 animate-spin text-amber-500" />
+                  <p className="text-muted-foreground animate-pulse text-sm">
+                    Se convertește documentul Word pentru editare...
+                  </p>
+                </div>
+            ) : docError ? (
+                <div className="flex flex-col items-center justify-center h-full py-16 gap-3 px-8 text-center">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                  <p className="text-red-600 font-medium">Nu s-a putut încărca documentul</p>
+                  <p className="text-sm text-muted-foreground">{docError}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Asigurați-vă că microserviciul Java rulează pe portul 8080 și că template-ul este
+                    un fișier DOCX valid.
+                  </p>
+                </div>
+            ) : processedHtml && hasRealContent ? (
+                /* Full document view with inline dropdowns */
+                <div className="contract-preview p-8 max-w-4xl mx-auto">
+                  <style
+                      dangerouslySetInnerHTML={{
+                        __html: `
                   .contract-preview { font-family: 'Times New Roman', Times, serif; font-size: 13px; line-height: 1.7; color: #1a1a1a; }
                   .contract-preview p { margin-bottom: 0.6rem; text-align: justify; }
                   .contract-preview h1 { font-size: 1.2rem; font-weight: bold; text-align: center; margin: 1.2rem 0; }
@@ -282,85 +307,95 @@ export function TemplateMappingModal({
                   .contract-preview ul, .contract-preview ol { padding-left: 2rem; margin-bottom: 0.6rem; }
                   .contract-preview li { margin-bottom: 0.3rem; }
                 `,
-                }}
-              />
-              {parse(processedHtml, parserOptions)}
-            </div>
-          ) : fields.length > 0 ? (
-            /* Fallback: numbered field mapping list */
-            <div className="p-6 space-y-3">
-              <p className="text-xs text-muted-foreground italic mb-4">
-                Configurează maparea câmpurilor detectate în ordinea apariției în document:
-              </p>
-              {fields.map((field, idx) => (
-                <div
-                  key={field.id}
-                  className="flex items-center gap-4 p-3 rounded-lg border bg-gray-50 hover:bg-amber-50 transition-colors"
-                >
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center">
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      Câmpul #{idx + 1} din document (poziție {field.fieldPosition ?? idx})
-                    </p>
-                    <Select
-                      value={mappings[field.id] || "MANUAL"}
-                      onValueChange={(val) =>
-                        setMappings((prev) => ({ ...prev, [field.id]: val }))
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500">
-                        <SelectValue placeholder="Selectează date pentru acest câmp..." />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-72 overflow-y-auto">
-                        {mappingOptions.map((opt) => (
-                          <SelectItem key={opt.value} value={opt.value} className="text-sm">
-                            {opt.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      }}
+                  />
+                  {parse(processedHtml, parserOptions)}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full py-16 gap-3 text-center">
-              <p className="text-muted-foreground text-sm">Nu există câmpuri de configurat.</p>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter className="pt-3 border-t shrink-0">
-          <div className="flex justify-between w-full items-center">
-            <p className="text-xs text-muted-foreground">
-              {detectedCount > 0
-                ? `${detectedCount} câmpuri detectate în document.`
-                : fields.length > 0
-                ? `${fields.length} câmpuri înregistrate în baza de date.`
-                : "Niciun câmp detectat."}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Închide
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={loading || saving || fields.length === 0}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                {saving ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4 mr-2" />
-                )}
-                Salvează Configurația
-              </Button>
-            </div>
+            ) : fields.length > 0 ? (
+                /* Fallback: numbered field mapping list */
+                <div className="p-6 space-y-3">
+                  <p className="text-xs text-muted-foreground italic mb-4">
+                    Configurează maparea câmpurilor detectate în ordinea apariției în document:
+                  </p>
+                  {fields.map((field, idx) => (
+                      <div
+                          key={field.id}
+                          className="flex items-center gap-4 p-3 rounded-lg border bg-gray-50 hover:bg-amber-50 transition-colors"
+                      >
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center">
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 space-y-1.5">
+                          <p className="text-xs text-muted-foreground">
+                            Câmpul #{idx + 1} din document (poziție {field.fieldPosition ?? idx})
+                          </p>
+                          <Select
+                              value={mappingTypes[field.id] || "MANUAL"}
+                              onValueChange={(val) =>
+                                  setMappingTypes((prev) => ({ ...prev, [field.id]: val }))
+                              }
+                          >
+                            <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500">
+                              <SelectValue placeholder="Selectează date pentru acest câmp..." />
+                            </SelectTrigger>
+                            <SelectContent className="max-h-72 overflow-y-auto">
+                              {mappingOptions.map((opt) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-sm">
+                                    {opt.label}
+                                  </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {(mappingTypes[field.id] || "MANUAL") === "MANUAL" && (
+                              <Input
+                                  className="h-8 text-sm border-amber-300"
+                                  placeholder="Denumire câmp (ex: Număr comandă, Reprezentant)..."
+                                  value={manualLabels[field.id] || ""}
+                                  onChange={(e) =>
+                                      setManualLabels((prev) => ({ ...prev, [field.id]: e.target.value }))
+                                  }
+                              />
+                          )}
+                        </div>
+                      </div>
+                  ))}
+                </div>
+            ) : (
+                <div className="flex flex-col items-center justify-center h-full py-16 gap-3 text-center">
+                  <p className="text-muted-foreground text-sm">Nu există câmpuri de configurat.</p>
+                </div>
+            )}
           </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+
+          <DialogFooter className="pt-3 border-t shrink-0">
+            <div className="flex justify-between w-full items-center">
+              <p className="text-xs text-muted-foreground">
+                {detectedCount > 0
+                    ? `${detectedCount} câmpuri detectate în document.`
+                    : fields.length > 0
+                        ? `${fields.length} câmpuri înregistrate în baza de date.`
+                        : "Niciun câmp detectat."}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setOpen(false)}>
+                  Închide
+                </Button>
+                <Button
+                    onClick={handleSave}
+                    disabled={loading || saving || fields.length === 0}
+                    className="bg-green-600 hover:bg-green-700"
+                >
+                  {saving ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                      <Save className="w-4 h-4 mr-2" />
+                  )}
+                  Salvează Configurația
+                </Button>
+              </div>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
   )
 }
