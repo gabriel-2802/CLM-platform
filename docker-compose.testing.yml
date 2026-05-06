@@ -30,8 +30,6 @@ services:
     networks:
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_NAME:-clm_platform}"]
       interval: 15s
@@ -55,8 +53,6 @@ services:
     networks:
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_USERS_NAME:-clm_users}"]
       interval: 15s
@@ -80,8 +76,6 @@ services:
     networks:
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_CLIENTS_NAME:-clm_clients}"]
       interval: 15s
@@ -147,8 +141,6 @@ services:
       - dmz-net
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8083"]
       interval: 15s
@@ -220,8 +212,6 @@ services:
       - dmz-net
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8081"]
       interval: 15s
@@ -275,8 +265,6 @@ services:
       - dmz-net
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8084"]
       interval: 15s
@@ -321,8 +309,6 @@ services:
     networks:
       - dmz-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8082"]
       interval: 15s
@@ -391,8 +377,6 @@ services:
       - dmz-net
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
       interval: 15s
@@ -436,8 +420,6 @@ services:
       - dmz-net
       - data-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       # FIX: check /-/healthy (the proper readiness endpoint), not root /.
       #      Root returns 302 → wget treats it as success even when TSDB is broken.
@@ -479,8 +461,6 @@ services:
     networks:
       - dmz-net
     restart: on-failure:3
-    security_opt:
-      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 15s
