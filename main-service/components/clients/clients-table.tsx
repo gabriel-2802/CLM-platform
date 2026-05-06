@@ -152,31 +152,76 @@ function TerminateContractDialog({
 }
 
 // Defined outside ClientsTable so its identity is stable across parent re-renders.
-// Uses local state for display (prevents focus loss) and calls onCommit to sync parent.
-function EditableTarifCell({
-  id,
-  fieldKey,
-  initialValue,
-  onCommit,
+function ClientDetailsDialog({
+  clientId,
+  clientName,
+  deLa,
+  panaLa,
+  tarifConta,
+  tarifBilant,
+  onEdit,
 }: {
-  id: number
-  fieldKey: keyof RowEditFields
-  initialValue: string
-  onCommit: (id: number, key: keyof RowEditFields, val: string) => void
+  clientId: number
+  clientName: string
+  deLa: string
+  panaLa: string
+  tarifConta: string
+  tarifBilant: string
+  onEdit: (id: number, key: keyof RowEditFields, val: string) => void
 }) {
-  const [val, setVal] = useState(initialValue)
-  const commitRef = useRef(onCommit)
-  commitRef.current = onCommit
+  const [open, setOpen] = useState(false)
   return (
-    <Input
-      type="number"
-      value={val}
-      onChange={(e) => {
-        setVal(e.target.value)
-        commitRef.current(id, fieldKey, e.target.value)
-      }}
-      className="h-8 px-2 py-1 w-24 text-sm text-slate-900"
-    />
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        Detalii
+      </Button>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Detalii - {clientName}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-1">
+            <Label>De la</Label>
+            <Input
+              type="date"
+              value={deLa}
+              onChange={(e) => onEdit(clientId, "deLa", e.target.value)}
+              className="text-slate-900"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Pana la</Label>
+            <Input
+              type="date"
+              value={panaLa}
+              onChange={(e) => onEdit(clientId, "panaLa", e.target.value)}
+              className="text-slate-900"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Tarif servicii conta</Label>
+            <Input
+              type="number"
+              value={tarifConta}
+              onChange={(e) => onEdit(clientId, "tarifConta", e.target.value)}
+              className="text-slate-900"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label>Tarif bilant</Label>
+            <Input
+              type="number"
+              value={tarifBilant}
+              onChange={(e) => onEdit(clientId, "tarifBilant", e.target.value)}
+              className="text-slate-900"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => setOpen(false)}>Gata</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -279,58 +324,18 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
         ),
     },
     {
-      accessorKey: "deLa",
-      header: () => <div className="w-36 min-w-[9rem]">De la</div>,
-      enableSorting: true,
+      id: "detalii",
+      header: "Detalii",
+      enableSorting: false,
       cell: ({ row }) => (
-        <div className="w-36 min-w-[9rem]">
-          <Input
-            type="date"
-            value={getEdit(row.original.id, "deLa")}
-            onChange={(e) => setEdit(row.original.id, "deLa", e.target.value)}
-            className="h-8 px-2 py-1 text-sm w-full text-slate-900"
-          />
-        </div>
-      ),
-    },
-    {
-      accessorKey: "panaLa",
-      header: () => <div className="w-36 min-w-[9rem]">Pana la</div>,
-      enableSorting: true,
-      cell: ({ row }) => (
-        <div className="w-36 min-w-[9rem]">
-          <Input
-            type="date"
-            value={getEdit(row.original.id, "panaLa")}
-            onChange={(e) => setEdit(row.original.id, "panaLa", e.target.value)}
-            className="h-8 px-2 py-1 text-sm w-full text-slate-900"
-          />
-        </div>
-      ),
-    },
-    {
-      accessorKey: "tarifConta",
-      header: "Tarif servicii conta",
-      enableSorting: true,
-      cell: ({ row }) => (
-        <EditableTarifCell
-          id={row.original.id}
-          fieldKey="tarifConta"
-          initialValue={getEdit(row.original.id, "tarifConta")}
-          onCommit={setEdit}
-        />
-      ),
-    },
-    {
-      accessorKey: "tarifBilant",
-      header: "Tarif bilant",
-      enableSorting: true,
-      cell: ({ row }) => (
-        <EditableTarifCell
-          id={row.original.id}
-          fieldKey="tarifBilant"
-          initialValue={getEdit(row.original.id, "tarifBilant")}
-          onCommit={setEdit}
+        <ClientDetailsDialog
+          clientId={row.original.id}
+          clientName={row.original.name ?? ""}
+          deLa={getEdit(row.original.id, "deLa")}
+          panaLa={getEdit(row.original.id, "panaLa")}
+          tarifConta={getEdit(row.original.id, "tarifConta")}
+          tarifBilant={getEdit(row.original.id, "tarifBilant")}
+          onEdit={setEdit}
         />
       ),
     },
@@ -340,12 +345,17 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       enableSorting: false,
       cell: ({ row }) => {
         const id = row.original.id;
+        const deLa = getEdit(id, "deLa");
+        const panaLa = getEdit(id, "panaLa");
+        const tarifConta = getEdit(id, "tarifConta");
+        const tarifBilant = getEdit(id, "tarifBilant");
+        const allFilled = !!(deLa && panaLa && tarifConta && tarifBilant);
         const enrichedClient = {
           ...row.original,
-          deLa: getEdit(id, "deLa"),
-          panaLa: getEdit(id, "panaLa"),
-          tarifConta: getEdit(id, "tarifConta") ? parseFloat(getEdit(id, "tarifConta")) : undefined,
-          tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
+          deLa,
+          panaLa,
+          tarifConta: tarifConta ? parseFloat(tarifConta) : undefined,
+          tarifBilant: tarifBilant ? parseFloat(tarifBilant) : undefined,
         };
 
         return (
@@ -374,7 +384,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
                 </Button>
               </>
             ) : (
-              <GenerateContractModal client={enrichedClient} />
+              <GenerateContractModal client={enrichedClient} disabled={!allFilled} />
             )}
           </div>
         );

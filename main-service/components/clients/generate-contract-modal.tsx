@@ -24,7 +24,7 @@ type ClientForContract = Record<string, unknown> & {
   tarifBilant?: number;
 };
 
-export function GenerateContractModal({ client }: { client: ClientForContract }) {
+export function GenerateContractModal({ client, disabled }: { client: ClientForContract; disabled?: boolean }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
@@ -182,7 +182,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">gen.</Button>
+        <Button variant="outline" size="sm" disabled={disabled}>gen.</Button>
       </DialogTrigger>
 
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
