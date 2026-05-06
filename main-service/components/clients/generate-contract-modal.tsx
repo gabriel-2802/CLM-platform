@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getClientTemplateFields, getTemplates, getTemplateById, type TemplateField, type TemplateMappingOption, type TemplateSummary } from "@/actions/contract-templates"
 import { getClientTemplateSource } from "@/actions/clients"
@@ -181,9 +182,20 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>gen.</Button>
-      </DialogTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span className="inline-flex">
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" disabled={disabled}>gen.</Button>
+            </DialogTrigger>
+          </span>
+        </TooltipTrigger>
+        {disabled && (
+          <TooltipContent side="top" className="max-w-xs text-center">
+            Nu se poate genera contract deoarece nu au fost completate toate campurile din sectiunea Detalii
+          </TooltipContent>
+        )}
+      </Tooltip>
 
       <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
