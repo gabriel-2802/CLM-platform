@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
 import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
 import { toast } from "sonner"
@@ -27,12 +28,17 @@ export function TemplateMappingModal({
   const [fields, setFields] = useState<TemplateField[]>([])
   const [mappingOptions, setMappingOptions] = useState<TemplateMappingOption[]>([MANUAL_MAPPING_OPTION])
   const [htmlContent, setHtmlContent] = useState<string>("")
-  const [mappings, setMappings] = useState<Record<number, string>>({})
+  // mappingTypes: fieldId → selected option ("MANUAL" or a client field key)
+  // manualLabels: fieldId → custom display name when option is "MANUAL"
+  const [mappingTypes, setMappingTypes] = useState<Record<number, string>>({})
+  const [manualLabels, setManualLabels] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
-  const mappingsRef = useRef(mappings)
-  mappingsRef.current = mappings
+  const mappingTypesRef = useRef(mappingTypes)
+  mappingTypesRef.current = mappingTypes
+  const manualLabelsRef = useRef(manualLabels)
+  manualLabelsRef.current = manualLabels
 
   useEffect(() => {
     if (!open) return
@@ -56,11 +62,21 @@ export function TemplateMappingModal({
             (a, b) => (a.fieldPosition || 0) - (b.fieldPosition || 0)
           )
           setFields(sorted)
-          const initial: Record<number, string> = {}
+          const clientFieldValues = new Set(clientFields.map((cf) => cf.value))
+          const initialTypes: Record<number, string> = {}
+          const initialLabels: Record<number, string> = {}
           sorted.forEach((f) => {
-            initial[f.id] = f.fieldLabel || "MANUAL"
+            const label = f.fieldLabel || "MANUAL"
+            if (label !== "MANUAL" && clientFieldValues.has(label)) {
+              initialTypes[f.id] = label
+              initialLabels[f.id] = ""
+            } else {
+              initialTypes[f.id] = "MANUAL"
+              initialLabels[f.id] = label === "MANUAL" ? "" : label
+            }
           })
-          setMappings(initial)
+          setMappingTypes(initialTypes)
+          setManualLabels(initialLabels)
         }
 
         // 2. Fetch the DOCX and convert with mammoth
@@ -108,7 +124,9 @@ export function TemplateMappingModal({
       const visibleFieldCount = hasRealContent && detectedCount > 0 ? detectedCount : fields.length
       const payload = fields.slice(0, visibleFieldCount).map((f) => ({
         fieldId: f.id,
-        fieldLabel: mappingsRef.current[f.id] || "MANUAL",
+        fieldLabel: mappingTypesRef.current[f.id] !== "MANUAL"
+          ? (mappingTypesRef.current[f.id] || "MANUAL")
+          : (manualLabelsRef.current[f.id]?.trim() || "MANUAL"),
       }))
 
       const res = await updateTemplateMappings(templateId, payload)
@@ -168,10 +186,10 @@ export function TemplateMappingModal({
         }
 
         return (
-          <span className="inline-block align-middle mx-0.5 my-0.5">
+          <span className="inline-flex flex-col align-middle mx-0.5 my-0.5 gap-0.5">
             <Select
-              value={mappings[fieldId] || "MANUAL"}
-              onValueChange={(val) => setMappings((prev) => ({ ...prev, [fieldId]: val }))}
+              value={mappingTypes[fieldId] || "MANUAL"}
+              onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
             >
               <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-amber-50 border-amber-400 px-2 focus:ring-1 focus:ring-amber-500 font-medium">
                 <SelectValue placeholder="Selectează câmp..." />
@@ -184,6 +202,14 @@ export function TemplateMappingModal({
                 ))}
               </SelectContent>
             </Select>
+            {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" && (
+              <Input
+                className="h-6 text-[11px] px-1.5 min-w-[150px] max-w-[200px] border-amber-300"
+                placeholder="Denumire câmp..."
+                value={manualLabels[fieldId] || ""}
+                onChange={(e) => setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value }))}
+              />
+            )}
           </span>
         )
       }
@@ -299,14 +325,14 @@ export function TemplateMappingModal({
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center">
                     {idx + 1}
                   </div>
-                  <div className="flex-1">
-                    <p className="text-xs text-muted-foreground mb-1">
+                  <div className="flex-1 space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
                       Câmpul #{idx + 1} din document (poziție {field.fieldPosition ?? idx})
                     </p>
                     <Select
-                      value={mappings[field.id] || "MANUAL"}
+                      value={mappingTypes[field.id] || "MANUAL"}
                       onValueChange={(val) =>
-                        setMappings((prev) => ({ ...prev, [field.id]: val }))
+                        setMappingTypes((prev) => ({ ...prev, [field.id]: val }))
                       }
                     >
                       <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500">
@@ -320,6 +346,16 @@ export function TemplateMappingModal({
                         ))}
                       </SelectContent>
                     </Select>
+                    {(mappingTypes[field.id] || "MANUAL") === "MANUAL" && (
+                      <Input
+                        className="h-8 text-sm border-amber-300"
+                        placeholder="Denumire câmp (ex: Număr comandă, Reprezentant)..."
+                        value={manualLabels[field.id] || ""}
+                        onChange={(e) =>
+                          setManualLabels((prev) => ({ ...prev, [field.id]: e.target.value }))
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               ))}
