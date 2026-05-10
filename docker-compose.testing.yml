@@ -255,6 +255,8 @@ services:
       SPRING_MAIL_FROM:                                  ${MAIL_FROM:-noreply@dev.example.com}
       CONTRACTS_SERVICE_URL:  ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       CONTRACTS_API_BASE_URL: ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      JWT_SECRET:             ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      NOTIFICATION_RECIPIENTS: ${NOTIFICATION_RECIPIENTS:-}
       APP_FRONTEND_URL:                ${FRONTEND_URL:-https://localhost}
       SPRING_WEB_CORS_ALLOWED_ORIGINS: https://localhost
       SERVER_PORT: 8082
@@ -329,6 +331,15 @@ services:
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_NEGOTIATION:     DEBUG
+      SPRING_MAIL_HOST:                                   ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                   ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                               ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                               ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:              "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:   "true"
+      NOTIFICATION_FROM:                                  ${MAIL_FROM:-noreply@dev.example.com}
+      NOTIFICATION_RECIPIENTS:                            ${NOTIFICATION_RECIPIENTS:-}
+      NEGOTIATION_NOTIFICATION_CRON:                      ${NEGOTIATION_NOTIFICATION_CRON:-0 0 9 1 * *}
     depends_on:
       postgres-negotiations:
         condition: service_healthy
