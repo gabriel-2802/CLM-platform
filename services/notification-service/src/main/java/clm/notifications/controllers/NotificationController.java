@@ -41,10 +41,6 @@ public class NotificationController {
     @GetMapping("/preview")
     public ResponseEntity<Map<String, Object>> preview() {
         List<ContractSummaryDTO> expiring = contractApiService.fetchExpiringContracts();
-        List<ContractSummaryDTO> inactive = contractApiService.fetchInactiveClientContracts();
-        return ResponseEntity.ok(Map.of(
-                "expiringContracts", expiring,
-                "inactiveClients", inactive
-        ));
+        return ResponseEntity.ok(Map.of("expiringContracts", expiring));
     }
 }
