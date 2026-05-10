@@ -31,6 +31,7 @@ public class NegotiationService {
 
     @Transactional
     public NegotiationResponseDTO create(@Valid CreateNegotiationRequest request) {
+        contractApiClient.requireContractActive(request.contractId());
         Negotiation negotiation = Negotiation.builder()
                 .contractId(request.contractId())
                 .clientId(request.clientId())

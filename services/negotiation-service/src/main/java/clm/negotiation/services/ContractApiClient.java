@@ -19,14 +19,35 @@ import java.util.Map;
 public class ContractApiClient {
 
     private final RestClient restClient;
-    private final String contractsBaseUrl;
     private final JwtTokenProvider jwtTokenProvider;
 
     public ContractApiClient(@Value("${contracts.service.url}") String contractsBaseUrl,
                              JwtTokenProvider jwtTokenProvider) {
-        this.contractsBaseUrl = contractsBaseUrl;
         this.jwtTokenProvider = jwtTokenProvider;
         this.restClient = RestClient.builder().baseUrl(contractsBaseUrl).build();
+    }
+
+    public void requireContractActive(Long contractId) {
+        String token = jwtTokenProvider.generateServiceToken();
+        try {
+            Map<String, Object> response = restClient.get()
+                    .uri("/api/contracts/{id}", contractId)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .body(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {});
+            String status = response != null ? (String) response.get("contractStatus") : null;
+            if (!"ACTIVE".equals(status)) {
+                throw new InvalidNegotiationStateException(
+                        "Negocierile pot fi inițiate doar pentru contracte ACTIVE. Status curent: " + status);
+            }
+        } catch (InvalidNegotiationStateException e) {
+            throw e;
+        } catch (HttpClientErrorException e) {
+            throw new InvalidNegotiationStateException("Contractul nu a fost găsit sau nu este accesibil.");
+        } catch (Exception e) {
+            log.error("Failed to check contract status for contract {}: {}", contractId, e.getMessage());
+            throw new RuntimeException("Could not verify contract status: " + e.getMessage(), e);
+        }
     }
 
     public void applyRenegotiation(Long contractId, BigDecimal newValue, LocalDate newEndDate) {
