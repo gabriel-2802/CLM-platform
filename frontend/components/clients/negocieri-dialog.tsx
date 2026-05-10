@@ -107,6 +107,13 @@ function NegotiationTimeline({
               )}
             </div>
 
+            {/* creator */}
+            {n.createdByUserName && (
+              <p className="text-xs text-muted-foreground">
+                Operată de <span className="font-medium text-slate-700">{n.createdByUserName}</span>
+              </p>
+            )}
+
             {/* propunere */}
             <div className="flex flex-wrap gap-3 text-sm">
               {n.proposedValue != null && (
@@ -255,7 +262,7 @@ export function NegocieriDialog({
         <DialogHeader>
           <DialogTitle>
             {view === "list"
-              ? `Negocieri — ${clientName ?? ""}`
+              ? `Negocieri - ${clientName ?? ""}`
               : "Negociere nouă"}
           </DialogTitle>
         </DialogHeader>

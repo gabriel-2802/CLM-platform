@@ -12,6 +12,7 @@ export type Negotiation = {
   status: "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED"
   notes: string | null
   createdByUserId: number
+  createdByUserName: string | null
   createdAt: string
   resolvedAt: string | null
 }
@@ -22,6 +23,7 @@ export type CreateNegotiationPayload = {
   proposedValue?: number | null
   proposedEndDate?: string | null
   notes?: string | null
+  createdByUserName?: string | null
 }
 
 async function extractError(res: Response): Promise<string> {
@@ -53,6 +55,9 @@ export async function createNegotiation(payload: CreateNegotiationPayload) {
   try {
     const session = await getSession()
     const userId = Number(session?.user?.id)
+    const userName = (session?.user as { name?: string | null })?.name
+                  ?? (session?.user as { email?: string | null })?.email
+                  ?? null
 
     if (!Number.isInteger(userId) || userId <= 0) {
       return { success: false, error: "Utilizator neautentificat" }
@@ -61,7 +66,7 @@ export async function createNegotiation(payload: CreateNegotiationPayload) {
     const res = await negotiationFetch("/api/negotiations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, createdByUserId: userId }),
+      body: JSON.stringify({ ...payload, createdByUserId: userId, createdByUserName: userName }),
     })
 
     if (!res.ok) {
