@@ -28,7 +28,8 @@ public class SecurityConfig {
             "/swagger-ui.html",
             "/api/negotiations/v3/api-docs/**",
             "/api/negotiations/swagger-ui/**",
-            "/actuator/**"
+            "/actuator/**",
+            "/api/negotiations/notifications/trigger"
     };
 
     private static final List<String> ALLOWED_METHODS =
