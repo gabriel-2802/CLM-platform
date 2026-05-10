@@ -13,6 +13,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { GenerateContractModal } from "@/components/clients/generate-contract-modal";
 import { ActeAditionaleDialog } from "@/components/clients/acte-aditionale-dialog";
+import { NegocieriDialog } from "@/components/clients/negocieri-dialog";
 import { terminateContract, toggleAutoRenewal, uploadSignedContract } from "@/actions/contracts";
 import { toast } from "sonner";
 
@@ -470,6 +471,22 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
           tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
         };
         return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} />;
+      },
+    },
+    {
+      id: "negocieri",
+      header: "Negocieri",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        if (!contractId) return <span className="text-muted-foreground">—</span>;
+        return (
+          <NegocieriDialog
+            contractId={contractId}
+            clientId={row.original.id}
+            clientName={row.original.name ?? undefined}
+          />
+        );
       },
     },
     {
