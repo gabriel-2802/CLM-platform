@@ -33,4 +33,13 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Long> 
         ORDER BY n.resolvedAt DESC
         """)
     List<Negotiation> findAcceptedBefore(@Param("cutoff") LocalDateTime cutoff);
+
+    @Query("""
+        SELECT n.clientId, MAX(n.createdAt)
+        FROM Negotiation n
+        GROUP BY n.clientId
+        HAVING MAX(n.createdAt) < :cutoff
+        ORDER BY MAX(n.createdAt) ASC
+        """)
+    List<Object[]> findClientsInactiveSince(@Param("cutoff") LocalDateTime cutoff);
 }
