@@ -92,7 +92,7 @@ class NegotiationServiceTest {
             when(mapper.toDto(any())).thenReturn(TestDataFactory.response(1L, NegotiationStatus.DRAFT));
 
             CreateNegotiationRequest req = new CreateNegotiationRequest(
-                    10L, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null);
+                    10L, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null, null);
             service.create(req);
 
             ArgumentCaptor<Negotiation> captor = ArgumentCaptor.forClass(Negotiation.class);

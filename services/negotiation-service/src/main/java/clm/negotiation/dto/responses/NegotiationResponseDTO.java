@@ -15,6 +15,7 @@ public record NegotiationResponseDTO(
         NegotiationStatus status,
         String notes,
         Integer createdByUserId,
+        String createdByUserName,
         LocalDateTime createdAt,
         LocalDateTime resolvedAt
 ) {}

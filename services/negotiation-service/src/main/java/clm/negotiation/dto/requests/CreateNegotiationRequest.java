@@ -23,6 +23,9 @@ public record CreateNegotiationRequest(
         @NotNull(message = "createdByUserId is required")
         Integer createdByUserId,
 
+        @Size(max = 255)
+        String createdByUserName,
+
         @Size(max = 2000, message = "notes must not exceed 2000 characters")
         String notes
 ) {}

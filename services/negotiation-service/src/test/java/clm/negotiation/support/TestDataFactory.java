@@ -70,37 +70,38 @@ public final class TestDataFactory {
                 BigDecimal.valueOf(4_500),
                 LocalDate.of(2027, 6, 1),
                 7,
+                "Test User",
                 "negociere trimestru Q2"
         );
     }
 
     public static CreateNegotiationRequest createRequestOnlyValue() {
         return new CreateNegotiationRequest(
-                10L, 42, BigDecimal.valueOf(4_500), null, 7, null
+                10L, 42, BigDecimal.valueOf(4_500), null, 7, null, null
         );
     }
 
     public static CreateNegotiationRequest createRequestOnlyEndDate() {
         return new CreateNegotiationRequest(
-                10L, 42, null, LocalDate.of(2027, 6, 1), 7, null
+                10L, 42, null, LocalDate.of(2027, 6, 1), 7, null, null
         );
     }
 
     public static CreateNegotiationRequest createRequestMissingContractId() {
         return new CreateNegotiationRequest(
-                null, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null
+                null, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null, null
         );
     }
 
     public static CreateNegotiationRequest createRequestMissingClientId() {
         return new CreateNegotiationRequest(
-                10L, null, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null
+                10L, null, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), 7, null, null
         );
     }
 
     public static CreateNegotiationRequest createRequestMissingCreatedBy() {
         return new CreateNegotiationRequest(
-                10L, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), null, null
+                10L, 42, BigDecimal.valueOf(4_500), LocalDate.of(2027, 6, 1), null, null, null
         );
     }
 
@@ -122,6 +123,7 @@ public final class TestDataFactory {
                 status,
                 "negociere trimestru Q2",
                 7,
+                "Test User",
                 LocalDateTime.of(2026, 1, 1, 10, 0),
                 null
         );
@@ -137,6 +139,7 @@ public final class TestDataFactory {
                 status,
                 "negociere trimestru Q2",
                 7,
+                "Test User",
                 LocalDateTime.of(2026, 1, 1, 10, 0),
                 LocalDateTime.of(2026, 3, 1, 12, 0)
         );

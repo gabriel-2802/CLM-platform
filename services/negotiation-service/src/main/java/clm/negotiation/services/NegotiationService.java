@@ -38,6 +38,7 @@ public class NegotiationService {
                 .proposedValue(request.proposedValue())
                 .proposedEndDate(request.proposedEndDate())
                 .createdByUserId(request.createdByUserId())
+                .createdByUserName(request.createdByUserName())
                 .notes(request.notes())
                 .status(NegotiationStatus.DRAFT)
                 .build();

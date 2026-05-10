@@ -48,6 +48,9 @@ public class Negotiation {
     @Column(name = "created_by_user_id", nullable = false)
     private Integer createdByUserId;
 
+    @Column(name = "created_by_user_name", length = 255)
+    private String createdByUserName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
