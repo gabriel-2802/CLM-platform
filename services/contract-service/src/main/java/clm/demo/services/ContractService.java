@@ -177,6 +177,27 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
+    @Transactional
+    public ContractResponseDTO renegotiateContract(Long contractId,
+                                                   clm.demo.dto.requests.RenegotiateContractRequest request) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+
+        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
+            throw new InvalidContractStateException(
+                    "Cannot renegotiate contract in status: " + contract.getContractStatus()
+                            + ". Only ACTIVE contracts can be renegotiated.");
+        }
+
+        if (request.getContractValue() != null)  contract.setContractValue(request.getContractValue());
+        if (request.getContractEndDate() != null) contract.setContractEndDate(request.getContractEndDate());
+
+        contract = contractRepository.save(contract);
+        log.info("Contract {} renegotiated — value={}, endDate={}", contractId,
+                contract.getContractValue(), contract.getContractEndDate());
+        return contractMapper.toResponseDTO(contract);
+    }
+
     @Transactional(readOnly = true)
     public Page<ContractResponseDTO> getAll(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size,

@@ -2,6 +2,7 @@ package clm.demo.controllers;
 
 import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.GenContractRequest;
+import clm.demo.dto.requests.RenegotiateContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.exceptions.FileConversionException;
@@ -118,6 +119,26 @@ public class ContractController {
             @Valid @RequestBody ContractTerminationRequest request) {
         contractService.terminateContract(contractId, request);
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(
+        summary     = "Apply renegotiation outcome to a contract",
+        description = """
+            Updates `contractValue` and/or `contractEndDate` on an ACTIVE contract.
+            Called automatically by the negotiation-service when a negotiation is accepted.
+            Only ACTIVE contracts can be renegotiated.
+            """
+    )
+    @ApiResponse(responseCode = "200", description = "Contract updated",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
+    @PatchMapping("/{contractId}/renegotiate")
+    public ResponseEntity<ContractResponseDTO> renegotiateContract(
+            @Parameter(description = "Contract ID", required = true, example = "88")
+            @PathVariable Long contractId,
+            @RequestBody RenegotiateContractRequest request) {
+        return ResponseEntity.ok(contractService.renegotiateContract(contractId, request));
     }
 
     @Operation(
