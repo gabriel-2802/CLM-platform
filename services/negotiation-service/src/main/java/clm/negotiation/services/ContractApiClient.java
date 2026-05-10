@@ -1,9 +1,11 @@
 package clm.negotiation.services;
 
+import clm.negotiation.dto.reports.ContractSummaryInfo;
 import clm.negotiation.exceptions.exceptions.InvalidNegotiationStateException;
 import clm.negotiation.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -12,7 +14,9 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Slf4j
 @Component
@@ -73,6 +77,25 @@ public class ContractApiClient {
         } catch (Exception e) {
             log.error("Failed to apply renegotiation to contract {}: {}", contractId, e.getMessage());
             throw new RuntimeException("Could not update contract " + contractId + ": " + e.getMessage(), e);
+        }
+    }
+
+    public Optional<ContractSummaryInfo> getContractForClient(Integer clientId) {
+        String token = jwtTokenProvider.generateServiceToken();
+        Map<String, Object> searchRequest = Map.of("clientId", clientId, "page", 0, "size", 1);
+        try {
+            List<ContractSummaryInfo> results = restClient.post()
+                    .uri("/api/contracts/search")
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(searchRequest)
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {});
+            if (results == null || results.isEmpty()) return Optional.empty();
+            return Optional.of(results.get(0));
+        } catch (Exception e) {
+            log.warn("Could not fetch contract for client {}: {}", clientId, e.getMessage());
+            return Optional.empty();
         }
     }
 
