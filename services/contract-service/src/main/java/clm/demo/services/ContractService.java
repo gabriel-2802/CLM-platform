@@ -177,6 +177,13 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
+    @Transactional(readOnly = true)
+    public ContractResponseDTO getById(Long contractId) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+        return contractMapper.toResponseDTO(contract);
+    }
+
     @Transactional
     public ContractResponseDTO renegotiateContract(Long contractId,
                                                    clm.demo.dto.requests.RenegotiateContractRequest request) {

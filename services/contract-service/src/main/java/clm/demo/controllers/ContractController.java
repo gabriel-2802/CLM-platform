@@ -161,6 +161,17 @@ public class ContractController {
     }
 
 
+    @Operation(summary = "Get contract by ID")
+    @ApiResponse(responseCode = "200", description = "Contract found",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @GetMapping("/{contractId}")
+    public ResponseEntity<ContractResponseDTO> getById(
+            @Parameter(description = "Contract ID", required = true)
+            @PathVariable Long contractId) {
+        return ResponseEntity.ok(contractService.getById(contractId));
+    }
+
     @Operation(
         summary     = "List all contracts",
         description = "Returns a paginated list of all contracts ordered by creation date descending."
