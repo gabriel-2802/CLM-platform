@@ -28,6 +28,15 @@ spring:
     clean-disabled: true
     encoding: UTF-8
 
+  mail:
+    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${MAIL_PORT:2525}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -44,3 +53,9 @@ contracts:
 
 jwt:
   secret: ${JWT_SECRET:local-dev-only-secret-do-not-use-in-prod-min32}
+
+notification:
+  cron: ${NEGOTIATION_NOTIFICATION_CRON:0 0 9 1 * *}
+  inactivity-months: ${NOTIFICATION_INACTIVITY_MONTHS:6}
+  from: ${NOTIFICATION_FROM:contractplatform@gmail.com}
+  recipients: ${NOTIFICATION_RECIPIENTS:}
