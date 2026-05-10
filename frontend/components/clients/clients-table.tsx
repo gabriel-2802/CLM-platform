@@ -485,6 +485,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
             contractId={contractId}
             clientId={row.original.id}
             clientName={row.original.name ?? undefined}
+            contractStatus={row.original.contractStatus ?? undefined}
           />
         );
       },

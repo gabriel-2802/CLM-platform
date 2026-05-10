@@ -185,10 +185,12 @@ export function NegocieriDialog({
   contractId,
   clientId,
   clientName,
+  contractStatus,
 }: {
   contractId: number
   clientId: number
   clientName?: string
+  contractStatus?: string
 }) {
   const [open, setOpen] = useState(false)
   const [view, setView] = useState<View>("list")
@@ -280,15 +282,21 @@ export function NegocieriDialog({
 
             {/* buton negociere nouă */}
             <div className="pt-3 border-t mt-auto">
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setView("new")}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Negociere nouă
-              </Button>
+              {contractStatus && contractStatus !== "ACTIVE" ? (
+                <p className="text-xs text-muted-foreground text-center italic">
+                  Negocierile pot fi inițiate doar pentru contracte active.
+                </p>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setView("new")}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Negociere nouă
+                </Button>
+              )}
             </div>
           </div>
         )}
