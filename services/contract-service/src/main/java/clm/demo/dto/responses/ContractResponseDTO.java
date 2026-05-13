@@ -22,8 +22,6 @@ public class ContractResponseDTO {
     private Long templateId;
     private Integer clientId;
     private String contractStatus;
-    private Integer generatedBy;
-    private String generatedByMail;
     private BigDecimal contractValue;
     private BigDecimal contractBalance;
     private LocalDate contractStartDate;
@@ -32,15 +30,16 @@ public class ContractResponseDTO {
     private LocalDate terminationDate;
     private String reasonsForTermination;
     private Boolean autoRenew;
-    private LocalDateTime createdAt;
 
     // Audit Fields
     private LocalDateTime generatedAt;
-    private Integer generatedByUserId;
+    private Integer generatedByUser;
+    private LocalDateTime uploadedSignedAt;
+    private Integer uploadedSignedByUser;
     private LocalDateTime terminatedAt;
     private Integer terminatedByUserId;
-    private LocalDateTime uploadedSignedAt;
-    private Integer uploadedSignedByUserId;
+    private LocalDateTime modifiedAt;
+    private Integer modifiedByUserId;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;
     private List<AppendixResponseDTO> appendices;

@@ -24,8 +24,8 @@ public class ContractSpecification {
     private static final String FIELD_NOTES             = "notes";
     private static final String FIELD_CONTRACT_STATUS   = "contractStatus";
     private static final String FIELD_CLIENT_ID         = "clientId";
-    private static final String FIELD_GENERATED_BY      = "generatedBy";
-    private static final String FIELD_CREATED_AT        = "createdAt";
+    private static final String FIELD_GENERATED_BY_USER = "generatedByUser";
+    private static final String FIELD_GENERATED_AT       = "generatedAt";
     private static final String FIELD_DOCUMENT_TEMPLATE = "documentTemplate";
     private static final String FIELD_TEMPLATE_NAME     = "templateName";
     private static final String FIELD_DESCRIPTION       = "description";
@@ -89,8 +89,8 @@ public class ContractSpecification {
         if (Objects.nonNull(request.clientId())) {
             predicates.add(cb.equal(root.get(FIELD_CLIENT_ID), request.clientId()));
         }
-        if (Objects.nonNull(request.generatedBy())) {
-            predicates.add(cb.equal(root.get(FIELD_GENERATED_BY), request.generatedBy()));
+        if (Objects.nonNull(request.generatedByUser())) {
+            predicates.add(cb.equal(root.get(FIELD_GENERATED_BY_USER), request.generatedByUser()));
         }
     }
 
@@ -100,13 +100,13 @@ public class ContractSpecification {
 
         if (Objects.nonNull(request.createdAfter())) {
             predicates.add(cb.greaterThanOrEqualTo(
-                    root.get(FIELD_CREATED_AT),
+                    root.get(FIELD_GENERATED_AT),
                     request.createdAfter().atStartOfDay()
             ));
         }
         if (Objects.nonNull(request.createdBefore())) {
             predicates.add(cb.lessThanOrEqualTo(
-                    root.get(FIELD_CREATED_AT),
+                    root.get(FIELD_GENERATED_AT),
                     LocalDateTime.of(request.createdBefore(), LocalTime.MAX)
             ));
         }

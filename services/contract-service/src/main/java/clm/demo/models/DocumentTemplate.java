@@ -1,6 +1,6 @@
 package clm.demo.models;
 
-import clm.demo.models.enums.DocumentFormat;
+import clm.demo.models.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;

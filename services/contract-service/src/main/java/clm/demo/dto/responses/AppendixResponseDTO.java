@@ -22,10 +22,11 @@ public class AppendixResponseDTO {
     private String title;
     private String appendixStatus;
     private String documentFormat;
-    private Integer generatedBy;
-    private String generatedByMail;
+    private LocalDateTime generatedAt;
+    private Integer generatedByUser;
+    private LocalDateTime uploadedSignedAt;
+    private Integer uploadedSignedByUser;
     private String notes;
-    private LocalDateTime createdAt;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;
 }

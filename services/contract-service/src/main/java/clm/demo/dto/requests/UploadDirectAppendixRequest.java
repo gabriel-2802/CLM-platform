@@ -22,6 +22,5 @@ public class UploadDirectAppendixRequest {
     private MultipartFile file;
 
     private Integer userId;
-    private String userMail;
     private String notes;
 }

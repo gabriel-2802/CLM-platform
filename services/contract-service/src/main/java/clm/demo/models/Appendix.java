@@ -1,6 +1,6 @@
 package clm.demo.models;
 
-import clm.demo.models.enums.AppendixStatus;
+import clm.demo.models.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;

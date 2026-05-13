@@ -16,7 +16,7 @@ public record SearchRequest(
         String notes,
         ContractStatus contractStatus,
         Integer clientId,
-        Integer generatedBy,
+        Integer generatedByUser,
         List<String> labelValues,
         String templateName,
         String templateDescription,

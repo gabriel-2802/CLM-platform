@@ -1,6 +1,7 @@
 package clm.demo.controllers;
 
 import clm.demo.dto.requests.ContractTerminationRequest;
+import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
@@ -139,6 +140,27 @@ public class ContractController {
         return ResponseEntity.ok(response);
     }
 
+
+    @Operation(
+        summary     = "Update contract financial/temporal terms",
+        description = """
+            Modifies the contract end date, balance, and/or value. Any combination of
+            the three fields may be supplied; omitted fields are left unchanged.
+            Records who made the change and when via `modifiedAt` / `modifiedByUserId`.
+            """
+    )
+    @ApiResponse(responseCode = "200", description = "Contract terms updated",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "400", description = "Missing required fields", content = @Content)
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @PatchMapping("/{contractId}/update-terms")
+    public ResponseEntity<ContractResponseDTO> updateContractTerms(
+            @Parameter(description = "Contract ID", required = true, example = "88")
+            @PathVariable Long contractId,
+            @Valid @RequestBody ContractUpdateRequest request) {
+        ContractResponseDTO response = contractService.updateContractTerms(contractId, request);
+        return ResponseEntity.ok(response);
+    }
 
     @Operation(
         summary     = "List all contracts",

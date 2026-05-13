@@ -3,7 +3,7 @@ spring:
     name: demo
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/clm_platform}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/demo_clm}
     driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
     username: ${SPRING_DATASOURCE_USERNAME:clm_user}
     password: ${SPRING_DATASOURCE_PASSWORD:clm_password}
@@ -62,4 +62,4 @@ libreoffice:
 # random string of at least 32 characters (256 bits). The fallback below is for local
 # development ONLY and must never be used in a deployed environment.
 jwt:
-  secret: ${JWT_SECRET:local-dev-only-secret-do-not-use-in-prod-min32}
+  secret: ${JWT_SECRET:dev-shared-jwt-secret-used-by-both-nextauth-and-spring-change-before-deploy

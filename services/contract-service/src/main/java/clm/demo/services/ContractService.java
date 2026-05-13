@@ -1,6 +1,7 @@
 package clm.demo.services;
 
 import clm.demo.dto.requests.ContractTerminationRequest;
+import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
@@ -47,7 +48,7 @@ import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
 @RequiredArgsConstructor
 public class ContractService {
 
-    private static final String SORT_FIELD_CREATED_AT = "createdAt";
+    private static final String SORT_FIELD_GENERATED_AT = "generatedAt";
 
     private final DocumentTemplateRepository   templateRepository;
     private final ContractRepository           contractRepository;
@@ -125,7 +126,7 @@ public class ContractService {
             contract.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             contract.setContractStatus(ContractStatus.ACTIVE);
             contract.setUploadedSignedAt(LocalDateTime.now());
-            contract.setUploadedSignedByUserId(userId);
+            contract.setUploadedSignedByUser(userId);
             contract = contractRepository.save(contract);
         } catch (IOException e) {
             throw new FileConversionException(
@@ -180,7 +181,7 @@ public class ContractService {
     @Transactional(readOnly = true)
     public Page<ContractResponseDTO> getAll(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size,
-                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATED_AT));
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_GENERATED_AT));
         return contractRepository.findAll(pageable)
                 .map(contractMapper::toResponseDTO);
     }
@@ -193,7 +194,7 @@ public class ContractService {
         int pageSize  = Objects.nonNull(request.size()) ? request.size() : DEFAULT_PAGE_SIZE;
 
         PageRequest pageable = PageRequest.of(pageIndex, pageSize,
-                Sort.by(Sort.Direction.DESC, SORT_FIELD_CREATED_AT));
+                Sort.by(Sort.Direction.DESC, SORT_FIELD_GENERATED_AT));
 
         Page<Contract> result = contractRepository.findAll(
                 contractSpecification.buildSearchSpecification(request), pageable);
@@ -203,6 +204,32 @@ public class ContractService {
                 result.getNumber(), result.getTotalPages());
 
         return result.map(contractMapper::toResponseDTO);
+    }
+
+    @Transactional
+    public ContractResponseDTO updateContractTerms(Long contractId, @Valid ContractUpdateRequest request) {
+        Contract contract = contractRepository.findById(contractId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Contract not found: " + contractId));
+
+        if (Objects.nonNull(request.contractEndDate())) {
+            contract.setContractEndDate(request.contractEndDate());
+        }
+        if (Objects.nonNull(request.balance())) {
+            contract.setContractBalance(request.balance());
+        }
+        if (Objects.nonNull(request.value())) {
+            contract.setContractValue(request.value());
+        }
+
+        contract.setModifiedAt(LocalDateTime.now());
+        contract.setModifiedByUserId(request.userId());
+
+        log.info("Contract {} terms updated by user {}: endDate={}, balance={}, value={}",
+                contractId, request.userId(),
+                request.contractEndDate(), request.balance(), request.value());
+
+        return contractMapper.toResponseDTO(contractRepository.save(contract));
     }
 
     private Contract fillAndPersistDocument(

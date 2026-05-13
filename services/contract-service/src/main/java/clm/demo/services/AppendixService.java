@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -77,8 +78,7 @@ public class AppendixService {
                 .contract(contract)
                 .documentTemplate(template)
                 .title(request.title())
-                .generatedBy(Objects.nonNull(request.userId()) ? request.userId().intValue() : null)
-                .generatedByMail(request.userMail())
+                .generatedByUser(Objects.nonNull(request.userId()) ? request.userId().intValue() : null)
                 .notes(request.notes())
                 .appendixStatus(AppendixStatus.DRAFT)
                 .build();
@@ -128,11 +128,12 @@ public class AppendixService {
             Appendix appendix = Appendix.builder()
                     .contract(contract)
                     .title(request.getTitle())
-                    .generatedBy(request.getUserId())
-                    .generatedByMail(request.getUserMail())
+                    .generatedByUser(request.getUserId())
                     .notes(request.getNotes())
                     .signedDocumentContent(fileUtils.compress(fileBytes))
                     .documentFormat(format)
+                    .uploadedSignedAt(LocalDateTime.now())
+                    .uploadedSignedByUser(request.getUserId())
                     .appendixStatus(AppendixStatus.SIGNED)
                     .build();
 
@@ -153,7 +154,7 @@ public class AppendixService {
      * @throws InvalidAppendixStateException if the appendix is already {@link AppendixStatus#SIGNED}
      */
     @Transactional
-    public AppendixResponseDTO uploadSignedAppendix(Long appendixId, byte[] fileBytes) {
+    public AppendixResponseDTO uploadSignedAppendix(Long appendixId, byte[] fileBytes, Integer userId) {
         log.info("Uploading signed document for appendix {}", appendixId);
 
         Appendix appendix = appendixRepository.findById(appendixId)
@@ -172,6 +173,8 @@ public class AppendixService {
                     : fileBytes;
 
             appendix.setSignedDocumentContent(fileUtils.compress(pdfBytes));
+            appendix.setUploadedSignedAt(LocalDateTime.now());
+            appendix.setUploadedSignedByUser(userId);
             appendix.setAppendixStatus(AppendixStatus.SIGNED);
             appendix = appendixRepository.save(appendix);
             log.info("Appendix {} transitioned DRAFT → SIGNED", appendixId);

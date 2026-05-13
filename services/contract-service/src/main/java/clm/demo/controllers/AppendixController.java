@@ -115,6 +115,8 @@ public class AppendixController {
     public ResponseEntity<AppendixResponseDTO> uploadSignedAppendix(
             @Parameter(description = "Appendix ID", required = true, example = "12")
             @PathVariable Long appendixId,
+            @Parameter(description = "User ID uploading the signed document", example = "42")
+            @RequestParam(required = false) Integer userId,
             @Parameter(description = "Signed DOCX or PDF file", required = true)
             @RequestParam("file") @NotNull MultipartFile file) {
 
@@ -123,7 +125,7 @@ public class AppendixController {
         }
 
         try {
-            return ResponseEntity.ok(appendixService.uploadSignedAppendix(appendixId, file.getBytes()));
+            return ResponseEntity.ok(appendixService.uploadSignedAppendix(appendixId, file.getBytes(), userId));
         } catch (IOException e) {
             throw new FileConversionException("Failed to read uploaded file: " + e.getMessage(), e);
         }

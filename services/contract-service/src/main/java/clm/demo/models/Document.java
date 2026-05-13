@@ -1,17 +1,17 @@
 package clm.demo.models;
 
-import clm.demo.models.enums.DocumentFormat;
+import clm.demo.models.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.BatchSize;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Abstract base entity for all managed documents (contracts, appendices).
@@ -63,18 +63,28 @@ public abstract class Document {
     @Column(name = "signed_document_content")
     private byte[] signedDocumentContent;
 
-    @Column(name = "generated_by")
-    private Integer generatedBy;
+    /* audit */
+    @Column(name = "generated_at")
+    private LocalDateTime generatedAt;
 
-    @Column(name = "generated_by_mail", length = 255)
-    private String generatedByMail;
+    @Column(name = "generated_by_user")
+    private Integer generatedByUser;
+
+    @Column(name = "uploaded_signed_at")
+    private LocalDateTime uploadedSignedAt;
+
+    @Column(name = "uploaded_signed_by_user")
+    private Integer uploadedSignedByUser;
 
     @Column(name = "notes", length = 1000)
     private String notes;
 
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    @PrePersist
+    protected void onDocumentCreate() {
+        if (this.generatedAt == null) {
+            this.generatedAt = LocalDateTime.now();
+        }
+    }
 
     @OneToMany(mappedBy = "document", cascade = CascadeType.ALL, orphanRemoval = true)
     @BatchSize(size = 50)

@@ -1,6 +1,6 @@
 package clm.demo.models;
 
-import clm.demo.models.enums.ContractStatus;
+import clm.demo.models.enums.*;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.SuperBuilder;
@@ -73,32 +73,15 @@ public class Contract extends Document {
 
     /* audit data */
 
-    @Column(name = "generated_at")
-    private LocalDateTime generatedAt;
-
-    @Column(name = "generated_by_user_id")
-    private Integer generatedByUserId;
-
     @Column(name = "terminated_at")
     private LocalDateTime terminatedAt;
 
     @Column(name = "terminated_by_user_id")
     private Integer terminatedByUserId;
 
-    @Column(name = "uploaded_signed_at")
-    private LocalDateTime uploadedSignedAt;
+    @Column(name = "modified_at")
+    private LocalDateTime modifiedAt;
 
-    @Column(name = "uploaded_signed_by_user_id")
-    private Integer uploadedSignedByUserId;
-
-    /**
-     * Automatically set generatedAt and generatedByUserId when the contract is first created.
-     * This is called before the entity is persisted to the database.
-     */
-    @PrePersist
-    protected void onCreate() {
-        if (this.generatedAt == null) {
-            this.generatedAt = LocalDateTime.now();
-        }
-    }
+    @Column(name = "modified_by_user_id")
+    private Integer modifiedByUserId;
 }
