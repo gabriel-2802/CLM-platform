@@ -1,0 +1,36 @@
+---
+title: Template Upload Pipeline
+---
+flowchart TD
+    A([User uploads DOCX or PDF]) --> B[detectDocumentFormat\nmagic bytes check]
+    B --> C[FileParser.parseTemplate]
+
+    C --> D{Format?}
+    D -->|PDF| E[PDFBox PDFTextStripper\nextract raw text]
+    D -->|DOCX| F[forEachParagraph\nparagraph.getText joined by newline]
+
+    E --> G[PlaceholderProcessor.normalize\nCRLF to LF\nUnicode dots to ASCII dots]
+    F --> G
+
+    G --> H[PlaceholderProcessor.findPlaceholders\nregex: 4 or more consecutive dots\ncount occurrences = N]
+
+    H --> I{Was PDF?}
+    I -->|Yes| J[FileUtils.convert\nPDF to DOCX via LibreOffice headless]
+    I -->|No| K[Use original DOCX bytes]
+
+    J --> L[DocxNormalizer.normalizePlaceholdersInDocx\nMERGE runs per paragraph\nSUBSTITUTE all dots to exactly 4 dots\nWRITEBACK to runs preserving formatting]
+    K --> L
+
+    L --> M[FileUtils.compress\nGZIP the normalized DOCX]
+
+    M --> N[(documentRepository.save\nDocumentTemplate entity\ndocumentContent = compressed DOCX\nfieldCount = N\ndocumentFormat = DOCX always\nisFullyMapped = false)]
+
+    N --> O[templateFieldRepository.saveAll\nfor position 0 to N-1:\nTemplateField with fieldPosition and null label]
+
+    O --> P[PlaceholderProcessor.substituteEach\nReplace each placeholder with field ID markers\nfor UI field-position display]
+
+    P --> Q([Return TemplateUploadResponseDTO\ntemplateName, templateId\ndocumentText with field markers])
+
+    style A fill:#4A90D9,color:#fff
+    style Q fill:#27AE60,color:#fff
+    style N fill:#8E44AD,color:#fff

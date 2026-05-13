@@ -1,0 +1,80 @@
+---
+title: CLM Contract Service — Entity Relationship Diagram
+---
+erDiagram
+    DOCUMENT_TEMPLATE {
+        bigint id PK
+        varchar template_name UK
+        varchar description
+        enum document_format
+        bytea document_content
+        int field_count
+        boolean is_fully_mapped
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    TEMPLATE_FIELD {
+        bigint id PK
+        bigint template_id FK
+        varchar field_label
+        enum data_type
+        int field_position
+        boolean is_required
+        varchar format_pattern
+    }
+
+    DOCUMENT {
+        bigint id PK
+        varchar document_type
+        bigint template_id FK
+        enum document_format
+        bytea document_content
+        bytea signed_document_content
+        int generated_by
+        varchar generated_by_mail
+        varchar notes
+        timestamp created_at
+    }
+
+    CONTRACT {
+        bigint document_id PK
+        int client_id
+        enum contract_status
+        numeric contract_value
+        numeric contract_balance
+        boolean auto_renew
+        date contract_start_date
+        date contract_end_date
+        date termination_date
+        varchar reasons_for_termination
+        timestamp generated_at
+        int generated_by_user_id
+        timestamp terminated_at
+        int terminated_by_user_id
+        timestamp uploaded_signed_at
+        int uploaded_signed_by_user_id
+    }
+
+    APPENDIX {
+        bigint document_id PK
+        bigint contract_id FK
+        varchar title
+        enum appendix_status
+    }
+
+    DOCUMENT_FIELD_VALUE {
+        bigint id PK
+        bigint document_id FK
+        bigint template_field_id FK
+        text field_value
+        timestamp created_at
+    }
+
+    DOCUMENT_TEMPLATE ||--o{ TEMPLATE_FIELD : "has fields"
+    DOCUMENT_TEMPLATE ||--o{ DOCUMENT : "used as blueprint"
+    DOCUMENT ||--|| CONTRACT : "JOINED subclass CONTRACT"
+    DOCUMENT ||--|| APPENDIX : "JOINED subclass APPENDIX"
+    CONTRACT ||--o{ APPENDIX : "owns appendices"
+    DOCUMENT ||--o{ DOCUMENT_FIELD_VALUE : "field value audit log"
+    TEMPLATE_FIELD ||--o{ DOCUMENT_FIELD_VALUE : "referenced by values"

@@ -1,0 +1,25 @@
+---
+title: Contract Lifecycle — State Machine
+---
+stateDiagram-v2
+    [*] --> PENDING_SIGNATURE : generateContract()\naudit: generated_at = NOW()\ngenerated_by_user_id = userId
+
+    PENDING_SIGNATURE --> ACTIVE : uploadSignedContract()\naudit: uploaded_signed_at = NOW()\nuploaded_signed_by_user_id = userId\nsignedDocumentContent = compressed PDF
+
+    ACTIVE --> TERMINATED : terminateContract()\naudit: terminated_at = NOW()\nterminated_by_user_id = userId\nterminationDate = request.terminationDate\nreasons saved
+
+    ACTIVE --> ARCHIVED : ContractArchiveJob (midnight)\ncondition: contractEndDate < today\nAND auto_renew = false\n[bulk UPDATE, no audit fields]
+
+    TERMINATED --> [*]
+    ARCHIVED --> [*]
+
+    note right of PENDING_SIGNATURE
+        documentContent = generated PDF (unsigned)
+        signedDocumentContent = NULL
+    end note
+
+    note right of ACTIVE
+        documentContent = generated PDF (unsigned)
+        signedDocumentContent = user-uploaded signed PDF
+        auto_renew toggle available at any point in ACTIVE state
+    end note
