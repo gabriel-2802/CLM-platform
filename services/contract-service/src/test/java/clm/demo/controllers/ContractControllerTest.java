@@ -401,4 +401,82 @@ class ContractControllerTest {
                     .andExpect(status().isNotFound());
         }
     }
+
+    // ================================================================== //
+    //  PATCH /api/contracts/{id}/renegotiate                               //
+    // ================================================================== //
+
+    @Nested
+    class RenegotiateContract {
+
+        @Test
+        void valid_request_updates_value_and_end_date_returns_200() throws Exception {
+            ContractResponseDTO dto = TestDataFactory.contractResponse(1L, "ACTIVE");
+            when(contractService.renegotiateContract(eq(1L), any())).thenReturn(dto);
+
+            mockMvc.perform(patch("/api/contracts/1/renegotiate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                {
+                                  "contractValue": 15000.00,
+                                  "contractEndDate": "2028-06-01"
+                                }
+                                """))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(1));
+        }
+
+        @Test
+        void request_with_only_value_returns_200() throws Exception {
+            ContractResponseDTO dto = TestDataFactory.contractResponse(1L, "ACTIVE");
+            when(contractService.renegotiateContract(eq(1L), any())).thenReturn(dto);
+
+            mockMvc.perform(patch("/api/contracts/1/renegotiate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                { "contractValue": 20000.00 }
+                                """))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void request_with_only_end_date_returns_200() throws Exception {
+            ContractResponseDTO dto = TestDataFactory.contractResponse(1L, "ACTIVE");
+            when(contractService.renegotiateContract(eq(1L), any())).thenReturn(dto);
+
+            mockMvc.perform(patch("/api/contracts/1/renegotiate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                { "contractEndDate": "2029-01-01" }
+                                """))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void contract_not_found_returns_404() throws Exception {
+            when(contractService.renegotiateContract(eq(99L), any()))
+                    .thenThrow(new ResourceNotFoundException("Contract not found: 99"));
+
+            mockMvc.perform(patch("/api/contracts/99/renegotiate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                { "contractValue": 5000.00 }
+                                """))
+                    .andExpect(status().isNotFound());
+        }
+
+        @Test
+        void non_active_contract_returns_409() throws Exception {
+            when(contractService.renegotiateContract(eq(1L), any()))
+                    .thenThrow(new InvalidContractStateException(
+                            "Cannot renegotiate contract in status: TERMINATED. Only ACTIVE contracts can be renegotiated."));
+
+            mockMvc.perform(patch("/api/contracts/1/renegotiate")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                { "contractValue": 5000.00 }
+                                """))
+                    .andExpect(status().isConflict());
+        }
+    }
 }

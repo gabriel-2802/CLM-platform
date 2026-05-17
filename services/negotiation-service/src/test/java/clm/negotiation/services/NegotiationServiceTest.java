@@ -45,9 +45,9 @@ class NegotiationServiceTest {
     class Create {
 
         @Test
-        void saves_negotiation_with_draft_status_and_returns_dto() {
-            Negotiation saved = TestDataFactory.negotiation(1L, NegotiationStatus.DRAFT);
-            NegotiationResponseDTO dto = TestDataFactory.response(1L, NegotiationStatus.DRAFT);
+        void saves_negotiation_with_sent_status_and_returns_dto() {
+            Negotiation saved = TestDataFactory.negotiation(1L, NegotiationStatus.SENT);
+            NegotiationResponseDTO dto = TestDataFactory.response(1L, NegotiationStatus.SENT);
 
             when(repository.save(any())).thenReturn(saved);
             when(mapper.toDto(saved)).thenReturn(dto);
@@ -55,21 +55,21 @@ class NegotiationServiceTest {
             NegotiationResponseDTO result = service.create(TestDataFactory.createRequest());
 
             assertThat(result.id()).isEqualTo(1L);
-            assertThat(result.status()).isEqualTo(NegotiationStatus.DRAFT);
+            assertThat(result.status()).isEqualTo(NegotiationStatus.SENT);
             verify(repository).save(any());
         }
 
         @Test
-        void persisted_entity_has_draft_status_regardless_of_input() {
-            Negotiation saved = TestDataFactory.negotiation(1L, NegotiationStatus.DRAFT);
+        void persisted_entity_has_sent_status_regardless_of_input() {
+            Negotiation saved = TestDataFactory.negotiation(1L, NegotiationStatus.SENT);
             when(repository.save(any())).thenReturn(saved);
-            when(mapper.toDto(any())).thenReturn(TestDataFactory.response(1L, NegotiationStatus.DRAFT));
+            when(mapper.toDto(any())).thenReturn(TestDataFactory.response(1L, NegotiationStatus.SENT));
 
             service.create(TestDataFactory.createRequest());
 
             ArgumentCaptor<Negotiation> captor = ArgumentCaptor.forClass(Negotiation.class);
             verify(repository).save(captor.capture());
-            assertThat(captor.getValue().getStatus()).isEqualTo(NegotiationStatus.DRAFT);
+            assertThat(captor.getValue().getStatus()).isEqualTo(NegotiationStatus.SENT);
         }
 
         @Test
@@ -231,13 +231,21 @@ class NegotiationServiceTest {
         }
 
         @Test
-        void draft_negotiation_cannot_be_accepted() {
+        void draft_negotiation_can_be_accepted_and_updates_contract() {
             Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.DRAFT);
             when(repository.findById(1L)).thenReturn(Optional.of(n));
+            when(repository.save(n)).thenReturn(n);
+            when(mapper.toDto(n)).thenReturn(TestDataFactory.resolvedResponse(1L, NegotiationStatus.ACCEPTED));
 
-            assertThatThrownBy(() -> service.accept(1L))
-                    .isInstanceOf(InvalidNegotiationStateException.class)
-                    .hasMessageContaining("SENT");
+            service.accept(1L);
+
+            assertThat(n.getStatus()).isEqualTo(NegotiationStatus.ACCEPTED);
+            assertThat(n.getResolvedAt()).isNotNull();
+            verify(contractApiClient).applyRenegotiation(
+                    eq(10L),
+                    eq(BigDecimal.valueOf(4_500)),
+                    eq(LocalDate.of(2027, 6, 1))
+            );
         }
 
         @Test
@@ -329,13 +337,17 @@ class NegotiationServiceTest {
         }
 
         @Test
-        void draft_negotiation_cannot_be_rejected() {
+        void draft_negotiation_can_be_rejected() {
             Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.DRAFT);
             when(repository.findById(1L)).thenReturn(Optional.of(n));
+            when(repository.save(n)).thenReturn(n);
+            when(mapper.toDto(n)).thenReturn(TestDataFactory.resolvedResponse(1L, NegotiationStatus.REJECTED));
 
-            assertThatThrownBy(() -> service.reject(1L, null))
-                    .isInstanceOf(InvalidNegotiationStateException.class)
-                    .hasMessageContaining("SENT");
+            service.reject(1L, null);
+
+            assertThat(n.getStatus()).isEqualTo(NegotiationStatus.REJECTED);
+            assertThat(n.getResolvedAt()).isNotNull();
+            verifyNoInteractions(contractApiClient);
         }
 
         @Test
