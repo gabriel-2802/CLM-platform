@@ -6,12 +6,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, ChevronLeft, Plus, Check, X, Send } from "lucide-react"
+import { Loader2, ChevronLeft, Plus, Check, X, Clock } from "lucide-react"
 import { toast } from "sonner"
 import {
   getNegotiationsForContract,
   createNegotiation,
-  sendNegotiation,
   acceptNegotiation,
   rejectNegotiation,
   type Negotiation,
@@ -20,22 +19,19 @@ import {
 type View = "list" | "new"
 
 const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Draft",
-  SENT: "Trimisă",
+  SENT:     "În așteptare",
   ACCEPTED: "Acceptată",
   REJECTED: "Respinsă",
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  DRAFT:    "bg-slate-100 text-slate-700 border-slate-300",
-  SENT:     "bg-blue-100  text-blue-700  border-blue-300",
+  SENT:     "bg-amber-100 text-amber-700 border-amber-300",
   ACCEPTED: "bg-green-100 text-green-700 border-green-300",
   REJECTED: "bg-red-100   text-red-700   border-red-300",
 }
 
 const DOT_COLORS: Record<string, string> = {
-  DRAFT:    "bg-slate-400",
-  SENT:     "bg-blue-500",
+  SENT:     "bg-amber-400",
   ACCEPTED: "bg-green-500",
   REJECTED: "bg-red-500",
 }
@@ -134,51 +130,40 @@ function NegotiationTimeline({
             )}
 
             {/* acțiuni */}
-            {n.status === "DRAFT" && (
-              <div className="flex gap-2 pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy[n.id]}
-                  onClick={() => run(n.id, () => sendNegotiation(n.id))}
-                >
-                  {busy[n.id] ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <><Send className="h-3 w-3 mr-1" />Trimite</>
-                  )}
-                </Button>
-              </div>
-            )}
-
-            {n.status === "SENT" && (
-              <div className="flex gap-2 pt-1">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-green-400 text-green-700 hover:bg-green-50"
-                  disabled={busy[n.id]}
-                  onClick={() => run(n.id, () => acceptNegotiation(n.id))}
-                >
-                  {busy[n.id] ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <><Check className="h-3 w-3 mr-1" />Acceptă</>
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-red-400 text-red-700 hover:bg-red-50"
-                  disabled={busy[n.id]}
-                  onClick={() => run(n.id, () => rejectNegotiation(n.id))}
-                >
-                  {busy[n.id] ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <><X className="h-3 w-3 mr-1" />Respinge</>
-                  )}
-                </Button>
+            {n.status !== "ACCEPTED" && n.status !== "REJECTED" && (
+              <div className="flex flex-col gap-2 pt-1">
+                <p className="flex items-center gap-1 text-xs text-amber-600">
+                  <Clock className="h-3 w-3" />
+                  În curs de procesare - înregistrează răspunsul:
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-green-400 text-green-700 hover:bg-green-50"
+                    disabled={busy[n.id]}
+                    onClick={() => run(n.id, () => acceptNegotiation(n.id))}
+                  >
+                    {busy[n.id] ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <><Check className="h-3 w-3 mr-1" />Acceptată</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-400 text-red-700 hover:bg-red-50"
+                    disabled={busy[n.id]}
+                    onClick={() => run(n.id, () => rejectNegotiation(n.id))}
+                  >
+                    {busy[n.id] ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <><X className="h-3 w-3 mr-1" />Respinsă</>
+                    )}
+                  </Button>
+                </div>
               </div>
             )}
           </div>

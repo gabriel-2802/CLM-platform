@@ -80,17 +80,6 @@ export async function createNegotiation(payload: CreateNegotiationPayload) {
   }
 }
 
-export async function sendNegotiation(id: number) {
-  try {
-    const res = await negotiationFetch(`/api/negotiations/${id}/send`, { method: "PATCH" })
-    if (!res.ok) return { success: false, error: await extractError(res) }
-    return { success: true, data: (await res.json()) as Negotiation }
-  } catch (error) {
-    console.error("Error sending negotiation:", error)
-    return { success: false, error: "Eroare de rețea" }
-  }
-}
-
 export async function acceptNegotiation(id: number) {
   try {
     const res = await negotiationFetch(`/api/negotiations/${id}/accept`, { method: "PATCH" })
