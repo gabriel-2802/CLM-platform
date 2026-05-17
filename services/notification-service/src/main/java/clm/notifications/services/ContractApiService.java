@@ -1,6 +1,7 @@
 package clm.notifications.services;
 
 import clm.notifications.dto.ContractSummaryDTO;
+import clm.notifications.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -27,12 +28,10 @@ import java.util.List;
 public class ContractApiService {
 
     private final RestClient contractsRestClient;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Value("${notification.expiry-warning-days:30}")
     private int expiryWarningDays;
-
-    @Value("${notification.inactivity-months:6}")
-    private int inactivityMonths;
 
     /**
      * Fetches ACTIVE contracts expiring within the configured look-ahead window.
@@ -40,9 +39,11 @@ public class ContractApiService {
      * @return list of expiring contracts, or empty list on error / no results
      */
     public List<ContractSummaryDTO> fetchExpiringContracts() {
+        String token = jwtTokenProvider.generateServiceToken();
         try {
             List<ContractSummaryDTO> result = contractsRestClient.get()
                     .uri("/api/contracts/report/expiring?days={days}", expiryWarningDays)
+                    .header("Authorization", "Bearer " + token)
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
                         log.warn("Contracts API returned {} for expiring contracts endpoint", res.getStatusCode());
@@ -59,29 +60,4 @@ public class ContractApiService {
         }
     }
 
-    /**
-     * Fetches the most recent contract for each client not renegotiated
-     * within the configured inactivity window.
-     *
-     * @return list of stale client contracts, or empty list on error / no results
-     */
-    public List<ContractSummaryDTO> fetchInactiveClientContracts() {
-        try {
-            List<ContractSummaryDTO> result = contractsRestClient.get()
-                    .uri("/api/contracts/report/inactive-clients?months={months}", inactivityMonths)
-                    .retrieve()
-                    .onStatus(HttpStatusCode::is4xxClientError, (req, res) -> {
-                        log.warn("Contracts API returned {} for inactive-clients endpoint", res.getStatusCode());
-                    })
-                    .body(new ParameterizedTypeReference<>() {});
-
-            if (result == null) return Collections.emptyList();
-            log.info("Fetched {} inactive client contracts from contracts API", result.size());
-            return result;
-
-        } catch (RestClientException e) {
-            log.error("Failed to fetch inactive client contracts from contracts API: {}", e.getMessage());
-            return Collections.emptyList();
-        }
-    }
 }

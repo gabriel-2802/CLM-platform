@@ -3,6 +3,7 @@ package clm.demo.controllers;
 import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.GenContractRequest;
+import clm.demo.dto.requests.RenegotiateContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.exceptions.FileConversionException;
@@ -122,6 +123,26 @@ public class ContractController {
     }
 
     @Operation(
+        summary     = "Apply renegotiation outcome to a contract",
+        description = """
+            Updates `contractValue` and/or `contractEndDate` on an ACTIVE contract.
+            Called automatically by the negotiation-service when a negotiation is accepted.
+            Only ACTIVE contracts can be renegotiated.
+            """
+    )
+    @ApiResponse(responseCode = "200", description = "Contract updated",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
+    @PatchMapping("/{contractId}/renegotiate")
+    public ResponseEntity<ContractResponseDTO> renegotiateContract(
+            @Parameter(description = "Contract ID", required = true, example = "88")
+            @PathVariable Long contractId,
+            @RequestBody RenegotiateContractRequest request) {
+        return ResponseEntity.ok(contractService.renegotiateContract(contractId, request));
+    }
+
+    @Operation(
         summary     = "Toggle auto-renewal status",
         description = """
             Toggles the auto-renewal flag for a contract. If `autoRenew` is `false`, it will be set to `true`
@@ -140,6 +161,17 @@ public class ContractController {
         return ResponseEntity.ok(response);
     }
 
+
+    @Operation(summary = "Get contract by ID")
+    @ApiResponse(responseCode = "200", description = "Contract found",
+        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @GetMapping("/{contractId}")
+    public ResponseEntity<ContractResponseDTO> getById(
+            @Parameter(description = "Contract ID", required = true)
+            @PathVariable Long contractId) {
+        return ResponseEntity.ok(contractService.getById(contractId));
+    }
 
     @Operation(
         summary     = "Update contract financial/temporal terms",

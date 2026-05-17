@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: negotiation-service
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5436/clm_negotiations}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:clm_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:clm_password}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
+    defer-datasource-initialization: false
+    properties:
+      hibernate:
+        default_schema: negotiations
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+    out-of-order: false
+    fail-on-missing-locations: false
+    clean-disabled: true
+    encoding: UTF-8
+
+  mail:
+    host: ${MAIL_HOST:sandbox.smtp.mailtrap.io}
+    port: ${MAIL_PORT:2525}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+    try-it-out-enabled: true
+    display-request-duration: true
+
+contracts:
+  service:
+    url: ${CONTRACTS_SERVICE_URL:http://localhost:8081}
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-only-secret-do-not-use-in-prod-min32}
+
+notification:
+  cron: ${NEGOTIATION_NOTIFICATION_CRON:0 0 9 1 * *}
+  inactivity-months: ${NOTIFICATION_INACTIVITY_MONTHS:6}
+  from: ${NOTIFICATION_FROM:contractplatform@gmail.com}
+  recipients: ${NOTIFICATION_RECIPIENTS:}

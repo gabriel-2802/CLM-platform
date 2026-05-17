@@ -255,6 +255,8 @@ services:
       SPRING_MAIL_FROM:                                  ${MAIL_FROM:-noreply@dev.example.com}
       CONTRACTS_SERVICE_URL:  ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
       CONTRACTS_API_BASE_URL: ${CONTRACTS_SERVICE_URL:-http://contracts:8081}
+      JWT_SECRET:             ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      NOTIFICATION_RECIPIENTS: ${NOTIFICATION_RECIPIENTS:-}
       APP_FRONTEND_URL:                ${FRONTEND_URL:-https://localhost}
       SPRING_WEB_CORS_ALLOWED_ORIGINS: https://localhost
       SERVER_PORT: 8082
@@ -270,6 +272,84 @@ services:
     restart: on-failure:3
     healthcheck:
       test: ["CMD", "nc", "-z", "localhost", "8082"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  # ── Negotiation-service database ──────────────────────────────────────────
+  postgres-negotiations:
+    image: postgres:16-alpine
+    container_name: clm-db-negotiations-test
+    environment:
+      POSTGRES_USER:        ${DB_USER:?DB_USER is required — check .env.testing}
+      POSTGRES_PASSWORD:    ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      POSTGRES_DB:          ${DB_NEGOTIATIONS_NAME:-clm_negotiations}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_negotiations_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_NEGOTIATIONS_EXPOSE_PORT:-5436}:5432"
+    networks:
+      - data-net
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_NEGOTIATIONS_NAME:-clm_negotiations}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Negotiation service ────────────────────────────────────────────────────
+  negotiation-service:
+    build:
+      context: services/negotiation-service
+      dockerfile: Dockerfile
+    container_name: clm-negotiation-service
+    environment:
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-negotiations:5432/${DB_NEGOTIATIONS_NAME:-clm_negotiations}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_PASSWORD:          ${DB_PASSWORD:?DB_PASSWORD is required — check .env.testing}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: negotiations
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   negotiations
+      JWT_SECRET:              ${JWT_SECRET:?JWT_SECRET is required — check .env.testing}
+      CONTRACTS_SERVICE_URL:   http://contracts:8081
+      SPRINGDOC_SWAGGER_UI_PATH:  /api/negotiations/swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH:    /api/negotiations/v3/api-docs
+      SERVER_PORT: 8085
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-test}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       negotiation-service
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      LOGGING_LEVEL_CLM_NEGOTIATION:     DEBUG
+      SPRING_MAIL_HOST:                                   ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
+      SPRING_MAIL_PORT:                                   ${MAIL_PORT:-2525}
+      SPRING_MAIL_USERNAME:                               ${MAIL_USERNAME:-your-mailtrap-username}
+      SPRING_MAIL_PASSWORD:                               ${MAIL_PASSWORD:-your-mailtrap-password}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:              "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:   "true"
+      NOTIFICATION_FROM:                                  ${MAIL_FROM:-noreply@dev.example.com}
+      NOTIFICATION_RECIPIENTS:                            ${NOTIFICATION_RECIPIENTS:-}
+      NEGOTIATION_NOTIFICATION_CRON:                      ${NEGOTIATION_NOTIFICATION_CRON:-0 0 9 1 * *}
+    depends_on:
+      postgres-negotiations:
+        condition: service_healthy
+      contracts:
+        condition: service_healthy
+    networks:
+      - data-net
+    restart: on-failure:3
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8085"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -313,6 +393,7 @@ services:
       NOTIFICATIONS_SERVICE_URL: http://notifications:8082
       USER_SERVICE_URL:          http://user-service:8083
       CLIENT_SERVICE_URL:        http://client-service:8084
+      NEGOTIATION_SERVICE_URL:   http://negotiation-service:8085
       ADMIN_REGISTER_CODE:  ${ADMIN_REGISTER_CODE:-devcode123}
       NEXTAUTH_URL:    ${FRONTEND_URL:-https://localhost}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET is required — check .env.testing}
@@ -426,6 +507,8 @@ services:
         condition: service_healthy
       client-service:
         condition: service_healthy
+      negotiation-service:
+        condition: service_healthy
       grafana:
         condition: service_healthy
     networks:
@@ -453,6 +536,8 @@ volumes:
   postgres_users_data:
     driver: local
   postgres_clients_data:
+    driver: local
+  postgres_negotiations_data:
     driver: local
   prometheus_data:
     driver: local

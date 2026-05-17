@@ -29,9 +29,6 @@ public class NotificationService {
     @Value("${notification.expiry-warning-days:30}")
     private int expiryWarningDays;
 
-    @Value("${notification.inactivity-months:6}")
-    private int inactivityMonths;
-
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
     /**
@@ -39,30 +36,28 @@ public class NotificationService {
      * Skips sending when both lists are empty.
      */
     public void sendMonthlyDigest() {
-        log.info("Starting monthly notification digest...");
+        log.info("Starting contract expiry notification digest...");
 
         List<ContractSummaryDTO> expiring = contractApiService.fetchExpiringContracts();
-        List<ContractSummaryDTO> inactive = contractApiService.fetchInactiveClientContracts();
 
-        if (expiring.isEmpty() && inactive.isEmpty()) {
-            log.info("No expiring contracts and no inactive clients – skipping email.");
+        if (expiring.isEmpty()) {
+            log.info("No expiring contracts found – skipping email.");
             return;
         }
 
-        String subject = "CLM Platform – Raport lunar contracte (" +
+        String subject = "CLM Platform – Contracte care expiră curând (" +
                 LocalDate.now().format(DateTimeFormatter.ofPattern("MM.yyyy")) + ")";
-        String body = buildHtmlBody(expiring, inactive);
+        String body = buildHtmlBody(expiring);
 
         emailService.sendHtml(subject, body);
-        log.info("Monthly digest sent: {} expiring, {} inactive clients", expiring.size(), inactive.size());
+        log.info("Contract expiry digest sent: {} expiring contracts", expiring.size());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // HTML email builder
     // ─────────────────────────────────────────────────────────────────────────
 
-    private String buildHtmlBody(List<ContractSummaryDTO> expiring,
-                                  List<ContractSummaryDTO> inactive) {
+    private String buildHtmlBody(List<ContractSummaryDTO> expiring) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
             <!DOCTYPE html>
@@ -86,7 +81,7 @@ public class NotificationService {
             <body>
             """);
 
-        sb.append("<h1>Raport lunar CLM Platform</h1>");
+        sb.append("<h1>Contracte care expiră curând – CLM Platform</h1>");
         sb.append("<p>Generat automat pe <strong>")
           .append(LocalDate.now().format(DATE_FMT))
           .append("</strong></p>");
@@ -126,41 +121,6 @@ public class NotificationService {
             sb.append("</tbody></table>");
         }
 
-        // ── Section 2: not renegotiated ─────────────────────────────────────
-        sb.append("<h2 style=\"margin-top:28px\">&#x1F4C5; Clienți cu care nu s-a renegociat în ultimele ")
-          .append(inactivityMonths)
-          .append(" luni</h2>");
-
-        if (inactive.isEmpty()) {
-            sb.append("<p class=\"empty\">Toți clienții au avut activitate contractuală recentă.</p>");
-        } else {
-            sb.append("""
-                <table>
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Client</th>
-                      <th>Ultimul contract</th>
-                      <th>Dată creare contract</th>
-                      <th>Status</th>
-                      <th>Generat de</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                """);
-            for (ContractSummaryDTO c : inactive) {
-                sb.append("<tr>")
-                  .append("<td>").append(c.getId()).append("</td>")
-                  .append("<td>").append(escapeHtml(c.clientLabel())).append("</td>")
-                  .append("<td>").append(formatDate(c.getContractEndDate())).append("</td>")
-                  .append("<td><span class=\"badge-stale\">").append(formatDateTime(c)).append("</span></td>")
-                  .append("<td>").append(escapeHtml(orDash(c.getContractStatus()))).append("</td>")
-                  .append("<td>").append(escapeHtml(orDash(c.getGeneratedByMail()))).append("</td>")
-                  .append("</tr>");
-            }
-            sb.append("</tbody></table>");
-        }
-
         sb.append("""
             <div class="footer">
               Acest email a fost generat automat de CLM Platform – Notifications Service.<br/>
@@ -178,12 +138,6 @@ public class NotificationService {
 
     private String formatDate(LocalDate date) {
         return date != null ? date.format(DATE_FMT) : "—";
-    }
-
-    private String formatDateTime(ContractSummaryDTO c) {
-        return c.getCreatedAt() != null
-                ? c.getCreatedAt().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
-                : "—";
     }
 
     private String formatValue(ContractSummaryDTO c) {

@@ -104,10 +104,16 @@ export async function uploadSignedContract(contractId: number, formData: FormDat
       return { success: false, error: "Fisier lipsa" };
     }
 
+    const session = await getSession();
+    const userId = Number(session?.user?.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return { success: false, error: "Utilizator neautentificat" };
+    }
+
     const backendFormData = new FormData();
     backendFormData.append("file", file);
 
-    const res = await contractsFetch(`/api/contracts/${contractId}/upload-signed`, {
+    const res = await contractsFetch(`/api/contracts/${contractId}/upload-signed?userId=${userId}`, {
       method: "POST",
       body: backendFormData,
     });

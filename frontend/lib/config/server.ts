@@ -17,3 +17,6 @@ export const CONTRACTS_SERVICE_URL =
 
 export const NOTIFICATIONS_SERVICE_URL =
   process.env.NOTIFICATIONS_SERVICE_URL ?? "http://notifications:8082"
+
+export const NEGOTIATION_SERVICE_URL =
+  process.env.NEGOTIATION_SERVICE_URL ?? "http://negotiation-service:8085"
