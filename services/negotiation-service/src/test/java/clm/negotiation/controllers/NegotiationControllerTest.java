@@ -259,40 +259,6 @@ class NegotiationControllerTest {
         }
     }
 
-    // ================================================================== //
-    //  PATCH /api/negotiations/{id}/send                                   //
-    // ================================================================== //
-
-    @Nested
-    class Send {
-
-        @Test
-        void draft_transitions_to_sent_returns_200() throws Exception {
-            NegotiationResponseDTO dto = TestDataFactory.response(1L, NegotiationStatus.SENT);
-            when(service.send(1L)).thenReturn(dto);
-
-            mockMvc.perform(patch("/api/negotiations/1/send"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.status").value("SENT"));
-        }
-
-        @Test
-        void not_found_returns_404() throws Exception {
-            when(service.send(99L)).thenThrow(new ResourceNotFoundException("Negotiation not found: 99"));
-
-            mockMvc.perform(patch("/api/negotiations/99/send"))
-                    .andExpect(status().isNotFound());
-        }
-
-        @Test
-        void wrong_state_returns_409() throws Exception {
-            when(service.send(1L)).thenThrow(
-                    new InvalidNegotiationStateException("Only DRAFT negotiations can be sent. Current status: SENT"));
-
-            mockMvc.perform(patch("/api/negotiations/1/send"))
-                    .andExpect(status().isConflict());
-        }
-    }
 
     // ================================================================== //
     //  PATCH /api/negotiations/{id}/accept                                 //

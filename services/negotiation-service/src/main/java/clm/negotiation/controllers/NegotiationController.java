@@ -32,7 +32,7 @@ public class NegotiationController {
 
     @Operation(
         summary     = "Create a new negotiation",
-        description = "Creates a new negotiation in DRAFT status for an existing contract."
+        description = "Creates a new negotiation in SENT (pending review) status for an existing contract."
     )
     @ApiResponse(responseCode = "201", description = "Negotiation created",
         content = @Content(schema = @Schema(implementation = NegotiationResponseDTO.class)))
@@ -78,21 +78,6 @@ public class NegotiationController {
             @PathVariable Integer clientId) {
         List<NegotiationResponseDTO> result = service.getByClientId(clientId);
         return result.isEmpty() ? ResponseEntity.noContent().build() : ResponseEntity.ok(result);
-    }
-
-    @Operation(
-        summary     = "Send negotiation to client",
-        description = "Transitions a DRAFT negotiation to SENT status."
-    )
-    @ApiResponse(responseCode = "200", description = "Negotiation sent",
-        content = @Content(schema = @Schema(implementation = NegotiationResponseDTO.class)))
-    @ApiResponse(responseCode = "404", description = "Negotiation not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Negotiation is not in DRAFT status", content = @Content)
-    @PatchMapping("/{id}/send")
-    public ResponseEntity<NegotiationResponseDTO> send(
-            @Parameter(description = "Negotiation ID", required = true)
-            @PathVariable Long id) {
-        return ResponseEntity.ok(service.send(id));
     }
 
     @Operation(

@@ -192,61 +192,6 @@ class NegotiationServiceTest {
         }
     }
 
-    // ================================================================== //
-    //  send                                                                //
-    // ================================================================== //
-
-    @Nested
-    class Send {
-
-        @Test
-        void draft_negotiation_transitions_to_sent() {
-            Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.DRAFT);
-            when(repository.findById(1L)).thenReturn(Optional.of(n));
-            when(repository.save(n)).thenReturn(n);
-            when(mapper.toDto(n)).thenReturn(TestDataFactory.response(1L, NegotiationStatus.SENT));
-
-            service.send(1L);
-
-            assertThat(n.getStatus()).isEqualTo(NegotiationStatus.SENT);
-        }
-
-        @Test
-        void not_found_throws_resource_not_found_exception() {
-            when(repository.findById(99L)).thenReturn(Optional.empty());
-
-            assertThatThrownBy(() -> service.send(99L))
-                    .isInstanceOf(ResourceNotFoundException.class);
-        }
-
-        @Test
-        void sent_negotiation_cannot_be_sent_again() {
-            Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.SENT);
-            when(repository.findById(1L)).thenReturn(Optional.of(n));
-
-            assertThatThrownBy(() -> service.send(1L))
-                    .isInstanceOf(InvalidNegotiationStateException.class)
-                    .hasMessageContaining("DRAFT");
-        }
-
-        @Test
-        void accepted_negotiation_cannot_be_sent() {
-            Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.ACCEPTED);
-            when(repository.findById(1L)).thenReturn(Optional.of(n));
-
-            assertThatThrownBy(() -> service.send(1L))
-                    .isInstanceOf(InvalidNegotiationStateException.class);
-        }
-
-        @Test
-        void rejected_negotiation_cannot_be_sent() {
-            Negotiation n = TestDataFactory.negotiation(1L, NegotiationStatus.REJECTED);
-            when(repository.findById(1L)).thenReturn(Optional.of(n));
-
-            assertThatThrownBy(() -> service.send(1L))
-                    .isInstanceOf(InvalidNegotiationStateException.class);
-        }
-    }
 
     // ================================================================== //
     //  accept                                                              //

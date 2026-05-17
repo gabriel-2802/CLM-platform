@@ -40,7 +40,7 @@ public class NegotiationService {
                 .createdByUserId(request.createdByUserId())
                 .createdByUserName(request.createdByUserName())
                 .notes(request.notes())
-                .status(NegotiationStatus.DRAFT)
+                .status(NegotiationStatus.SENT)
                 .build();
 
         Negotiation saved = repository.save(negotiation);
@@ -66,18 +66,9 @@ public class NegotiationService {
     }
 
     @Transactional
-    public NegotiationResponseDTO send(Long id) {
-        Negotiation n = findOrThrow(id);
-        requireStatus(n, NegotiationStatus.DRAFT, "Only DRAFT negotiations can be sent");
-        n.setStatus(NegotiationStatus.SENT);
-        log.info("Negotiation {} sent to client", id);
-        return mapper.toDto(repository.save(n));
-    }
-
-    @Transactional
     public NegotiationResponseDTO accept(Long id) {
         Negotiation n = findOrThrow(id);
-        requireStatus(n, NegotiationStatus.SENT, "Only SENT negotiations can be accepted");
+        requirePendingStatus(n, "Only pending negotiations can be accepted");
         n.setStatus(NegotiationStatus.ACCEPTED);
         n.setResolvedAt(LocalDateTime.now());
         repository.save(n);
@@ -90,7 +81,7 @@ public class NegotiationService {
     @Transactional
     public NegotiationResponseDTO reject(Long id, UpdateNotesRequest request) {
         Negotiation n = findOrThrow(id);
-        requireStatus(n, NegotiationStatus.SENT, "Only SENT negotiations can be rejected");
+        requirePendingStatus(n, "Only pending negotiations can be rejected");
         n.setStatus(NegotiationStatus.REJECTED);
         n.setResolvedAt(LocalDateTime.now());
         if (request != null && request.notes() != null) {
@@ -112,8 +103,8 @@ public class NegotiationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Negotiation not found: " + id));
     }
 
-    private void requireStatus(Negotiation n, NegotiationStatus required, String message) {
-        if (n.getStatus() != required) {
+    private void requirePendingStatus(Negotiation n, String message) {
+        if (n.getStatus() != NegotiationStatus.SENT && n.getStatus() != NegotiationStatus.DRAFT) {
             throw new InvalidNegotiationStateException(
                     message + ". Current status: " + n.getStatus());
         }
