@@ -66,6 +66,49 @@ export async function generateAppendix(payload: GenerateAppendixPayload) {
     }
 }
 
+export async function terminateAppendix(appendixId: number) {
+    try {
+        const res = await contractsFetch(`/api/appendices/${appendixId}/terminate`, {
+            method: "PATCH",
+        })
+        if (!res.ok) return { success: false, error: await res.text() }
+        const data = await res.json()
+        revalidatePath("/clients", "page")
+        revalidatePath("/clienti", "page")
+        return { success: true, data }
+    } catch {
+        return { success: false, error: "Network error" }
+    }
+}
+
+export async function uploadSignedAppendix(appendixId: number, formData: FormData) {
+    try {
+        const session = await getSession()
+        const user = session?.user as SessionUser | undefined
+        const userId = Number(user?.id)
+
+        const file = formData.get("file") as File | null
+        if (!file) return { success: false, error: "Fisier lipsa" }
+
+        const backendFormData = new FormData()
+        backendFormData.append("file", file)
+        if (Number.isInteger(userId) && userId > 0) backendFormData.append("userId", String(userId))
+
+        const res = await contractsFetch(`/api/appendices/${appendixId}/upload-signed`, {
+            method: "POST",
+            body: backendFormData,
+        })
+
+        if (!res.ok) return { success: false, error: await res.text() }
+        const data = await res.json()
+        revalidatePath("/clients", "page")
+        revalidatePath("/clienti", "page")
+        return { success: true, data }
+    } catch {
+        return { success: false, error: "Network error" }
+    }
+}
+
 export async function uploadDirectAppendix(contractId: number, title: string, formData: FormData) {
     try {
         const session = await getSession()

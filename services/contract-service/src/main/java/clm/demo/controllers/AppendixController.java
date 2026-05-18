@@ -154,6 +154,21 @@ public class AppendixController {
 
 
     @Operation(
+        summary     = "Terminate a SIGNED appendix",
+        description = "Transitions a SIGNED appendix to TERMINATED status. Only SIGNED appendices can be terminated."
+    )
+    @ApiResponse(responseCode = "200", description = "Appendix is now TERMINATED",
+        content = @Content(schema = @Schema(implementation = AppendixResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Appendix not found", content = @Content)
+    @ApiResponse(responseCode = "409", description = "Appendix is not in SIGNED status", content = @Content)
+    @PatchMapping("/{appendixId}/terminate")
+    public ResponseEntity<AppendixResponseDTO> terminateAppendix(
+            @Parameter(description = "Appendix ID", required = true, example = "12")
+            @PathVariable Long appendixId) {
+        return ResponseEntity.ok(appendixService.terminateAppendix(appendixId));
+    }
+
+    @Operation(
         summary     = "Delete an appendix",
         description = "Deletes the appendix and cascades to its audit-trail field values."
     )

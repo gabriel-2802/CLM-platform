@@ -198,6 +198,22 @@ public class AppendixService {
     }
 
     @Transactional
+    public AppendixResponseDTO terminateAppendix(Long appendixId) {
+        Appendix appendix = appendixRepository.findById(appendixId)
+                .orElseThrow(() -> new ResourceNotFoundException("Appendix not found: " + appendixId));
+
+        if (appendix.getAppendixStatus() != AppendixStatus.SIGNED) {
+            throw new InvalidAppendixStateException(
+                    "Appendix " + appendixId + " cannot be terminated: only SIGNED appendices can be terminated.");
+        }
+
+        appendix.setAppendixStatus(AppendixStatus.TERMINATED);
+        appendix = appendixRepository.save(appendix);
+        log.info("Appendix {} terminated", appendixId);
+        return appendixMapper.toResponseDTO(appendix);
+    }
+
+    @Transactional
     public void deleteAppendix(Long appendixId) {
         if (!appendixRepository.existsById(appendixId)) {
             throw new ResourceNotFoundException("Appendix not found: " + appendixId);

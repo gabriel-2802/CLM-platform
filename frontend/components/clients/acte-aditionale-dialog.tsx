@@ -13,6 +13,8 @@ import {
     getAppendicesForContract,
     generateAppendix,
     uploadDirectAppendix,
+    uploadSignedAppendix,
+    terminateAppendix,
     type AppendixSummary,
 } from "@/actions/appendices"
 import {
@@ -29,7 +31,6 @@ type View = "list" | "upload" | "generate"
 
 const EXTRA_MAPPING_FIELDS = ["deLa", "panaLa", "tarifConta", "tarifBilant"]
 
-const STATUS_LABELS: Record<string, string> = { DRAFT: "Draft", SIGNED: "Semnat" }
 
 export type ClientForAppendix = Record<string, unknown> & {
     id: number
@@ -54,6 +55,8 @@ export function ActeAditionaleDialog({
     // List
     const [appendices, setAppendices] = useState<AppendixSummary[]>([])
     const [loadingList, setLoadingList] = useState(false)
+    const [uploadingSignedId, setUploadingSignedId] = useState<number | null>(null)
+    const [terminatingId, setTerminatingId] = useState<number | null>(null)
 
     // Upload
     const [uploadTitle, setUploadTitle] = useState("")
@@ -176,6 +179,33 @@ export function ActeAditionaleDialog({
         !loadingFields &&
         manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
 
+    const handleUploadSigned = async (appendixId: number, file: File | null) => {
+        if (!file) return
+        setUploadingSignedId(appendixId)
+        const fd = new FormData()
+        fd.append("file", file)
+        const res = await uploadSignedAppendix(appendixId, fd)
+        if (res.success) {
+            toast.success("Act adițional semnat încărcat.")
+            loadAppendices()
+        } else {
+            toast.error("Eroare la încărcare: " + res.error)
+        }
+        setUploadingSignedId(null)
+    }
+
+    const handleTerminate = async (appendixId: number) => {
+        setTerminatingId(appendixId)
+        const res = await terminateAppendix(appendixId)
+        if (res.success) {
+            toast.success("Act adițional încheiat.")
+            loadAppendices()
+        } else {
+            toast.error("Eroare la încheiere: " + res.error)
+        }
+        setTerminatingId(null)
+    }
+
     const handleUpload = async () => {
         if (!uploadFile || !uploadTitle.trim()) return
         setUploading(true)
@@ -248,26 +278,82 @@ export function ActeAditionaleDialog({
                                 {appendices.map((a) => (
                                     <div
                                         key={a.id}
-                                        className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"
+                                        className="rounded-md border px-3 py-2 text-sm space-y-2"
                                     >
-                                        <div>
-                                            <span className="font-medium">{a.title}</span>
-                                            <span className="ml-2 text-xs text-muted-foreground">
-                        {STATUS_LABELS[a.appendixStatus] ?? a.appendixStatus}
-                      </span>
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="space-y-0.5">
+                                                <span className="font-medium">{a.title}</span>
+                                                {a.templateId != null && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Generat din template
+                                                    </p>
+                                                )}
+                                                <p className={`text-xs font-medium ${
+                                                    a.appendixStatus === "SIGNED" ? "text-green-600"
+                                                    : a.appendixStatus === "TERMINATED" ? "text-gray-500"
+                                                    : "text-red-600"
+                                                }`}>
+                                                    {a.appendixStatus === "SIGNED" ? "Semnat"
+                                                     : a.appendixStatus === "TERMINATED" ? "Încheiat"
+                                                     : "Nesemnat"}
+                                                </p>
+                                            </div>
+                                            <div className="flex gap-2 flex-shrink-0">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        window.open(
+                                                            `/api/appendices/download/${a.id}?type=${a.appendixStatus === "SIGNED" ? "signed" : "unsigned"}`,
+                                                            "_blank"
+                                                        )
+                                                    }
+                                                >
+                                                    {a.appendixStatus === "DRAFT" ? "Descarcă nesemnat" : "Descarcă semnat"}
+                                                </Button>
+                                                {a.appendixStatus === "DRAFT" && (
+                                                    <>
+                                                        <input
+                                                            type="file"
+                                                            id={`sign-input-${a.id}`}
+                                                            className="hidden"
+                                                            accept=".pdf,.doc,.docx"
+                                                            onChange={(e) =>
+                                                                handleUploadSigned(a.id, e.target.files?.[0] ?? null)
+                                                            }
+                                                        />
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={uploadingSignedId === a.id}
+                                                            onClick={() =>
+                                                                (document.getElementById(`sign-input-${a.id}`) as HTMLInputElement)?.click()
+                                                            }
+                                                        >
+                                                            {uploadingSignedId === a.id ? (
+                                                                <><Loader2 className="animate-spin h-4 w-4 mr-1" />Se încarcă...</>
+                                                            ) : (
+                                                                "Încarcă semnat"
+                                                            )}
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {a.appendixStatus === "SIGNED" && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        disabled={terminatingId === a.id}
+                                                        onClick={() => handleTerminate(a.id)}
+                                                    >
+                                                        {terminatingId === a.id ? (
+                                                            <><Loader2 className="animate-spin h-4 w-4 mr-1" />Se procesează...</>
+                                                        ) : (
+                                                            "Încheie"
+                                                        )}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() =>
-                                                window.open(
-                                                    `/api/appendices/download/${a.id}?type=${a.appendixStatus === "SIGNED" ? "signed" : "unsigned"}`,
-                                                    "_blank"
-                                                )
-                                            }
-                                        >
-                                            Descarcă
-                                        </Button>
                                     </div>
                                 ))}
                             </div>
