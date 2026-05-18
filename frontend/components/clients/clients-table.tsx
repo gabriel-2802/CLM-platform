@@ -162,6 +162,7 @@ function ClientDetailsDialog({
                                tarifConta,
                                tarifBilant,
                                onEdit,
+                               readOnly,
                              }: {
   clientId: number
   clientName: string
@@ -170,6 +171,7 @@ function ClientDetailsDialog({
   tarifConta: string
   tarifBilant: string
   onEdit: (id: number, key: keyof RowEditFields, val: string) => void
+  readOnly?: boolean
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -182,40 +184,49 @@ function ClientDetailsDialog({
             <DialogTitle>Detalii - {clientName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {readOnly && (
+              <p className="text-xs text-muted-foreground">
+                Valorile pot fi modificate doar prin încărcarea unui act adițional semnat.
+              </p>
+            )}
             <div className="space-y-1">
-              <Label>De la <span className="text-red-500">*</span></Label>
+              <Label>De la {!readOnly && <span className="text-red-500">*</span>}</Label>
               <Input
                   type="date"
                   value={deLa}
                   onChange={(e) => onEdit(clientId, "deLa", e.target.value)}
                   className="text-slate-900"
+                  disabled={readOnly}
               />
             </div>
             <div className="space-y-1">
-              <Label>Pana la <span className="text-red-500">*</span></Label>
+              <Label>Pana la {!readOnly && <span className="text-red-500">*</span>}</Label>
               <Input
                   type="date"
                   value={panaLa}
                   onChange={(e) => onEdit(clientId, "panaLa", e.target.value)}
                   className="text-slate-900"
+                  disabled={readOnly}
               />
             </div>
             <div className="space-y-1">
-              <Label>Tarif servicii conta <span className="text-red-500">*</span></Label>
+              <Label>Tarif servicii conta {!readOnly && <span className="text-red-500">*</span>}</Label>
               <Input
                   type="number"
                   value={tarifConta}
                   onChange={(e) => onEdit(clientId, "tarifConta", e.target.value)}
                   className="text-slate-900"
+                  disabled={readOnly}
               />
             </div>
             <div className="space-y-1">
-              <Label>Tarif bilant <span className="text-red-500">*</span></Label>
+              <Label>Tarif bilant {!readOnly && <span className="text-red-500">*</span>}</Label>
               <Input
                   type="number"
                   value={tarifBilant}
                   onChange={(e) => onEdit(clientId, "tarifBilant", e.target.value)}
                   className="text-slate-900"
+                  disabled={readOnly}
               />
             </div>
           </div>
@@ -329,7 +340,10 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       id: "detalii",
       header: "Detalii",
       enableSorting: false,
-      cell: ({ row }) => (
+      cell: ({ row }) => {
+        const status = row.original.contractStatus
+        const contractSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat)
+        return (
           <ClientDetailsDialog
               clientId={row.original.id}
               clientName={row.original.name ?? ""}
@@ -338,8 +352,10 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
               tarifConta={getEdit(row.original.id, "tarifConta")}
               tarifBilant={getEdit(row.original.id, "tarifBilant")}
               onEdit={setEdit}
+              readOnly={contractSigned}
           />
-      ),
+        )
+      },
     },
     {
       accessorKey: "contractGen",
