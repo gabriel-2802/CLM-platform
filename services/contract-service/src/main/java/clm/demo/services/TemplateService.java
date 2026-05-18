@@ -1,5 +1,6 @@
 package clm.demo.services;
 
+import clm.demo.cache.CacheNames;
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.UploadTemplateRequest;
 import clm.demo.dto.responses.TemplateFieldResponseDTO;
@@ -22,6 +23,8 @@ import clm.demo.utils.file.FileUtils;
 import clm.demo.utils.file.PlaceholderProcessor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -104,6 +107,7 @@ public class TemplateService {
         }
     }
 
+    @Cacheable(value = CacheNames.TEMPLATES, key = "#templateId")
     @Transactional(readOnly = true)
     public TemplateResponseDTO getTemplate(Long templateId) {
         return templateRepository.findById(templateId)
@@ -119,6 +123,7 @@ public class TemplateService {
                 .map(templateMapper::toResponseDTO);
     }
 
+    @CacheEvict(value = CacheNames.TEMPLATES, key = "#templateId")
     @Transactional
     public void deleteTemplate(Long templateId) {
         if (!templateRepository.existsById(templateId)) {
@@ -128,6 +133,7 @@ public class TemplateService {
         log.info("Template {} deleted", templateId);
     }
 
+    @CacheEvict(value = CacheNames.TEMPLATES, key = "#request.templateId")
     @Transactional
     public List<TemplateFieldResponseDTO> updateFieldLabels(FieldMappingRequest request) {
         if (!templateRepository.existsById(request.getTemplateId())) {

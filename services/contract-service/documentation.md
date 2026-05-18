@@ -3,7 +3,7 @@
 > **Platform:** CLM (Contract Lifecycle Management)  
 > **Runtime:** Java 21 · Spring Boot 4.0.5 · PostgreSQL (`clm` schema)  
 > **Build tool:** Maven  
-> **Document version:** 2026-05-07
+> **Document version:** 2026-05-18
 
 ---
 
@@ -47,7 +47,15 @@
 11. [Scheduled Jobs](#11-scheduled-jobs)
 12. [REST API Surface](#12-rest-api-surface)
 13. [Exception Handling](#13-exception-handling)
-14. [Configuration Reference](#14-configuration-reference)
+14. [Caching — Caffeine L2 Cache](#14-caching--caffeine-l2-cache)
+    - 14.1 [Motivation](#141-motivation)
+    - 14.2 [Cache Regions](#142-cache-regions)
+    - 14.3 [Eviction Rules](#143-eviction-rules)
+    - 14.4 [Configuration](#144-configuration)
+    - 14.5 [Metrics & Observability](#145-metrics--observability)
+    - 14.6 [Testing Strategy](#146-testing-strategy)
+    - 14.7 [Test Results](#147-test-results)
+15. [Configuration Reference](#15-configuration-reference)
 
 ---
 
@@ -1152,7 +1160,216 @@ All exceptions are centralized in `GlobalExceptionHandler` (`@RestControllerAdvi
 
 ---
 
-## 14. Configuration Reference
+## 14. Caching — Caffeine L2 Cache
+
+### 14.1 Motivation
+
+Two entity types in the contract-service carry significant binary payloads that make individual DB round-trips expensive:
+
+| Entity | Binary field | Typical compressed size |
+|---|---|---|
+| `DocumentTemplate` | `document_content` (GZIP-compressed DOCX) | 20 – 500 KB |
+| `Contract` | `document_content` + `signedDocumentContent` (GZIP-compressed PDFs) | 50 KB – several MB |
+
+These entities are also **read-heavy relative to their mutation rate**: templates are uploaded once and read on every contract or appendix generation; contracts are read for display, download, and search far more often than they are modified. Hibernate's built-in first-level (session-scoped) cache already avoids redundant loads *within* a single transaction, but provides no benefit across requests.
+
+A **service-level L2 cache** backed by Caffeine keeps the last-fetched entity in JVM heap memory. Subsequent reads for the same ID bypass the database entirely, eliminating the network round-trip, PostgreSQL query execution, JDBC deserialization, and Hibernate hydration overhead.
+
+---
+
+### 14.2 Cache Regions
+
+Two named caches are defined in `CacheConfig` and shared via the `CacheNames` constants class:
+
+| Cache name | Constant | Covers | Max entries | TTL (after write) | Rationale |
+|---|---|---|---|---|---|
+| `templates` | `CacheNames.TEMPLATES` | `TemplateResponseDTO` keyed by `Long templateId` | 200 | 1 hour | Templates are rarely updated; 200 is sufficient for any realistic deployment |
+| `contracts` | `CacheNames.CONTRACTS` | `ContractResponseDTO` keyed by `Long contractId` | 1 000 | 10 minutes | Contracts change more often (status transitions, renegotiations); shorter TTL keeps stale risk low |
+
+Both caches are configured with `recordStats()`, which enables Caffeine's internal hit/miss/eviction counters and exposes them via Micrometer (see §14.5).
+
+**What is cached**: the **DTO** produced by the service method (`TemplateResponseDTO`, `ContractResponseDTO`) — not the JPA entity. This avoids holding open lazy-load references in cache memory and means cached objects are fully serializable plain Java records/classes.
+
+**What is NOT cached**: list queries (`getAll`, `search`, `getAllTemplates`), report queries, or any write that changes state. Caching mutable collection results would require invalidating on every mutation — the hit rate would be negligible and the consistency risk high.
+
+---
+
+### 14.3 Eviction Rules
+
+Spring's `@CacheEvict` annotations ensure the cache never serves a stale entry after a mutation. The complete eviction matrix is:
+
+#### `templates` cache
+
+| Method | Annotation | Key evicted | Why |
+|---|---|---|---|
+| `TemplateService.getTemplate(id)` | `@Cacheable` | — | Populates cache on miss |
+| `TemplateService.deleteTemplate(id)` | `@CacheEvict` | `#templateId` | Template no longer exists |
+| `TemplateService.updateFieldLabels(request)` | `@CacheEvict` | `#request.templateId` | `isFullyMapped` flag and field labels change |
+
+#### `contracts` cache
+
+| Method | Annotation | Key evicted | Why |
+|---|---|---|---|
+| `ContractService.getById(id)` | `@Cacheable` | — | Populates cache on miss |
+| `ContractService.uploadSignedContract(id, …)` | `@CacheEvict` | `#contractId` | Status changes to ACTIVE; signed content added |
+| `ContractService.terminateContract(id, …)` | `@CacheEvict` | `#contractId` | Status changes to TERMINATED; audit fields set |
+| `ContractService.toggleAutoRenewal(id)` | `@CacheEvict` | `#contractId` | `autoRenew` flag flips |
+| `ContractService.renegotiateContract(id, …)` | `@CacheEvict` | `#contractId` | `contractValue` and/or `contractEndDate` change |
+| `ContractService.updateContractTerms(id, …)` | `@CacheEvict` | `#contractId` | Multiple fields can change |
+
+`@CacheEvict` uses the default `beforeInvocation = false` — eviction happens **after** the method returns successfully. If the method throws an exception (e.g., contract not found, invalid state), the cache entry is preserved, which is correct: a failed mutation leaves the entity unchanged.
+
+The scheduled archival job (`ContractArchiveJob`) performs a bulk `UPDATE` in SQL that bypasses the service layer entirely. Because it changes `contract_status` in bulk without calling `getById` or any eviction-annotated method, archived contracts may remain in the `contracts` cache with status `ACTIVE` until their TTL (10 minutes) expires. This is an accepted tradeoff: archival runs at midnight, no users are querying those contracts at that moment, and the TTL guarantees consistency is restored within 10 minutes.
+
+---
+
+### 14.4 Configuration
+
+**`CacheConfig.java`** (`clm.demo.config`) — defines the `CacheManager` bean using `SimpleCacheManager` with per-region `CaffeineCache` instances:
+
+```java
+@Bean
+public CacheManager cacheManager() {
+    SimpleCacheManager manager = new SimpleCacheManager();
+    manager.setCaches(List.of(
+            new CaffeineCache(CacheNames.TEMPLATES,
+                    Caffeine.newBuilder()
+                            .maximumSize(200)
+                            .expireAfterWrite(Duration.ofHours(1))
+                            .recordStats()
+                            .build()),
+            new CaffeineCache(CacheNames.CONTRACTS,
+                    Caffeine.newBuilder()
+                            .maximumSize(1_000)
+                            .expireAfterWrite(Duration.ofMinutes(10))
+                            .recordStats()
+                            .build())
+    ));
+    return manager;
+}
+```
+
+`SimpleCacheManager` (rather than `CaffeineCacheManager`) is used because the latter applies a **single** Caffeine spec to all caches, while the two regions here have intentionally different TTL and size settings.
+
+**`application.yaml`** declares the cache type to prevent Spring Boot's auto-configuration from falling back to `NoOpCacheManager` if the `CacheManager` bean is not found early in startup:
+
+```yaml
+spring:
+  cache:
+    type: caffeine
+```
+
+**`DemoApplication.java`** carries `@EnableCaching` to activate the Spring Cache AOP proxy infrastructure. Placing it on the main class (rather than on a `@Configuration` class) ensures caching is active for the entire application context, including integration test contexts that import the full application.
+
+---
+
+### 14.5 Metrics & Observability
+
+Caffeine's `recordStats()` mode exposes the following per-region counters. With `micrometer-registry-prometheus` on the classpath (already a production dependency), these are scraped by Prometheus and visible in Grafana:
+
+| Micrometer metric | Description |
+|---|---|
+| `cache.gets{name="templates",result="hit"}` | Template cache hits |
+| `cache.gets{name="templates",result="miss"}` | Template cache misses |
+| `cache.puts{name="templates"}` | Entries written to the templates cache |
+| `cache.evictions{name="templates"}` | Entries evicted (by TTL or explicit `@CacheEvict`) |
+| `cache.gets{name="contracts",result="hit"}` | Contract cache hits |
+| `cache.gets{name="contracts",result="miss"}` | Contract cache misses |
+
+A **hit rate** (`hits / (hits + misses)`) above 80% indicates the cache is providing meaningful benefit. Low hit rates on `contracts` may indicate the TTL is too short for the access pattern, or that the client is predominantly doing list/search operations rather than individual `getById` calls.
+
+Access cache statistics at runtime:
+
+```
+GET /actuator/metrics/cache.gets?tag=name:contracts
+GET /actuator/metrics/cache.gets?tag=name:templates
+```
+
+---
+
+### 14.6 Testing Strategy
+
+The cache is validated by two independent test suites that prove orthogonal properties.
+
+#### In-vitro suite — `CachePerformanceTest`
+
+**Purpose:** verify correctness and latency in complete isolation — no database, no Flyway, no network.
+
+**Approach:** a minimal Spring context loads only `TemplateService`, `ContractService`, and `CacheConfig`. All repositories are Mockito mocks. A mock `PlatformTransactionManager` satisfies the `@Transactional` AOP interceptor. Each mock repository answer sleeps for 50 ms before returning, simulating a real DB round-trip.
+
+**Correctness proof:** after N calls to the same cached method, `verify(repository, times(1)).findById(id)` confirms the repository was called exactly once — all subsequent calls were served from Caffeine. After a mutating operation, `verify(repository, times(3)).findById(id)` confirms the entry was re-fetched (the mutating method loads once internally, plus one load after eviction).
+
+**Latency proof:** wall-clock time is measured with `System.currentTimeMillis()` before and after each call. The cold call must be ≥ 50 ms; the warm call must be < 10 ms.
+
+#### Real-DB integration suite — `CacheRealDbTest`
+
+**Purpose:** verify that the cache behaves correctly end-to-end against a live PostgreSQL instance with the full schema and Hibernate stack.
+
+**Approach:** `@SpringBootTest(webEnvironment = NONE)` with `@ActiveProfiles("test")` loads the complete application context. The datasource points to a short-lived PostgreSQL container started externally by the Makefile target `test-cache-real` (port 5434) and removed after the test run — whether it passes or fails. No Testcontainers library is involved; container lifecycle is managed entirely by the Makefile.
+
+```bash
+make test-cache-real   # start postgres → run test → remove container
+```
+
+**Correctness proof:** Caffeine's built-in stats (`recordStats()` is enabled in `CacheConfig`) expose `missCount()` and `hitCount()` as authoritative counters. Because the counters are cumulative (they do not reset when `cache.clear()` is called), each test snapshots the counters in `@BeforeEach` and asserts on the **delta** since the snapshot. Absence of a cache entry is checked via `cache.asMap().containsKey(key)` — which does not register as a hit or miss — to avoid polluting the stats being asserted.
+
+**Latency proof:** `System.nanoTime()` measurements assert directionally (`warmNs < coldNs`) rather than against an absolute threshold, because PostgreSQL round-trip times vary with Docker overhead and host hardware.
+
+**Eviction correctness:** after every mutating operation, `asMap().containsKey(key) == false` is asserted before any subsequent read, proving no stale value remains in the cache.
+
+---
+
+### 14.7 Test Results
+
+#### In-vitro results (`CachePerformanceTest`) — 12 tests, all passing
+
+| Cache region | Cold call | Warm call | Speedup |
+|---|---|---|---|
+| `templates` | 55 ms | 1 ms | **55×** |
+| `contracts` | 52 ms | 0 ms | **52×** |
+
+*Cold latency reflects the 50 ms artificial sleep injected by the mock. Warm latency is pure Caffeine in-process lookup overhead.*
+
+**Correctness scenarios verified:**
+
+| Scenario | Assertion |
+|---|---|
+| Repeated reads (same ID) | Repository called **exactly once** regardless of call count |
+| `deleteTemplate` | Entry evicted — next `getTemplate` re-fetches from repository |
+| `updateFieldLabels` | Entry evicted — next `getTemplate` re-fetches from repository |
+| `renegotiateContract` | Entry evicted — next `getById` re-fetches from repository |
+| `updateContractTerms` | Entry evicted — next `getById` re-fetches from repository |
+| `terminateContract` | Entry evicted — next `getById` re-fetches from repository |
+| `toggleAutoRenewal` | Entry evicted — next `getById` re-fetches from repository |
+| N distinct IDs | Exactly N repository fetches for any number of repeated reads across all IDs |
+
+#### Real-DB results (`CacheRealDbTest`) — 12 tests, all passing
+
+Measured against a live PostgreSQL 16 container with full Flyway schema, JPA/Hibernate stack, and HikariCP connection pool.
+
+| Cache region | Cold call (real DB) | Warm call (Caffeine) | Speedup |
+|---|---|---|---|
+| `templates` | ~2.4 ms | ~62 µs | **~38×** |
+| `contracts` | ~3.7 ms | ~66 µs | **~56×** |
+
+*Cold latency includes HikariCP checkout, Hibernate JOINED-inheritance join query, and ResultSet mapping. Warm latency is pure in-heap Caffeine lookup (~62–66 µs).*
+
+**Caffeine stats verified per test (delta since `@BeforeEach` snapshot):**
+
+| Scenario | `missCount` delta | `hitCount` delta |
+|---|---|---|
+| Second read is a cache hit | 1 | 1 |
+| N repeated reads | 1 | N − 1 |
+| Eviction after `deleteTemplate` | 1 (initial load only) | — |
+| Eviction after `updateFieldLabels` | 2 (load + re-fetch post-eviction) | 0 |
+| Eviction after `renegotiateContract` | 2 | 1 |
+| Eviction after `terminateContract` | 2 | 0 |
+| Eviction after `updateContractTerms` | 2 | 0 |
+| Eviction after `toggleAutoRenewal` | 2 | 0 |
+
+---
+
+## 15. Configuration Reference
 
 | Property | Default | Description |
 |---|---|---|
@@ -1164,6 +1381,7 @@ All exceptions are centralized in `GlobalExceptionHandler` (`@RestControllerAdvi
 | `libreoffice.path` | `libreoffice` | Absolute path or command name for LibreOffice binary |
 | `jwt.secret` | — | HMAC-SHA256 key, minimum 32 characters |
 | `job.archive-contracts.cron` | `0 0 0 * * *` | Cron expression for contract archival job |
+| `spring.cache.type` | `caffeine` | Cache provider; must be `caffeine` to activate `CacheConfig` |
 | `spring.datasource.hikari.maximum-pool-size` | `10` | Max concurrent DB connections |
 | `spring.datasource.hikari.connection-timeout` | `30000` | Connection wait timeout (ms) |
 

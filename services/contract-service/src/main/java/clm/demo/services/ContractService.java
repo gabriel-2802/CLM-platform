@@ -1,5 +1,6 @@
 package clm.demo.services;
 
+import clm.demo.cache.CacheNames;
 import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.GenContractRequest;
@@ -25,6 +26,8 @@ import clm.demo.utils.file.FileUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -111,6 +114,7 @@ public class ContractService {
      * @param fileBytes  the signed document file bytes (DOCX or PDF)
      * @return ContractResponseDTO with updated contract details
      */
+    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes, Integer userId) {
         Contract contract = contractRepository.findById(contractId)
@@ -136,6 +140,7 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
+    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public void terminateContract(Long contractId, @Valid ContractTerminationRequest request) {
         Contract contract = contractRepository.findById(contractId)
@@ -164,6 +169,7 @@ public class ContractService {
      * @return ContractResponseDTO with updated auto-renewal status
      * @throws ResourceNotFoundException if contract is not found
      */
+    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO toggleAutoRenewal(Long contractId) {
         Contract contract = contractRepository.findById(contractId)
@@ -178,6 +184,7 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
+    @Cacheable(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional(readOnly = true)
     public ContractResponseDTO getById(Long contractId) {
         Contract contract = contractRepository.findById(contractId)
@@ -185,6 +192,7 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
+    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO renegotiateContract(Long contractId,
                                                    clm.demo.dto.requests.RenegotiateContractRequest request) {
@@ -234,6 +242,7 @@ public class ContractService {
         return result.map(contractMapper::toResponseDTO);
     }
 
+    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO updateContractTerms(Long contractId, @Valid ContractUpdateRequest request) {
         Contract contract = contractRepository.findById(contractId)

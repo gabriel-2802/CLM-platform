@@ -2,7 +2,9 @@ package clm.demo.support;
 
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.models.Contract;
+import clm.demo.models.DocumentTemplate;
 import clm.demo.models.enums.ContractStatus;
+import clm.demo.models.enums.DocumentFormat;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -10,6 +12,19 @@ import java.time.LocalDate;
 public final class TestDataFactory {
 
     private TestDataFactory() {}
+
+    public static DocumentTemplate template(Long id) {
+        DocumentTemplate t = DocumentTemplate.builder()
+                .templateName("Template-" + id)
+                .description("Test template")
+                .documentFormat(DocumentFormat.DOCX)
+                .documentContent(new byte[]{1, 2, 3})
+                .fieldCount(3)
+                .isFullyMapped(true)
+                .build();
+        setId(t, id);
+        return t;
+    }
 
     public static Contract contract(Long id, ContractStatus status) {
         Contract c = Contract.builder()
