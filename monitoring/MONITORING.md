@@ -8,7 +8,8 @@ This document explains how Prometheus and Grafana are wired into the CLM Platfor
 Services (Micrometer/Prometheus)
 ├── user-service:8083 (/actuator/prometheus)
 ├── contract-service:8081 (/actuator/prometheus)
-└── client-service:8084 (/actuator/prometheus)
+├── client-service:8084 (/actuator/prometheus)
+└── negotiation-service:8085 (/actuator/prometheus)
         ↓
     Prometheus:9090 (scrapes metrics)
         ↓
@@ -28,7 +29,7 @@ Services (Micrometer/Prometheus)
 
 All services expose Prometheus metrics at `/actuator/prometheus`.
 
-- Ports: 8081 (contract-service), 8083 (user-service), 8084 (client-service)
+- Ports: 8081 (contract-service), 8083 (user-service), 8084 (client-service), 8085 (negotiation-service)
 - Common metrics: HTTP requests, JVM memory/threads, database pools
 - Custom metrics: service-specific counters, timers, gauges
 

@@ -30,10 +30,12 @@
     <button class="tab active" onclick="load('contracts', this)">Contracts</button>
     <button class="tab"        onclick="load('user', this)">User</button>
     <button class="tab"        onclick="load('client', this)">Client</button>
+    <button class="tab"        onclick="load('negotiations', this)">Negotiations</button>
     <span style="margin-left: 12px;">OpenAPI v3:</span>
     <button class="tab" onclick="openV3('contracts')">Contracts JSON</button>
     <button class="tab" onclick="openV3('user')">User JSON</button>
     <button class="tab" onclick="openV3('client')">Client JSON</button>
+    <button class="tab" onclick="openV3('negotiations')">Negotiations JSON</button>
   </div>
   <div id="swagger-ui"></div>
 
@@ -46,12 +48,14 @@
       contracts: './proxy/contracts',
       user:      './proxy/user',
       client:    './proxy/client',
+      negotiations: './proxy/negotiations',
     };
 
     const v3Urls = {
       contracts: './proxy/contracts',
       user:      './proxy/user',
       client:    './proxy/client',
+      negotiations: './proxy/negotiations',
     };
 
     let ui;

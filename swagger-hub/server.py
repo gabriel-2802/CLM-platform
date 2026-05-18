@@ -12,6 +12,7 @@ PROXY = {
     "/proxy/contracts": "http://contracts:8081/api/contracts/v3/api-docs",
     "/proxy/user":      "http://user-service:8083/api/users/v3/api-docs",
     "/proxy/client":    "http://client-service:8084/api/clients/v3/api-docs",
+    "/proxy/negotiations": "http://negotiation-service:8085/api/negotiations/v3/api-docs",
 }
 
 

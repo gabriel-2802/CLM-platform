@@ -507,7 +507,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 67 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 67 },
       "id": 60,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "10.4.3",
@@ -545,7 +545,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 67 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 67 },
       "id": 61,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "10.4.3",
@@ -583,7 +583,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 67 },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 67 },
       "id": 62,
       "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
       "pluginVersion": "10.4.3",
@@ -595,6 +595,44 @@
         "refId": "A"
       }],
       "title": "Apdex — client-service",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "decimals": 3,
+          "mappings": [
+            { "options": { "from": 0.94, "result": { "text": "Excellent" }, "to": 1 }, "type": "range" },
+            { "options": { "from": 0.85, "result": { "text": "Good" }, "to": 0.94 }, "type": "range" },
+            { "options": { "from": 0.70, "result": { "text": "Fair" }, "to": 0.85 }, "type": "range" },
+            { "options": { "from": 0, "result": { "text": "Poor" }, "to": 0.70 }, "type": "range" }
+          ],
+          "max": 1,
+          "min": 0,
+          "thresholds": { "mode": "absolute", "steps": [
+            { "color": "red",    "value": null },
+            { "color": "orange", "value": 0.70 },
+            { "color": "yellow", "value": 0.85 },
+            { "color": "green",  "value": 0.94 }
+          ]},
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 67 },
+      "id": 64,
+      "options": { "colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "auto" },
+      "pluginVersion": "10.4.3",
+      "description": "Apdex score for negotiation-service. T=0.5s.",
+      "targets": [{
+        "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
+        "expr": "(\n  sum(rate(http_server_requests_seconds_bucket{job=\"negotiation-service\", le=\"0.5\"}[5m]))\n  + sum(rate(http_server_requests_seconds_bucket{job=\"negotiation-service\", le=\"2.0\"}[5m]))\n) / 2 / sum(rate(http_server_requests_seconds_count{job=\"negotiation-service\"}[5m]))",
+        "legendFormat": "negotiation-service",
+        "refId": "A"
+      }],
+      "title": "Apdex — negotiation-service",
       "type": "stat"
     },
     {
@@ -638,6 +676,12 @@
           "expr": "(\n  sum(rate(http_server_requests_seconds_bucket{job=\"client-service\", le=\"0.5\"}[5m]))\n  + sum(rate(http_server_requests_seconds_bucket{job=\"client-service\", le=\"2.0\"}[5m]))\n) / 2 / sum(rate(http_server_requests_seconds_count{job=\"client-service\"}[5m]))",
           "legendFormat": "client-service",
           "refId": "C"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
+          "expr": "(\n  sum(rate(http_server_requests_seconds_bucket{job=\"negotiation-service\", le=\"0.5\"}[5m]))\n  + sum(rate(http_server_requests_seconds_bucket{job=\"negotiation-service\", le=\"2.0\"}[5m]))\n) / 2 / sum(rate(http_server_requests_seconds_count{job=\"negotiation-service\"}[5m]))",
+          "legendFormat": "negotiation-service",
+          "refId": "D"
         }
       ],
       "title": "Apdex Score over Time (T=0.5s)",

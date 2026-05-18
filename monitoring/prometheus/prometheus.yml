@@ -59,3 +59,16 @@ scrape_configs:
     relabel_configs:
       - source_labels: [__address__]
         target_label:  instance
+
+  # ── negotiation-service ────────────────────────────────────────────────────
+  - job_name: negotiation-service
+    metrics_path: /actuator/prometheus
+    honor_labels: false
+    static_configs:
+      - targets:
+          - negotiation-service:8085
+        labels:
+          service: negotiation-service
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label:  instance
