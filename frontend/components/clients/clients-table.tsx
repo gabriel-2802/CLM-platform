@@ -183,7 +183,7 @@ function ClientDetailsDialog({
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1">
-              <Label>De la</Label>
+              <Label>De la <span className="text-red-500">*</span></Label>
               <Input
                   type="date"
                   value={deLa}
@@ -192,7 +192,7 @@ function ClientDetailsDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label>Pana la</Label>
+              <Label>Pana la <span className="text-red-500">*</span></Label>
               <Input
                   type="date"
                   value={panaLa}
@@ -201,7 +201,7 @@ function ClientDetailsDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label>Tarif servicii conta</Label>
+              <Label>Tarif servicii conta <span className="text-red-500">*</span></Label>
               <Input
                   type="number"
                   value={tarifConta}
@@ -210,7 +210,7 @@ function ClientDetailsDialog({
               />
             </div>
             <div className="space-y-1">
-              <Label>Tarif bilant</Label>
+              <Label>Tarif bilant <span className="text-red-500">*</span></Label>
               <Input
                   type="number"
                   value={tarifBilant}

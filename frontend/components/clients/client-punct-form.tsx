@@ -113,11 +113,11 @@ export default function ClientPunctForm({ initial, onSubmit, submitLabel = "Save
       </div>
 
       <div>
-        <Label className="mb-2 text-purple-800">De la</Label>
+        <Label className="mb-2 text-purple-800">De la <span className="text-red-500">*</span></Label>
         <Input type="date" name="deLa" value={deLa} onChange={(e) => setDeLa(e.target.value)} required />
       </div>
       <div>
-        <Label className="mb-2 text-purple-800">Pana la</Label>
+        <Label className="mb-2 text-purple-800">Pana la <span className="text-red-500">*</span></Label>
         <Input type="date" name="panaLa" value={panaLa} onChange={(e) => setPanaLa(e.target.value)} />
       </div>
 
