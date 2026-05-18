@@ -470,7 +470,12 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
           tarifConta: getEdit(id, "tarifConta") ? parseFloat(getEdit(id, "tarifConta")) : undefined,
           tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
         };
-        return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} />;
+        return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} onUpdateDetails={(vals) => {
+          setEdit(id, "deLa", vals.deLa)
+          setEdit(id, "panaLa", vals.panaLa)
+          setEdit(id, "tarifConta", vals.tarifConta)
+          setEdit(id, "tarifBilant", vals.tarifBilant)
+        }} />;
       },
     },
     {
