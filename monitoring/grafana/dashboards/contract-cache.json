@@ -57,7 +57,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
-          "expr": "rate(cache_gets_total{name=\"contracts\", result=\"hit\"}[5m]) / rate(cache_gets_total{name=\"contracts\"}[5m]) * 100",
+          "expr": "rate(cache_gets_total{cache=\"contracts\", result=\"hit\"}[5m]) / rate(cache_gets_total{cache=\"contracts\"}[5m]) * 100",
           "legendFormat": "contracts",
           "refId": "A"
         }
@@ -98,7 +98,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
-          "expr": "rate(cache_gets_total{name=\"templates\", result=\"hit\"}[5m]) / rate(cache_gets_total{name=\"templates\"}[5m]) * 100",
+          "expr": "rate(cache_gets_total{cache=\"templates\", result=\"hit\"}[5m]) / rate(cache_gets_total{cache=\"templates\"}[5m]) * 100",
           "legendFormat": "templates",
           "refId": "A"
         }
@@ -136,7 +136,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
-          "expr": "rate(cache_gets_total{name=~\"contracts|templates\"}[1m])",
+          "expr": "rate(cache_gets_total{cache=~\"contracts|templates\"}[1m])",
           "legendFormat": "{{name}} — {{result}}",
           "refId": "A"
         }
@@ -174,7 +174,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
-          "expr": "rate(cache_evictions_total{name=~\"contracts|templates\"}[5m])",
+          "expr": "rate(cache_evictions_total{cache=~\"contracts|templates\"}[5m])",
           "legendFormat": "{{name}}",
           "refId": "A"
         }
@@ -214,7 +214,7 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus-clm" },
-          "expr": "cache_size{name=~\"contracts|templates\"}",
+          "expr": "cache_size{cache=~\"contracts|templates\"}",
           "legendFormat": "{{name}}",
           "refId": "A"
         }

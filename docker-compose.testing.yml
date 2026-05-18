@@ -122,6 +122,7 @@ services:
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
       MANAGEMENT_METRICS_TAGS_APPLICATION:       user-service
+      JAVA_TOOL_OPTIONS: "-Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms"
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_USER_DEMO:       DEBUG
@@ -180,6 +181,7 @@ services:
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
       MANAGEMENT_METRICS_TAGS_APPLICATION:       contract-service
+      JAVA_TOOL_OPTIONS: "-Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms"
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_DEMO:            DEBUG
@@ -224,6 +226,7 @@ services:
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
       MANAGEMENT_METRICS_TAGS_APPLICATION:       client-service
+      JAVA_TOOL_OPTIONS: "-Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms"
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
     depends_on:
@@ -328,6 +331,7 @@ services:
       MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
       MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
       MANAGEMENT_METRICS_TAGS_APPLICATION:       negotiation-service
+      JAVA_TOOL_OPTIONS: "-Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms"
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_NEGOTIATION:     DEBUG
