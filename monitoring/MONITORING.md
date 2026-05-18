@@ -22,6 +22,7 @@ Services (Micrometer/Prometheus)
 - Open Grafana at http://localhost:3001.
 - Default credentials are `admin` / `Admin123!`.
 - Dashboards are provisioned from [monitoring/grafana/dashboards](monitoring/grafana/dashboards).
+- **Populate metrics with load**: Run [scripts/load-test.sh](../scripts/load-test.sh) to generate traffic. See [scripts/LOAD_TEST_GUIDE.md](../scripts/LOAD_TEST_GUIDE.md) for details.
 
 ## Components
 
