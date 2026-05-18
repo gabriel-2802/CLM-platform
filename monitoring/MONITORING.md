@@ -33,6 +33,22 @@ Each service exposes metrics via Spring Boot Actuator:
 - **Config**: `prometheus.yml`
 - **Function**: Scrapes metrics from all services every 15 seconds
 
+### 4. **Contract Cache Metrics**
+Contract-service exposes cache metrics on the same `/actuator/prometheus` endpoint.
+Grafana dashboard: `monitoring/grafana/dashboards/contract-cache.json`.
+
+Key queries:
+- Hit rate (contracts):
+  - `rate(cache_gets_total{name="contracts", result="hit"}[5m]) / rate(cache_gets_total{name="contracts"}[5m]) * 100`
+- Hit rate (templates):
+  - `rate(cache_gets_total{name="templates", result="hit"}[5m]) / rate(cache_gets_total{name="templates"}[5m]) * 100`
+- RPS (hits vs misses):
+  - `rate(cache_gets_total{name=~"contracts|templates"}[1m])`
+- Evictions per second:
+  - `rate(cache_evictions_total{name=~"contracts|templates"}[5m])`
+- Cache size:
+  - `cache_size{name=~"contracts|templates"}`
+
 ### 3. **Grafana** (Visualization)
 - **Port**: 3001
 - **URL**: http://localhost:3001

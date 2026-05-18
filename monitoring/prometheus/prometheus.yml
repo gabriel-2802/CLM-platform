@@ -36,6 +36,7 @@ scrape_configs:
   # ── contract-service ───────────────────────────────────────────────────────
   - job_name: contract-service
     metrics_path: /actuator/prometheus
+    # Cache metrics (Caffeine/Micrometer) are exposed on the same endpoint.
     honor_labels: false
     static_configs:
       - targets:
