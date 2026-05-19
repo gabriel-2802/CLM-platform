@@ -185,11 +185,11 @@ function ClientDetailsDialog({
   return (
       <Dialog open={open} onOpenChange={setOpen}>
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          Detalii
+          Contract Info
         </Button>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Detalii - {clientName}</DialogTitle>
+            <DialogTitle>Contract Info - {clientName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {readOnly && (
@@ -327,7 +327,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       header: "Firma",
       enableSorting: true,
       cell: ({ row }) => (
-          <Link href={`/clients/edit/${row.original.id}`} className="font-medium text-slate-800 hover:text-slate-600 hover:underline whitespace-nowrap">
+          <Link href={`/clients/edit/${row.original.id}`} className="font-medium text-blue-600 underline hover:text-blue-800 whitespace-nowrap">
             {row.original.name}
           </Link>
       ),
@@ -346,9 +346,12 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
     },
     {
       id: "detalii",
-      header: "Detalii",
+      header: "Contract Info",
       enableSorting: false,
       cell: ({ row }) => {
+        if (!row.original.contractId) {
+          return <span className="text-muted-foreground text-xs">—</span>
+        }
         const status = row.original.contractStatus
         const contractSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat)
         return (
@@ -371,17 +374,12 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       enableSorting: false,
       cell: ({ row }) => {
         const id = row.original.id;
-        const deLa = getEdit(id, "deLa");
-        const panaLa = getEdit(id, "panaLa");
-        const tarifConta = getEdit(id, "tarifConta");
-        const tarifBilant = getEdit(id, "tarifBilant");
-        const allFilled = !!(deLa && panaLa && tarifConta && tarifBilant);
         const enrichedClient = {
           ...row.original,
-          deLa,
-          panaLa,
-          tarifConta: tarifConta ? parseFloat(tarifConta) : undefined,
-          tarifBilant: tarifBilant ? parseFloat(tarifBilant) : undefined,
+          deLa: getEdit(id, "deLa"),
+          panaLa: getEdit(id, "panaLa"),
+          tarifConta: getEdit(id, "tarifConta") ? parseFloat(getEdit(id, "tarifConta")) : undefined,
+          tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
         };
 
         const status = row.original.contractStatus ?? "";
@@ -399,7 +397,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
               </button>
             </div>
         ) : (
-            <GenerateContractModal client={enrichedClient} disabled={!allFilled} />
+            <GenerateContractModal client={enrichedClient} />
         );
       },
     },
@@ -524,21 +522,6 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
             />
         );
       },
-    },
-    {
-      id: "probleme",
-      header: "Probleme",
-      enableSorting: false,
-      cell: ({ row }) =>
-          row.original.probleme?.length ? (
-              <div className="flex flex-wrap gap-1 max-w-[200px]">
-                {row.original.probleme.map((p) => (
-                    <span key={p} className="inline-flex px-1.5 py-0.5 rounded text-[11px] bg-red-50 text-red-700 border border-red-100 whitespace-nowrap">
-                      {p}
-                    </span>
-                ))}
-              </div>
-          ) : <span className="text-slate-300">—</span>,
     },
   ], [getEdit, setEdit]);
 

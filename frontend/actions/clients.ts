@@ -101,7 +101,7 @@ export async function getClientRows(): Promise<Row[]> {
       .map((entry) => [entry.clientId, entry.contract!])
   )
 
-  const userMap = new Map(allUsers.map((u: any) => [u.id, u]))
+  const userMap = new Map(allUsers.map((u: any) => [String(u.id), u]))
 
   return clients.map((c: any) => {
     const workPoints: any[] = c.workPoints ?? []
@@ -124,7 +124,7 @@ export async function getClientRows(): Promise<Row[]> {
     if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
     if (!details.ucRegistry) problems.push("Registru UC")
 
-    const userIds: number[] = (c.userClients ?? []).map((uc: any) => uc.userId)
+    const userIds: string[] = (c.userClients ?? []).map((uc: any) => String(uc.userId))
 
     const contract = contractMap.get(c.id)
     const contractId = contract?.id ?? c.contractId ?? c.contract?.id ?? c.currentContract?.id
@@ -148,7 +148,7 @@ export async function getClientRows(): Promise<Row[]> {
       panaLa: toISODate(latestValidTo),
       users: userIds
         .map((id) => {
-          const u = userMap.get(id) as any
+          const u = userMap.get(String(id)) as any
           return u ? (u.name || u.email) : null
         })
         .filter((s): s is string => !!s)

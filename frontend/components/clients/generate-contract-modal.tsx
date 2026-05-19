@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getClientTemplateFields, getTemplates, getTemplateById, type TemplateField, type TemplateMappingOption, type TemplateSummary } from "@/actions/contract-templates"
 import { getClientTemplateSource } from "@/actions/clients"
@@ -25,7 +24,7 @@ type ClientForContract = Record<string, unknown> & {
   tarifBilant?: number;
 };
 
-export function GenerateContractModal({ client, disabled }: { client: ClientForContract; disabled?: boolean }) {
+export function GenerateContractModal({ client }: { client: ClientForContract }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [templates, setTemplates] = useState<TemplateSummary[]>([])
@@ -37,6 +36,10 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
   const [generating, setGenerating] = useState(false)
   const [manualValues, setManualValues] = useState<Record<number, string>>({})
   const [notes, setNotes] = useState("")
+  const [localDeLa, setLocalDeLa] = useState<string>("")
+  const [localPanaLa, setLocalPanaLa] = useState<string>("")
+  const [localTarifConta, setLocalTarifConta] = useState<string>("")
+  const [localTarifBilant, setLocalTarifBilant] = useState<string>("")
 
   // Load templates on open
   useEffect(() => {
@@ -49,6 +52,11 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
           setSelectedTemplate("")
           setTemplateFields([])
           setManualValues({})
+          const src = { ...(freshClient ?? {}), ...client } as Record<string, unknown>
+          setLocalDeLa(src.deLa ? String(src.deLa) : "")
+          setLocalPanaLa(src.panaLa ? String(src.panaLa) : "")
+          setLocalTarifConta(src.tarifConta != null ? String(src.tarifConta) : "")
+          setLocalTarifBilant(src.tarifBilant != null ? String(src.tarifBilant) : "")
         }
     )
   }, [client.id, open])
@@ -92,8 +100,9 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
   const isFormValid =
       selectedTemplate !== "" &&
       !loadingFields &&
-      Boolean(clientSource.deLa) &&
-      Boolean(clientSource.panaLa) &&
+      Boolean(localDeLa) &&
+      Boolean(localPanaLa) &&
+      Boolean(localTarifBilant) &&
       manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
 
   const fmt = (val: number | undefined | null) =>
@@ -131,8 +140,14 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
       mappings[field.value] = formatMappingValue(getClientFieldValue(field.value))
     })
 
+    const localOverrides: Record<string, string> = {
+      deLa: localDeLa,
+      panaLa: localPanaLa,
+      tarifConta: localTarifConta,
+      tarifBilant: localTarifBilant,
+    }
     EXTRA_MAPPING_FIELDS.forEach((field) => {
-      mappings[field] = formatMappingValue(clientSource[field])
+      mappings[field] = localOverrides[field] ?? ""
     })
 
     manualFields.forEach((field) => {
@@ -146,22 +161,15 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
   const handleGenerate = async () => {
     setGenerating(true)
     try {
-      const contractBalance = toNumberOrNull(clientSource.tarifBilant)
-      if (contractBalance === null) {
-        toast.error("Tarif bilanț este obligatoriu pentru generare contract")
-        setGenerating(false)
-        return
-      }
-
       const payload = {
         templateId: Number(selectedTemplate),
         clientId: client.id,
-        startDate: String(clientSource.deLa || ""),
-        endDate: String(clientSource.panaLa || ""),
+        startDate: localDeLa,
+        endDate: localPanaLa,
         mappings: buildMappings(),
         autoRenew: true,
-        contractBalance,
-        value: toNumberOrNull(clientSource.tarifConta),
+        contractBalance: toNumberOrNull(localTarifBilant),
+        value: toNumberOrNull(localTarifConta),
         notes: notes || null,
       }
 
@@ -182,20 +190,9 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
 
   return (
       <Dialog open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm" disabled={disabled}>gen.</Button>
-            </DialogTrigger>
-          </span>
-          </TooltipTrigger>
-          {disabled && (
-              <TooltipContent side="top" className="max-w-xs text-center">
-                Nu se poate genera contract deoarece nu au fost completate toate campurile din sectiunea Detalii
-              </TooltipContent>
-          )}
-        </Tooltip>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">gen.</Button>
+        </DialogTrigger>
 
         <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -245,26 +242,26 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
 
             {selectedTemplate && !loadingFields && (
                 <div className="space-y-4 border rounded-md p-4 bg-muted/20">
-                  {/* Summary of auto-filled values from client row */}
+                  {/* Editable contract period and value fields */}
                   <h4 className="font-medium text-sm text-muted-foreground border-b pb-2">
-                    Informații preluate din fișa clientului
+                    Detalii contract
                   </h4>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">De la: </span>
-                      <span className="font-medium">{clientSource.deLa || "—"}</span>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-xs">De la <span className="text-red-500">*</span></Label>
+                      <Input type="date" value={localDeLa} onChange={(e) => setLocalDeLa(e.target.value)} className="h-8 text-sm" />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Până la: </span>
-                      <span className="font-medium">{clientSource.panaLa || "—"}</span>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Până la <span className="text-red-500">*</span></Label>
+                      <Input type="date" value={localPanaLa} onChange={(e) => setLocalPanaLa(e.target.value)} className="h-8 text-sm" />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Tarif conta: </span>
-                      <span className="font-medium">{clientSource.tarifConta != null ? clientSource.tarifConta : "—"}</span>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tarif conta</Label>
+                      <Input type="number" value={localTarifConta} onChange={(e) => setLocalTarifConta(e.target.value)} className="h-8 text-sm" placeholder="0.00" />
                     </div>
-                    <div>
-                      <span className="text-muted-foreground">Tarif bilanț: </span>
-                      <span className="font-medium">{clientSource.tarifBilant != null ? clientSource.tarifBilant : "—"}</span>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Tarif bilanț <span className="text-red-500">*</span></Label>
+                      <Input type="number" value={localTarifBilant} onChange={(e) => setLocalTarifBilant(e.target.value)} className="h-8 text-sm" placeholder="0.00" />
                     </div>
                   </div>
 
@@ -279,14 +276,8 @@ export function GenerateContractModal({ client, disabled }: { client: ClientForC
 
                   {/* Auto-filled fields info */}
                   <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                    Câmpurile mapate la fișa clientului sunt completate
-                    automat din baza de date.
+                    Câmpurile mapate la fișa clientului sunt completate automat din baza de date.
                   </div>
-                  {(!clientSource.deLa || !clientSource.panaLa) && (
-                      <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded px-3 py-2">
-                        Completează câmpurile De la și Până la în tabel înainte de generare.
-                      </div>
-                  )}
 
                   {/* Manual / custom fields */}
                   {manualFields.length > 0 && (
