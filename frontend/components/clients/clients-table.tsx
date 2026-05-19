@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   PENDING_SIGNATURE: "bg-amber-100 text-amber-800",
   ACTIVE: "bg-green-100 text-green-800",
-  TERMINATED: "bg-slate-100 text-slate-600",
+  TERMINATED: "bg-red-100 text-red-700",
   ARCHIVED: "bg-slate-100 text-slate-400",
 };
 
@@ -123,8 +123,8 @@ function TerminateContractDialog({
 
   return (
       <Dialog open={open} onOpenChange={setOpen}>
-        <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
-          incheie
+        <Button variant="outline" size="sm" className="border-red-200 bg-red-50 text-red-700 hover:bg-red-100 hover:text-red-800" onClick={() => setOpen(true)}>
+          Încheie
         </Button>
         <DialogContent>
           <DialogHeader>
@@ -511,7 +511,11 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
           return <span className="text-muted-foreground">—</span>;
         }
 
-        if (status === "TERMINATED" || status === "ARCHIVED") {
+        if (status === "TERMINATED") {
+          const date = row.original.contractEndDate;
+          return <span className="text-xs text-red-700">{date ?? "—"}</span>;
+        }
+        if (status === "ARCHIVED") {
           return <span className="text-muted-foreground">—</span>;
         }
 
