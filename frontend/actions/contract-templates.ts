@@ -131,14 +131,14 @@ export async function getClientTemplateFields(): Promise<TemplateMappingOption[]
   }));
 }
 
-export async function updateTemplateMappings(templateId: number, mappings: { fieldId: number, fieldLabel: string }[]) {
+export async function updateTemplateMappings(templateId: number, mappings: { fieldId: number, fieldLabel: string, isRequired?: boolean }[]) {
   const payload = {
     templateId,
     mappings: mappings.map(m => ({
       fieldId: m.fieldId,
       fieldLabel: m.fieldLabel,
       dataType: "STRING",
-      isRequired: true,
+      isRequired: m.isRequired ?? true,
       formatPattern: ""
     }))
   };

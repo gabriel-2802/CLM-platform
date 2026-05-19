@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
 import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
 import { toast } from "sonner"
@@ -32,6 +31,7 @@ export function TemplateMappingModal({
   // manualLabels: fieldId → custom display name when option is "MANUAL"
   const [mappingTypes, setMappingTypes] = useState<Record<number, string>>({})
   const [manualLabels, setManualLabels] = useState<Record<number, string>>({})
+  const [requiredFields, setRequiredFields] = useState<Record<number, boolean>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
@@ -39,6 +39,8 @@ export function TemplateMappingModal({
   mappingTypesRef.current = mappingTypes
   const manualLabelsRef = useRef(manualLabels)
   manualLabelsRef.current = manualLabels
+  const requiredFieldsRef = useRef(requiredFields)
+  requiredFieldsRef.current = requiredFields
 
   useEffect(() => {
     if (!open) return
@@ -65,6 +67,7 @@ export function TemplateMappingModal({
           const clientFieldValues = new Set(clientFields.map((cf) => cf.value))
           const initialTypes: Record<number, string> = {}
           const initialLabels: Record<number, string> = {}
+          const initialRequired: Record<number, boolean> = {}
           sorted.forEach((f) => {
             const label = f.fieldLabel || "MANUAL"
             if (label !== "MANUAL" && clientFieldValues.has(label)) {
@@ -74,9 +77,11 @@ export function TemplateMappingModal({
               initialTypes[f.id] = "MANUAL"
               initialLabels[f.id] = label === "MANUAL" ? "" : label
             }
+            initialRequired[f.id] = f.isRequired ?? true
           })
           setMappingTypes(initialTypes)
           setManualLabels(initialLabels)
+          setRequiredFields(initialRequired)
         }
 
         // 2. Fetch the DOCX and convert with mammoth
@@ -122,12 +127,24 @@ export function TemplateMappingModal({
       // (e.g. because some placeholders are in headers/footers not rendered by mammoth),
       // the extra fields are excluded so they don't get defaulted to "MANUAL".
       const visibleFieldCount = hasRealContent && detectedCount > 0 ? detectedCount : fields.length
-      const payload = fields.slice(0, visibleFieldCount).map((f) => ({
-        fieldId: f.id,
-        fieldLabel: mappingTypesRef.current[f.id] !== "MANUAL"
-            ? (mappingTypesRef.current[f.id] || "MANUAL")
-            : (manualLabelsRef.current[f.id]?.trim() || "MANUAL"),
-      }))
+      const payload = fields.slice(0, visibleFieldCount).map((f: TemplateField, idx: number) => {
+        const type = mappingTypesRef.current[f.id]
+        const isRequired = requiredFieldsRef.current[f.id] ?? true
+        let fieldLabel: string
+        if (type !== "MANUAL") {
+          fieldLabel = type || "MANUAL"
+        } else {
+          const manualLabel = manualLabelsRef.current[f.id]?.trim()
+          if (manualLabel) {
+            fieldLabel = manualLabel
+          } else if (!isRequired) {
+            fieldLabel = `field_for_template_${templateId}_no_${idx + 1}`
+          } else {
+            fieldLabel = "MANUAL"
+          }
+        }
+        return { fieldId: f.id, fieldLabel, isRequired }
+      })
 
       const res = await updateTemplateMappings(templateId, payload)
       if (res.success) {
@@ -186,13 +203,25 @@ export function TemplateMappingModal({
         }
 
         return (
-            <span className="inline-flex flex-col align-middle mx-0.5 my-0.5 gap-0.5">
+            <span className="inline-flex items-center align-middle mx-0.5 my-0.5 gap-1">
             <Select
                 value={mappingTypes[fieldId] || "MANUAL"}
                 onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
             >
               <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-amber-50 border-amber-400 px-2 focus:ring-1 focus:ring-amber-500 font-medium">
-                <SelectValue placeholder="Selectează câmp..." />
+                {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" ? (
+                    <input
+                        className="flex-1 bg-transparent outline-none text-[11px] placeholder:text-gray-400 min-w-0"
+                        placeholder="Denumire câmp..."
+                        value={manualLabels[fieldId] || ""}
+                        onChange={(e) => { e.stopPropagation(); setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value })) }}
+                        onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onKeyDown={(e: { stopPropagation(): void }) => e.stopPropagation()}
+                    />
+                ) : (
+                    <SelectValue placeholder="Selectează câmp..." />
+                )}
               </SelectTrigger>
               <SelectContent className="max-h-72 overflow-y-auto">
                 {mappingOptions.map((opt) => (
@@ -202,14 +231,13 @@ export function TemplateMappingModal({
                 ))}
               </SelectContent>
             </Select>
-              {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" && (
-                  <Input
-                      className="h-6 text-[11px] px-1.5 min-w-[150px] max-w-[200px] border-amber-300"
-                      placeholder="Denumire câmp..."
-                      value={manualLabels[fieldId] || ""}
-                      onChange={(e) => setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value }))}
-                  />
-              )}
+              <input
+                  type="checkbox"
+                  className="w-3 h-3 accent-red-500 cursor-pointer shrink-0"
+                  checked={requiredFields[fieldId] ?? true}
+                  onChange={(e) => setRequiredFields((prev) => ({ ...prev, [fieldId]: e.target.checked }))}
+                  title="Câmp obligatoriu"
+              />
           </span>
         )
       }
@@ -325,37 +353,47 @@ export function TemplateMappingModal({
                         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-bold text-sm flex items-center justify-center">
                           {idx + 1}
                         </div>
-                        <div className="flex-1 space-y-1.5">
-                          <p className="text-xs text-muted-foreground">
-                            Câmpul #{idx + 1} din document (poziție {field.fieldPosition ?? idx})
-                          </p>
+                        <div className="flex-1 flex items-center gap-2">
                           <Select
                               value={mappingTypes[field.id] || "MANUAL"}
                               onValueChange={(val) =>
                                   setMappingTypes((prev) => ({ ...prev, [field.id]: val }))
                               }
                           >
-                            <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500">
-                              <SelectValue placeholder="Selectează date pentru acest câmp..." />
+                            <SelectTrigger className="h-8 text-sm bg-white border-amber-300 focus:ring-amber-500 flex-1">
+                              {(mappingTypes[field.id] || "MANUAL") === "MANUAL" ? (
+                                  <input
+                                      className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 min-w-0"
+                                      placeholder="Denumire câmp..."
+                                      value={manualLabels[field.id] || ""}
+                                      onChange={(e) => { e.stopPropagation(); setManualLabels((prev: Record<number, string>) => ({ ...prev, [field.id]: e.target.value })) }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onPointerDown={(e) => e.stopPropagation()}
+                                      onKeyDown={(e: { stopPropagation(): void }) => e.stopPropagation()}
+                                  />
+                              ) : (
+                                  <SelectValue placeholder="Selectează date pentru acest câmp..." />
+                              )}
                             </SelectTrigger>
                             <SelectContent className="max-h-72 overflow-y-auto">
-                              {mappingOptions.map((opt) => (
+                              {mappingOptions.map((opt: TemplateMappingOption) => (
                                   <SelectItem key={opt.value} value={opt.value} className="text-sm">
                                     {opt.label}
                                   </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                          {(mappingTypes[field.id] || "MANUAL") === "MANUAL" && (
-                              <Input
-                                  className="h-8 text-sm border-amber-300"
-                                  placeholder="Denumire câmp (ex: Număr comandă, Reprezentant)..."
-                                  value={manualLabels[field.id] || ""}
-                                  onChange={(e) =>
-                                      setManualLabels((prev) => ({ ...prev, [field.id]: e.target.value }))
-                                  }
-                              />
-                          )}
+                          <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                className="w-3.5 h-3.5 accent-red-500 cursor-pointer"
+                                checked={requiredFields[field.id] ?? true}
+                                onChange={(e: { target: HTMLInputElement }) =>
+                                    setRequiredFields((prev: Record<number, boolean>) => ({ ...prev, [field.id]: e.target.checked }))
+                                }
+                            />
+                            req.
+                          </label>
                         </div>
                       </div>
                   ))}
