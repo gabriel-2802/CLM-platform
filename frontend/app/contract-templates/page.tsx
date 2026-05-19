@@ -6,7 +6,7 @@ export default async function ContractTemplatesPage() {
   const templates = await getTemplates()
 
   return (
-    <div className="p-8 max-w-5xl mx-auto w-full">
+    <div className="p-8 w-full">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Document Templates</h1>
@@ -15,32 +15,35 @@ export default async function ContractTemplatesPage() {
         <UploadTemplateDialog />
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg border border-gray-200">
+      <div className="bg-white shadow overflow-x-auto sm:rounded-lg border border-gray-200">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Name
+                Nume
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                File
+                Fișier
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Mapped
+                Mapat
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created
+                Creat la
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Actualizat la
               </th>
               <th scope="col" className="relative px-6 py-3">
-                <span className="sr-only">Actions</span>
+                <span className="sr-only">Acțiuni</span>
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {templates.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
-                  No templates uploaded yet.
+                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  Niciun template încărcat.
                 </td>
               </tr>
             ) : (
@@ -74,12 +77,15 @@ export default async function ContractTemplatesPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(template.createdAt).toLocaleDateString()}
+                    {template.createdAt ? new Date(template.createdAt).toLocaleDateString("ro-RO") : "—"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {template.updatedAt ? new Date(template.updatedAt).toLocaleDateString("ro-RO") : "—"}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <form action={deleteTemplate.bind(null, template.id)}>
                       <button type="submit" className="text-red-600 hover:text-red-900 transition-colors">
-                        Delete
+                        Șterge
                       </button>
                     </form>
                   </td>

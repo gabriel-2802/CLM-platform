@@ -13,6 +13,7 @@ export type TemplateSummary = {
   id: number;
   name: string;
   createdAt?: string;
+  updatedAt?: string;
   fullyMapped?: boolean;
   fieldCount?: number;
 };
@@ -32,6 +33,7 @@ type TemplateSummaryResponse = {
   templateId: number;
   templateName: string;
   createdAt?: string;
+  updatedAt?: string;
   fullyMapped?: boolean;
   fieldCount?: number;
 };
@@ -94,6 +96,7 @@ export async function getTemplates(): Promise<TemplateSummary[]> {
     id: t.templateId,
     name: t.templateName,
     createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
     fullyMapped: t.fullyMapped,
     fieldCount: t.fieldCount
   }));
