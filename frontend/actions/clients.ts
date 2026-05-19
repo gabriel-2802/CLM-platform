@@ -135,6 +135,7 @@ export async function getClientRows(): Promise<Row[]> {
     const contractStartDate = toISODate(contract?.contractStartDate ?? null)
     const contractEndDate = toISODate(contract?.contractEndDate ?? null)
     const contractValue = contract?.contractValue ?? null
+    const contractBalance = contract?.contractBalance ?? null
     const autoRenew = contract?.autoRenew ?? null
 
     return {
@@ -144,8 +145,8 @@ export async function getClientRows(): Promise<Row[]> {
       cui: c.taxId,
       adresa: c.address,
       administratie: c.administration,
-      deLa: toISODate(earliestValidFrom ?? c.verificationDate),
-      panaLa: toISODate(latestValidTo),
+      deLa: toISODate(earliestValidFrom ?? c.verificationDate) ?? contractStartDate ?? undefined,
+      panaLa: toISODate(latestValidTo) ?? contractEndDate ?? undefined,
       users: userIds
         .map((id) => {
           const u = userMap.get(String(id)) as any
@@ -158,6 +159,8 @@ export async function getClientRows(): Promise<Row[]> {
       contractSemnat: contractSemnat ?? undefined,
       contractStartDate: contractStartDate ?? undefined,
       contractEndDate: contractEndDate ?? undefined,
+      tarifConta: contractValue != null ? Number(contractValue) : undefined,
+      tarifBilant: contractBalance != null ? Number(contractBalance) : undefined,
       contractValue: contractValue != null ? Number(contractValue) : undefined,
       autoRenew: autoRenew != null ? Boolean(autoRenew) : undefined,
       probleme: problems.length ? problems : undefined,

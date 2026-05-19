@@ -26,6 +26,7 @@ export type ContractLookup = {
   clientId: number;
   contractStatus?: string | null;
   contractValue?: number | null;
+  contractBalance?: number | null;
   contractStartDate?: string | null;
   contractEndDate?: string | null;
   autoRenew?: boolean | null;
