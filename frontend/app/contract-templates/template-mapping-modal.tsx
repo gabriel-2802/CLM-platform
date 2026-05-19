@@ -17,7 +17,6 @@ const PLACEHOLDER_REGEX = /\.{4,}|…+|_{5,}/g
 export function TemplateMappingModal({
                                        templateId,
                                        templateName,
-                                       fullyMapped = false,
                                      }: {
   templateId: number
   templateName: string
@@ -247,16 +246,9 @@ export function TemplateMappingModal({
   return (
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
-          <Button
-              variant="outline"
-              size="sm"
-              className={fullyMapped
-                  ? "bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:text-gray-700"
-                  : "bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700"
-              }
-          >
+          <Button variant="outline" size="sm">
             <FileEdit className="w-4 h-4 mr-2" />
-            {fullyMapped ? "Editează Mapare" : "Mapare Vizuală"}
+            Editează Etichetarea
           </Button>
         </DialogTrigger>
 
