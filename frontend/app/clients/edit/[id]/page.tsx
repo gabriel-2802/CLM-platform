@@ -14,8 +14,9 @@ import ClientUsersPanel from "@/components/clients/client-users-panel";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditClientPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id: idParam } = await params;
+  const { tab: defaultTab } = await searchParams;
   const id = Number(idParam);
   if (Number.isNaN(id)) return notFound();
 
@@ -37,7 +38,7 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     <div className="p-6 space-y-4">
       <PageTitleSetter title={`Clients / ${client.name} / Edit`} />
       <h1 className="text-2xl font-semibold">Editeaza: {client.name}</h1>
-      <Tabs defaultValue="form" className="w-full">
+      <Tabs defaultValue={defaultTab ?? "form"} className="w-full">
         <TabsList>
           <TabsTrigger value="form">Client</TabsTrigger>
           <TabsTrigger value="other">Detalii</TabsTrigger>

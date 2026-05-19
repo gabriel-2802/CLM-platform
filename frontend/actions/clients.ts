@@ -89,16 +89,31 @@ export async function getClientRows(): Promise<Row[]> {
     getUsers(token),
   ])
 
-  const contractEntries = await Promise.all(
-    clients.map(async (c: any) => ({
-      clientId: c.id,
-      contract: await getContractByClientId(c.id),
-    }))
-  )
+  const [contractEntries, userAssignmentEntries] = await Promise.all([
+    Promise.all(
+      clients.map(async (c: any) => ({
+        clientId: c.id,
+        contract: await getContractByClientId(c.id),
+      }))
+    ),
+    Promise.all(
+      clients.map(async (c: any) => {
+        const res = await clientServiceFetch(`/api/clients/${c.id}/users`, { cache: "no-store" }).catch(() => null)
+        if (!res || !res.ok) return { clientId: c.id, userIds: [] as number[] }
+        const data = await res.json().catch(() => ({}))
+        return { clientId: c.id, userIds: (data.userIds ?? []) as number[] }
+      })
+    ),
+  ])
+
   const contractMap = new Map(
     contractEntries
       .filter((entry) => entry.contract)
       .map((entry) => [entry.clientId, entry.contract!])
+  )
+
+  const userAssignmentMap = new Map<number, number[]>(
+    userAssignmentEntries.map((e) => [e.clientId, e.userIds])
   )
 
   const userMap = new Map(allUsers.map((u: any) => [String(u.id), u]))
@@ -124,7 +139,7 @@ export async function getClientRows(): Promise<Row[]> {
     if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
     if (!details.ucRegistry) problems.push("Registru UC")
 
-    const userIds: string[] = (c.userClients ?? []).map((uc: any) => String(uc.userId))
+    const userIds: string[] = (userAssignmentMap.get(c.id) ?? []).map(String)
 
     const contract = contractMap.get(c.id)
     const contractId = contract?.id ?? c.contractId ?? c.contract?.id ?? c.currentContract?.id
@@ -166,6 +181,13 @@ export async function getClientRows(): Promise<Row[]> {
       probleme: problems.length ? problems : undefined,
     }
   })
+}
+
+export async function getClientList(): Promise<{ id: number; name: string }[]> {
+  const clients: any[] = await fetchAllClients().catch(() => [])
+  return clients
+    .map((c: any) => ({ id: c.id, name: c.name }))
+    .sort((a, b) => a.name.localeCompare(b.name))
 }
 
 export async function getClient(id: number): Promise<ClientDetails | null> {

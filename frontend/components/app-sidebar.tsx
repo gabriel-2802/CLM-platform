@@ -34,7 +34,8 @@ const data = {
   //   avatar: "/avatars/shadcn.jpg",
   // },
   navMain: [
-    { title: "Clienti", url: "/clients", icon: IconFolder },
+    { title: "Contracts", url: "/contracts", icon: IconFileDescription },
+    { title: "Clients", url: "/clients", icon: IconFolder },
     { title: "Tasks", url: "/taskuri", icon: IconListDetails },
     { title: "Reports", url: "/situatie", icon: IconChartBar },
     { title: "Document Templates", url: "/contract-templates", icon: IconFileDescription },

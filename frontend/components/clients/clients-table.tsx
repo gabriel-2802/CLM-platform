@@ -246,7 +246,7 @@ function ClientDetailsDialog({
   )
 }
 
-export default function ClientsTable({ rows }: { rows: Row[] }) {
+export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; headerExtra?: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -542,6 +542,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
                 Afiseaza fostii clienti
               </label>
               <div className="ml-auto flex gap-2">
+                {headerExtra}
                 <Button asChild variant="outline" size="sm">
                   <Link href="/clients/new"><span className="i-plus">+</span> client nou</Link>
                 </Button>
