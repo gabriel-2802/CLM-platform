@@ -543,9 +543,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
               </label>
               <div className="ml-auto flex gap-2">
                 {headerExtra}
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/clients/new"><span className="i-plus">+</span> client nou</Link>
-                </Button>
+
                 <Button variant="outline" size="sm" onClick={() => setOpenCabinet(true)}>
                   <span className="i-edit">✎</span> date cabinet
                 </Button>
