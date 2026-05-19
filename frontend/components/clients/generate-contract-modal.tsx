@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { Dialog, DialogPortal, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getClientTemplateFields, getTemplates, getTemplateById, type TemplateField, type TemplateMappingOption, type TemplateSummary } from "@/actions/contract-templates"
 import { getClientTemplateSource } from "@/actions/clients"
@@ -194,7 +195,9 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
           <Button variant="outline" size="sm">gen.</Button>
         </DialogTrigger>
 
-        <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogPortal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 backdrop-blur-[2px] transition-all duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
+        <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 rounded-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Genereaza Contract - {client.name || "Client"}</DialogTitle>
           </DialogHeader>
@@ -328,7 +331,8 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
               )}
             </Button>
           </DialogFooter>
-        </DialogContent>
+        </DialogPrimitive.Content>
+        </DialogPortal>
       </Dialog>
   )
 }

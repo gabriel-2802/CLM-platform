@@ -33,7 +33,7 @@ export function UploadTemplateDialog() {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-[2px] animate-in fade-in-0 duration-500">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
             <h2 className="text-xl font-semibold mb-4 text-gray-900">Upload New Template</h2>
             
