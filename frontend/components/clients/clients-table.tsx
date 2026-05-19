@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Download } from "lucide-react";
-import { type Row } from "@/actions/clients";
+import { type Row, getClientRows } from "@/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
