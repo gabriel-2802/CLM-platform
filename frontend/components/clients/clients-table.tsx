@@ -327,7 +327,7 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       header: "Firma",
       enableSorting: true,
       cell: ({ row }) => (
-          <Link href={`/clients/edit/${row.original.id}`} className="font-medium text-blue-600 underline hover:text-blue-800 whitespace-nowrap">
+          <Link href={`/clients/edit/${row.original.id}`} className="font-semibold text-slate-800 hover:underline cursor-pointer whitespace-nowrap">
             {row.original.name}
           </Link>
       ),
