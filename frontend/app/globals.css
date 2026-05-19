@@ -101,10 +101,9 @@
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
-/* Media-query dark fallback so system dark users still get dark tokens */
+/* Media-query dark fallback — only applies when the .dark class is also present */
 @media (prefers-color-scheme: dark) {
-  :root {
-
+  .dark {
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 

@@ -112,14 +112,14 @@ export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComp
           {table.getFilteredRowModel().rows.length} results
         </div>
       </div>
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">
         <div className="overflow-x-auto overflow-y-auto max-h-[60vh]">
           <Table className="text-xs md:text-sm min-w-full">
-               <TableHeader className={stickyHeader ? "bg-muted/50 backdrop-blur supports-[backdrop-filter]:bg-muted/60 sticky top-0 z-10" : undefined}>
+            <TableHeader className={stickyHeader ? "sticky top-0 z-10" : undefined}>
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+                <TableRow key={headerGroup.id} className="bg-slate-700 hover:bg-slate-700 border-0">
                 {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id} className="px-3 py-2 md:px-4 border-b whitespace-nowrap text-foreground">
+                      <TableHead key={header.id} className="px-3 py-2.5 md:px-4 whitespace-nowrap text-slate-100 font-semibold text-xs uppercase tracking-wide border-0">
                     {header.isPlaceholder ? null : (
                       <div
                         className={header.column.getCanSort() ? "cursor-pointer select-none" : undefined}

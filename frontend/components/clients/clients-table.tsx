@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import React, { useCallback, useMemo, useRef, useState } from "react";
+import { Download } from "lucide-react";
 import { type Row } from "@/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,13 @@ const STATUS_LABELS: Record<string, string> = {
   ACTIVE: "Activ",
   TERMINATED: "Incetat",
   ARCHIVED: "Arhivat",
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  PENDING_SIGNATURE: "bg-amber-100 text-amber-800",
+  ACTIVE: "bg-green-100 text-green-800",
+  TERMINATED: "bg-slate-100 text-slate-600",
+  ARCHIVED: "bg-slate-100 text-slate-400",
 };
 
 function SignedContractUploadDialog({
@@ -57,8 +65,8 @@ function SignedContractUploadDialog({
 
   return (
       <Dialog open={open} onOpenChange={setOpen}>
-        <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
-          incarca
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          Incarca semnat
         </Button>
         <DialogContent>
           <DialogHeader>
@@ -319,9 +327,9 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       header: "Firma",
       enableSorting: true,
       cell: ({ row }) => (
-          <span className="text-slate-900 underline">
-          <Link href={`/clients/edit/${row.original.id}`}>{row.original.name}</Link>
-        </span>
+          <Link href={`/clients/edit/${row.original.id}`} className="font-medium text-slate-800 hover:text-slate-600 hover:underline whitespace-nowrap">
+            {row.original.name}
+          </Link>
       ),
     },
     { accessorKey: "tip", header: "Tip", enableSorting: true },
@@ -376,35 +384,22 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
           tarifBilant: tarifBilant ? parseFloat(tarifBilant) : undefined,
         };
 
-        return (
-            <div className="flex flex-col gap-1">
-              {row.original.contractId ? (
-                  <>
-                    <Button
-                        variant="secondary"
-                        size="sm"
-                        disabled
-                        className="bg-slate-300 text-slate-900 disabled:opacity-100"
-                    >
-                      {STATUS_LABELS[row.original.contractStatus ?? ""] ?? "Generat"}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          window.open(
-                              `/api/contracts/download/${row.original.contractId}?type=unsigned`,
-                              "_blank"
-                          );
-                        }}
-                    >
-                      Descarca nesemnat
-                    </Button>
-                  </>
-              ) : (
-                  <GenerateContractModal client={enrichedClient} disabled={!allFilled} />
-              )}
+        const status = row.original.contractStatus ?? "";
+        return row.original.contractId ? (
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"}`}>
+                {STATUS_LABELS[status] ?? "Generat"}
+              </span>
+              <button
+                  className="text-slate-400 hover:text-slate-700 transition-colors"
+                  title="Descarca nesemnat"
+                  onClick={() => window.open(`/api/contracts/download/${row.original.contractId}?type=unsigned`, "_blank")}
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
             </div>
+        ) : (
+            <GenerateContractModal client={enrichedClient} disabled={!allFilled} />
         );
       },
     },
@@ -423,18 +418,14 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
 
         if (hasSigned) {
           return (
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    window.open(
-                        `/api/contracts/download/${contractId}?type=signed`,
-                        "_blank"
-                    );
-                  }}
+              <button
+                  className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors"
+                  title="Descarca semnat"
+                  onClick={() => window.open(`/api/contracts/download/${contractId}?type=signed`, "_blank")}
               >
-                Descarca semnat
-              </Button>
+                <Download className="w-3.5 h-3.5" />
+                semnat
+              </button>
           );
         }
 
@@ -539,13 +530,15 @@ export default function ClientsTable({ rows }: { rows: Row[] }) {
       header: "Probleme",
       enableSorting: false,
       cell: ({ row }) =>
-          row.original.probleme ? (
-              <ul className="list-disc pl-4 space-y-1">
+          row.original.probleme?.length ? (
+              <div className="flex flex-wrap gap-1 max-w-[200px]">
                 {row.original.probleme.map((p) => (
-                    <li key={p}>{p}</li>
+                    <span key={p} className="inline-flex px-1.5 py-0.5 rounded text-[11px] bg-red-50 text-red-700 border border-red-100 whitespace-nowrap">
+                      {p}
+                    </span>
                 ))}
-              </ul>
-          ) : null,
+              </div>
+          ) : <span className="text-slate-300">—</span>,
     },
   ], [getEdit, setEdit]);
 

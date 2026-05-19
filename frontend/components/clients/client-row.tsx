@@ -10,7 +10,7 @@ export function ClientRow<TData>({ row }: { row: Row<TData> }) {
   return (
     <TableRow data-state={row.getIsSelected() && "selected"} className="transition-colors">
       {row.getVisibleCells().map((cell) => (
-        <TableCell key={cell.id} className="px-4 py-2 border-b">
+        <TableCell key={cell.id} className="px-4 py-3 align-middle">
           {flexRender(cell.column.columnDef.cell, cell.getContext())}
         </TableCell>
       ))}
