@@ -1,9 +1,0 @@
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/NotificationsApplication.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/config/RestClientConfig.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/controllers/NotificationController.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/dto/ContractFieldValueDTO.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/dto/ContractSummaryDTO.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/jobs/ContractNotificationJob.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/services/ContractApiService.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/services/EmailService.java
-/Users/gabrielcarauleanu/Desktop/CLM-platform/notifications/src/main/java/clm/notifications/services/NotificationService.java

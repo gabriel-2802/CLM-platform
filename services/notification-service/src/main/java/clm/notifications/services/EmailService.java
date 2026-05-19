@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.util.ByteArrayDataSource;
 import java.util.List;
 
 /**
@@ -34,6 +35,18 @@ public class EmailService {
      * @param htmlBody HTML content of the email body
      */
     public void sendHtml(String subject, String htmlBody) {
+        sendHtml(subject, htmlBody, null, null);
+    }
+
+    /**
+     * Sends an HTML email with an optional .ics calendar attachment.
+     *
+     * @param subject        email subject line
+     * @param htmlBody       HTML content of the email body
+     * @param icsAttachment  raw bytes of the .ics file, or null to skip
+     * @param icsFileName    filename shown in the email attachment, or null to skip
+     */
+    public void sendHtml(String subject, String htmlBody, byte[] icsAttachment, String icsFileName) {
         List<String> recipients = parseRecipients();
         if (recipients.isEmpty()) {
             log.warn("No notification recipients configured – email not sent. " +
@@ -49,8 +62,15 @@ public class EmailService {
                 helper.setTo(recipient.trim());
                 helper.setSubject(subject);
                 helper.setText(htmlBody, true);
+
+                if (icsAttachment != null && icsFileName != null) {
+                    helper.addAttachment(icsFileName,
+                            new ByteArrayDataSource(icsAttachment, "text/calendar; charset=UTF-8; method=PUBLISH"));
+                }
+
                 mailSender.send(message);
-                log.info("Notification email sent to {}", recipient);
+                log.info("Notification email sent to {}{}", recipient,
+                        icsAttachment != null ? " (with .ics attachment)" : "");
             } catch (MessagingException e) {
                 log.error("Failed to send notification email to {}: {}", recipient, e.getMessage());
             }

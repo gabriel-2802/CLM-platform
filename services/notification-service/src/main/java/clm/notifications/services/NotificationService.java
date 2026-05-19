@@ -25,6 +25,7 @@ public class NotificationService {
 
     private final ContractApiService contractApiService;
     private final EmailService emailService;
+    private final ICalendarService iCalendarService;
 
     @Value("${notification.expiry-warning-days:30}")
     private int expiryWarningDays;
@@ -49,8 +50,13 @@ public class NotificationService {
                 LocalDate.now().format(DateTimeFormatter.ofPattern("MM.yyyy")) + ")";
         String body = buildHtmlBody(expiring);
 
-        emailService.sendHtml(subject, body);
-        log.info("Contract expiry digest sent: {} expiring contracts", expiring.size());
+        byte[] icsBytes = iCalendarService.buildCalendarFile(expiring);
+        String icsFileName = "contracte-expirare-" +
+                LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM")) + ".ics";
+
+        emailService.sendHtml(subject, body, icsBytes, icsFileName);
+        log.info("Contract expiry digest sent: {} expiring contracts (with .ics calendar attachment)",
+                expiring.size());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
