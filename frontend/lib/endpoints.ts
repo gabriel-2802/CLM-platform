@@ -13,13 +13,13 @@ export const API = {
   },
 
   templates: {
-    downloadDocx: (id: number | string) => `/api/templates/download/${id}`,
+    downloadDocx: (id: number | string) => `/api/templates/download/${id}/docx`,
     downloadPdf:  (id: number | string) => `/api/templates/download/${id}/pdf`,
   },
 
   contracts: {
-    download: (id: number | string, type: "unsigned" | "signed" = "unsigned") =>
-      `/api/contracts/download/${id}?type=${type}`,
+    downloadPdf: (id: number | string, type: "unsigned" | "signed" = "unsigned") =>
+      `/api/contracts/download/${id}/${type}/pdf`,
   },
 
   tasks: {
@@ -84,7 +84,7 @@ export const CONTRACTS_SERVICE = {
     autoRenew:    (id: number | string) => `/api/contracts/${id}/toggle-auto-renew`,
     uploadSigned: (id: number | string) => `/api/contracts/${id}/upload-signed`,
     downloadPdf:  (id: number | string, type: "unsigned" | "signed") =>
-                    `/api/contracts/download/${id}/${type}/pdf`,
+            `/api/contracts/download/${id}/${type}/pdf`,
   },
 
   templates: {

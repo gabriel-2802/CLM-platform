@@ -17,6 +17,7 @@ import { ActeAditionaleDialog } from "@/components/clients/acte-aditionale-dialo
 import { NegocieriDialog } from "@/components/clients/negocieri-dialog";
 import { terminateContract, toggleAutoRenewal, uploadSignedContract } from "@/actions/contracts";
 import { toast } from "sonner";
+import { useAuthenticatedDownload } from "@/hooks/use-authenticated-download";
 
 type RowEditFields = { deLa: string; panaLa: string; tarifConta: string; tarifBilant: string }
 
@@ -250,6 +251,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const downloadWithAuth = useAuthenticatedDownload();
   const initialFormer = (searchParams.get("former") ?? "1").toString();
   const [showFormer, setShowFormer] = useState<boolean>(initialFormer === "1" || initialFormer === "true");
   const [openCabinet, setOpenCabinet] = useState(false);
@@ -391,7 +393,15 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
               <button
                   className="text-slate-400 hover:text-slate-700 transition-colors"
                   title="Descarca nesemnat"
-                  onClick={() => window.open(`/api/contracts/download/${row.original.contractId}?type=unsigned`, "_blank")}
+                  onClick={() =>
+                    downloadWithAuth(
+                      `/api/contracts/download/${row.original.contractId}/unsigned/pdf`,
+                      { openInNewTab: true, fallbackFilename: `contract-${row.original.contractId}.pdf` }
+                    ).catch((err) => {
+                      const message = err instanceof Error ? err.message : "Descarcare esuata.";
+                      toast.error(message);
+                    })
+                  }
               >
                 <Download className="w-3.5 h-3.5" />
               </button>
@@ -419,7 +429,15 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
               <button
                   className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors"
                   title="Descarca semnat"
-                  onClick={() => window.open(`/api/contracts/download/${contractId}?type=signed`, "_blank")}
+                  onClick={() =>
+                    downloadWithAuth(`/api/contracts/download/${contractId}/signed/pdf`, {
+                      openInNewTab: true,
+                      fallbackFilename: `contract-${contractId}.pdf`,
+                    }).catch((err) => {
+                      const message = err instanceof Error ? err.message : "Descarcare esuata.";
+                      toast.error(message);
+                    })
+                  }
               >
                 <Download className="w-3.5 h-3.5" />
                 semnat

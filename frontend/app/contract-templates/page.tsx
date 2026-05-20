@@ -1,6 +1,7 @@
 import { getTemplates, deleteTemplate } from "@/actions/contract-templates"
 import { UploadTemplateDialog } from "@/components/upload-template-dialog"
 import { TemplateMappingModal } from "./template-mapping-modal"
+import { AuthenticatedDownloadLink } from "@/components/authenticated-download-link"
 
 export default async function ContractTemplatesPage() {
   const templates = await getTemplates()
@@ -41,12 +42,18 @@ export default async function ContractTemplatesPage() {
                     <td className="px-4 py-2 whitespace-nowrap font-medium text-slate-800">{template.name}</td>
                     <td className="px-4 py-2 whitespace-nowrap">
                       <div className="flex items-center gap-3">
-                        <a href={`/api/templates/download/${template.id}`} target="_blank" rel="noreferrer" className="text-slate-600 hover:text-slate-900 hover:underline">
-                          Download DOCX
-                        </a>
-                        <a href={`/api/templates/download/${template.id}/pdf`} target="_blank" rel="noreferrer" className="text-slate-600 hover:text-slate-900 hover:underline">
-                          Download PDF
-                        </a>
+                        <AuthenticatedDownloadLink
+                          path={`/api/templates/download/${template.id}/docx`}
+                          label="Download DOCX"
+                          className="text-slate-600 hover:text-slate-900 hover:underline"
+                          fallbackFilename={`template-${template.id}.docx`}
+                        />
+                        <AuthenticatedDownloadLink
+                          path={`/api/templates/download/${template.id}/pdf`}
+                          label="Download PDF"
+                          className="text-slate-600 hover:text-slate-900 hover:underline"
+                          fallbackFilename={`template-${template.id}.pdf`}
+                        />
                       </div>
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap">

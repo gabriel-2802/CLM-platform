@@ -10,6 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from "sonner"
 import { Loader2, ChevronLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useAuthenticatedDownload } from "@/hooks/use-authenticated-download"
 import {
     getAppendicesForContract,
     generateAppendix,
@@ -53,6 +54,7 @@ export function ActeAditionaleDialog({
     onUpdateDetails?: (vals: DetailVals) => void
 }) {
     const router = useRouter()
+    const downloadWithAuth = useAuthenticatedDownload()
     const [open, setOpen] = useState(false)
     const [view, setView] = useState<View>("list")
 
@@ -361,10 +363,13 @@ export function ActeAditionaleDialog({
                                                     variant="outline"
                                                     size="sm"
                                                     onClick={() =>
-                                                        window.open(
-                                                            `/api/appendices/download/${a.id}?type=${a.appendixStatus === "SIGNED" ? "signed" : "unsigned"}`,
-                                                            "_blank"
-                                                        )
+                                                        downloadWithAuth(
+                                                            `/api/appendices/download/${a.id}/${a.appendixStatus === "SIGNED" ? "signed" : "unsigned"}/pdf`,
+                                                            { openInNewTab: true, fallbackFilename: `appendix-${a.id}.pdf` }
+                                                        ).catch((err) => {
+                                                            const message = err instanceof Error ? err.message : "Descarcare esuata."
+                                                            toast.error(message)
+                                                        })
                                                     }
                                                 >
                                                     {a.appendixStatus === "DRAFT" ? "Descarcă nesemnat" : "Descarcă semnat"}

@@ -8,6 +8,8 @@ import { AlertCircle, FileEdit, Loader2, Save } from "lucide-react"
 import { getClientTemplateFields, getTemplateById, updateTemplateMappings, type TemplateField, type TemplateMappingOption } from "@/actions/contract-templates"
 import { toast } from "sonner"
 import parse, { Element, HTMLReactParserOptions } from "html-react-parser"
+import { useSession } from "next-auth/react"
+import { API_BASE_URL } from "@/lib/config/public"
 
 const MANUAL_MAPPING_OPTION = { label: "Manual (Input utilizator)", value: "MANUAL" }
 
@@ -22,6 +24,8 @@ export function TemplateMappingModal({
   templateName: string
   fullyMapped?: boolean
 }) {
+  const { data: session } = useSession()
+  const token = (session?.user as { serviceToken?: string } | undefined)?.serviceToken
   const [open, setOpen] = useState(false)
   const [fields, setFields] = useState<TemplateField[]>([])
   const [mappingOptions, setMappingOptions] = useState<TemplateMappingOption[]>([MANUAL_MAPPING_OPTION])
@@ -84,7 +88,14 @@ export function TemplateMappingModal({
         }
 
         // 2. Fetch the DOCX and convert with mammoth
-        const response = await fetch(`/api/templates/download/${templateId}`, { cache: "no-store" })
+        if (!token) {
+          throw new Error("Autentificare lipsa.")
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/templates/download/${templateId}/docx`, {
+          cache: "no-store",
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (!response.ok) {
           const errText = await response.text()
           throw new Error(`Eroare la descărcarea fișierului (${response.status}): ${errText}`)
@@ -116,7 +127,7 @@ export function TemplateMappingModal({
     }
 
     fetchData()
-  }, [open, templateId])
+  }, [open, templateId, token])
 
   const handleSave = async () => {
     setSaving(true)
