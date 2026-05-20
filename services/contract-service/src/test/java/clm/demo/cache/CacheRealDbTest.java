@@ -4,10 +4,13 @@ import clm.demo.dto.requests.ContractTerminationRequest;
 import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.RenegotiateContractRequest;
+import clm.demo.models.Appendix;
 import clm.demo.models.Contract;
 import clm.demo.models.DocumentTemplate;
+import clm.demo.models.enums.AppendixStatus;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.repositories.AppendixRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
 import clm.demo.services.ContractService;
@@ -95,12 +98,14 @@ class CacheRealDbTest {
     @Autowired ContractService            contractService;
     @Autowired DocumentTemplateRepository templateRepository;
     @Autowired ContractRepository         contractRepository;
+    @Autowired AppendixRepository         appendixRepository;
     @Autowired CacheManager               cacheManager;
 
     // ── Per-test fixtures ────────────────────────────────────────────────── //
 
     DocumentTemplate     seededTemplate;
     Contract             seededContract;
+    Appendix             seededAppendix;
     Map<String, long[]>  statsBaseline = new HashMap<>(); // [misses, hits]
 
     @BeforeEach
@@ -121,19 +126,25 @@ class CacheRealDbTest {
                 Contract.builder()
                         .clientId(999)
                         .contractStatus(ContractStatus.ACTIVE)
-                        .contractBalance(BigDecimal.valueOf(1_000))
-                        .contractValue(BigDecimal.valueOf(10_000))
-                        .contractStartDate(LocalDate.of(2026, 1, 1))
-                        .contractEndDate(LocalDate.of(2027, 1, 1))
+                        .build());
+
+        seededAppendix = appendixRepository.save(
+                Appendix.builder()
+                        .contract(seededContract)
+                        .title("Test Appendix")
+                        .appendixStatus(AppendixStatus.SIGNED)
                         .build());
     }
 
     @AfterEach
     void cleanup() {
         clearAllCaches();
+        // Delete contract first: cascades to contract_details and appendix.
+        // Explicit appendix deletion would violate the RESTRICT FK from contract_details.
         if (seededContract != null) {
             contractRepository.deleteById(seededContract.getId());
-            seededContract = null;
+            seededContract  = null;
+            seededAppendix  = null;
         }
         if (seededTemplate != null) {
             templateRepository.deleteById(seededTemplate.getId());
@@ -350,6 +361,7 @@ class CacheRealDbTest {
 
             contractService.renegotiateContract(id,
                     new RenegotiateContractRequest(
+                            1, seededAppendix.getId().intValue(),
                             BigDecimal.valueOf(20_000), LocalDate.of(2028, 1, 1)));
 
             assertThat(isAbsent(CacheNames.CONTRACTS, id))
@@ -392,7 +404,7 @@ class CacheRealDbTest {
             assertThat(isAbsent(CacheNames.CONTRACTS, id)).isFalse();
 
             contractService.updateContractTerms(id,
-                    new ContractUpdateRequest(1, LocalDate.of(2028, 6, 1), null, null));
+                    new ContractUpdateRequest(1, seededAppendix.getId().intValue(), LocalDate.of(2028, 6, 1), null, null));
 
             assertThat(isAbsent(CacheNames.CONTRACTS, id))
                     .as("cache must not hold a stale entry after updateContractTerms")

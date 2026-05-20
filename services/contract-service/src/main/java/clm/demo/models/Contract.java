@@ -7,7 +7,6 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.JdbcTypeCode;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -20,8 +19,7 @@ import java.util.List;
  */
 @Entity
 @Table(name = "contract", schema = "clm", indexes = {
-        @Index(name = "idx_contract_template_client", columnList = "document_id, client_id"),
-        @Index(name = "idx_contract_validity",        columnList = "contract_start_date, contract_end_date")
+        @Index(name = "idx_contract_template_client", columnList = "document_id, client_id")
 })
 @DiscriminatorValue("CONTRACT")
 @PrimaryKeyJoinColumn(name = "document_id")
@@ -43,21 +41,9 @@ public class Contract extends Document {
     @Builder.Default
     private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
 
-    @Column(name = "contract_value", precision = 12, scale = 2)
-    private BigDecimal contractValue;
-
-    @Column(name = "contract_balance", precision = 12, scale = 2, nullable = false)
-    private BigDecimal contractBalance;
-
     @Column(name = "auto_renew", nullable = false)
     @Builder.Default
     private Boolean autoRenew = false;
-
-    @Column(name = "contract_start_date")
-    private LocalDate contractStartDate;
-
-    @Column(name = "contract_end_date")
-    private LocalDate contractEndDate;
 
     @Column(name = "termination_date")
     private LocalDate terminationDate;
@@ -71,6 +57,11 @@ public class Contract extends Document {
     @Builder.Default
     private List<Appendix> appendices = new ArrayList<>();
 
+    @OneToMany(mappedBy = "contract")
+    @BatchSize(size = 10)
+    @Builder.Default
+    private List<ContractDetails> contractDetailsList = new ArrayList<>();
+
     /* audit data */
 
     @Column(name = "terminated_at")
@@ -78,10 +69,4 @@ public class Contract extends Document {
 
     @Column(name = "terminated_by_user_id")
     private Integer terminatedByUserId;
-
-    @Column(name = "modified_at")
-    private LocalDateTime modifiedAt;
-
-    @Column(name = "modified_by_user_id")
-    private Integer modifiedByUserId;
 }

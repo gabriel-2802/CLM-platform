@@ -12,7 +12,9 @@ import clm.demo.mappers.DocumentTemplateMapper;
 import clm.demo.mappers.GeneratedContractMapper;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.enums.ContractStatus;
+import clm.demo.models.Appendix;
 import clm.demo.repositories.AppendixRepository;
+import clm.demo.repositories.ContractDetailsRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentFieldValueRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
@@ -51,6 +53,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -100,6 +103,7 @@ class CachePerformanceTest {
     @MockitoBean DocumentTemplateRepository   templateRepository;
     @MockitoBean TemplateFieldRepository      templateFieldRepository;
     @MockitoBean ContractRepository           contractRepository;
+    @MockitoBean ContractDetailsRepository    contractDetailsRepository;
     @MockitoBean DocumentFieldValueRepository fieldValueRepository;
     @MockitoBean AppendixRepository           appendixRepository;
     @MockitoBean ContractGenerationMapper     contractGenerationMapper;
@@ -313,9 +317,10 @@ class CachePerformanceTest {
             });
             when(contractRepository.save(any())).thenReturn(contract);
 
+            when(appendixRepository.findById(any())).thenReturn(Optional.of(mock(Appendix.class)));
             contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
             contractService.renegotiateContract(CONTRACT_ID,
-                    new RenegotiateContractRequest(BigDecimal.valueOf(20_000), LocalDate.of(2028, 1, 1)));
+                    new RenegotiateContractRequest(1, 1, BigDecimal.valueOf(20_000), LocalDate.of(2028, 1, 1)));
             //  renegotiateContract loads the contract internally via findById (#2), then evicts the cache.
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
@@ -332,9 +337,10 @@ class CachePerformanceTest {
             });
             when(contractRepository.save(any())).thenReturn(contract);
 
+            when(appendixRepository.findById(any())).thenReturn(Optional.of(mock(Appendix.class)));
             contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
             contractService.updateContractTerms(CONTRACT_ID,
-                    new ContractUpdateRequest(1, LocalDate.of(2028, 6, 1), null, null));
+                    new ContractUpdateRequest(1, 1, LocalDate.of(2028, 6, 1), null, null));
             // ↑ updateContractTerms loads the contract internally via findById (#2), then evicts the cache.
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)

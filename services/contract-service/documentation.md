@@ -1410,6 +1410,7 @@ Measured against a live PostgreSQL 16 container with full Flyway schema, JPA/Hib
 | `libreoffice.path` | `libreoffice` | Absolute path or command name for LibreOffice binary |
 | `jwt.secret` | — | HMAC-SHA256 key, minimum 32 characters |
 | `job.archive-contracts.cron` | `0 0 0 * * *` | Cron expression for contract archival job |
+| `job.process-termination.cron` | `0 0 0 * * *` | Cron expression for processing termination-due contracts |
 | `spring.cache.type` | `caffeine` | Cache provider; must be `caffeine` to activate `CacheConfig` |
 | `spring.datasource.hikari.maximum-pool-size` | `10` | Max concurrent DB connections |
 | `spring.datasource.hikari.connection-timeout` | `30000` | Connection wait timeout (ms) |

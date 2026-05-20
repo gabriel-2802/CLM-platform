@@ -1,56 +1,92 @@
-[INFO] Scanning for projects...
-[INFO] 
-[INFO] ------------------------------< clm:demo >------------------------------
-[INFO] Building CLM Demo 0.0.1-SNAPSHOT
-[INFO]   from pom.xml
-[INFO] --------------------------------[ jar ]---------------------------------
-[INFO] 
-[INFO] --- dependency:3.9.0:properties (get-byte-buddy-agent) @ demo ---
-[INFO] 
-[INFO] --- resources:3.3.1:resources (default-resources) @ demo ---
-[INFO] Copying 1 resource from src/main/resources to target/classes
-[INFO] Copying 8 resources from src/main/resources to target/classes
-[INFO] 
-[INFO] --- compiler:3.14.1:compile (default-compile) @ demo ---
-[INFO] Recompiling the module because of changed source code.
-[INFO] Compiling 98 source files with javac [debug parameters release 21] to target/classes
-[INFO] /Users/gabrielcarauleanu/Desktop/CLM-platform/services/contract-service/src/main/java/clm/demo/exceptions/GlobalExceptionHandler.java: /Users/gabrielcarauleanu/Desktop/CLM-platform/services/contract-service/src/main/java/clm/demo/exceptions/GlobalExceptionHandler.java uses or overrides a deprecated API.
-[INFO] /Users/gabrielcarauleanu/Desktop/CLM-platform/services/contract-service/src/main/java/clm/demo/exceptions/GlobalExceptionHandler.java: Recompile with -Xlint:deprecation for details.
-[INFO] 
-[INFO] --- resources:3.3.1:testResources (default-testResources) @ demo ---
-[INFO] Copying 1 resource from src/test/resources to target/test-classes
-[INFO] 
-[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ demo ---
-[INFO] Recompiling the module because of changed dependency.
-[INFO] Compiling 4 source files with javac [debug parameters release 21] to target/test-classes
-[INFO] 
-[INFO] --- surefire:3.5.5:test (default-test) @ demo ---
-[INFO] Using auto detected provider org.apache.maven.surefire.junitplatform.JUnitPlatformProvider
-[INFO] 
-[INFO] -------------------------------------------------------
-[INFO]  T E S T S
-[INFO] -------------------------------------------------------
-[INFO] Running clm.demo.cache.CachePerformanceTest
-[INFO] Running contracts cache
-[CONTRACT] cold=52 ms  warm=0 ms  speedup=52,0×
-17:14:00.923 [main] INFO clm.demo.services.ContractService -- Contract 10 renegotiated — value=20000, endDate=2028-01-01
-17:14:01.155 [main] INFO clm.demo.services.ContractService -- Contract 10 terms updated by user 1: endDate=2028-06-01, balance=null, value=null
-17:14:01.395 [main] INFO clm.demo.services.ContractService -- Auto-renewal toggled for contract 10: new state = true
-[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.551 s -- in contracts cache
-[INFO] Running templates cache
-17:14:02.069 [main] INFO clm.demo.services.TemplateService -- Template 1 deleted
-[TEMPLATE] cold=55 ms  warm=1 ms  speedup=55,0×
-17:14:02.377 [main] INFO clm.demo.services.TemplateService -- Template 1 field labels updated: 0/3 fields mapped
-[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.638 s -- in templates cache
-[INFO] Tests run: 0, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.341 s -- in clm.demo.cache.CachePerformanceTest
-[INFO] 
-[INFO] Results:
-[INFO] 
-[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
-[INFO] 
-[INFO] ------------------------------------------------------------------------
-[INFO] BUILD SUCCESS
-[INFO] ------------------------------------------------------------------------
-[INFO] Total time:  10.133 s
-[INFO] Finished at: 2026-05-18T17:14:02+03:00
-[INFO] ------------------------------------------------------------------------
+Yes, this is fully understood. Here is a professional rephrasing:
+
+---
+
+## Refactoring Specification: Contract Versioning via ContractDetails
+
+### Overview
+
+The mutable financial and temporal fields currently residing on the `Contract` entity are to be extracted into a new `ContractDetails` entity. This reflects the business rule that any change to a contract's value, balance, or validity period must be backed by a formal **Appendix** document, creating an auditable history of contract amendments.
+
+---
+
+### 1. Entity Changes
+
+**Remove from `Contract`:**
+- `contractValue`, `contractBalance`, `contractStartDate`, `contractEndDate`, `modifiedAt`, `modifiedByUserId`
+
+**Create `ContractDetails` entity with:**
+
+| New Field Name | Origin | Notes |
+|---|---|---|
+| `contractValue` | was `contractValue` | — |
+| `contractBalance` | was `contractBalance` | — |
+| `startDate` | was `contractStartDate` | renamed |
+| `endDate` | was `contractEndDate` | renamed |
+| `createdAt` | was `modifiedAt` | renamed |
+| `createdByUserId` | was `modifiedByUserId` | renamed |
+| `appendix` | new | `@OneToOne` to `Appendix`; nullable (null  ONLY on initial contract creation) |
+
+`ContractDetails` has a `@ManyToOne` relationship to `Contract`.
+
+---
+
+### 2. Contract Creation
+
+When a new `Contract` is created, a corresponding `ContractDetails` record is **automatically generated** using the values provided in the existing creation DTO (no DTO changes). `appendix` is set to `null`. `createdAt` is set to the current timestamp.
+
+---
+
+### 3. Contract Update
+
+The **update DTO** is modified to include:
+```java
+private Integer appendixId; // required
+```
+
+On update, a **new `ContractDetails` record is created** — the existing ones are never mutated. The new record is populated with:
+- `startDate`, `contractValue`, `contractBalance` from the DTO
+- `endDate` from the DTO; if `null`, it is defaulted to the `endDate` of the current **PRESENT_VALID** `ContractDetails`
+- if 'contractValue' or 'contractBalance' are `null`, they are defaulted to the corresponding values from the current **PRESENT_VALID** `ContractDetails`
+- `createdAt` = `LocalDateTime.now()`
+- `createdByUserId` from request
+- `appendix` resolved and **validated** from `appendixId` — throws if not found
+
+---
+
+### 4. PRESENT_VALID ContractDetails Resolution
+
+Given a contract's list of `ContractDetails`:
+- **Single record** → that record is the valid one
+- **Multiple records** → filter to those whose `startDate ≤ today ≤ endDate`, then select the one with the **latest `createdAt`**
+
+This logic is encapsulated in a reusable private method in the service.
+
+---
+
+### 5. Response DTO Mapping
+
+`ContractResponseDTO` fields:
+```java
+private BigDecimal contractValue;
+private BigDecimal contractBalance;
+private LocalDate contractStartDate;
+private LocalDate contractEndDate;
+private LocalDateTime modifiedAt;
+private Integer modifiedByUserId;
+```
+contractValue, contractBalance, modifiedAt, modifiedByUserId are now read from the `ContractDetails` record.
+startDate and endDate are THE OLDEST value of startDate and endDate from all `ContractDetails` records.
+
+---
+
+### 6. Deliverables
+
+- `ContractDetails` entity + repository
+- Flyway migration: drops columns from `contract`, creates `contract_details` table
+- Updated `Contract` entity
+- Updated service: creation flow, update flow, PRESENT_VALID resolution
+- Updated mapper: reads from PRESENT_VALID `ContractDetails`
+- Updated update DTO: adds `appendixId`
+
+---

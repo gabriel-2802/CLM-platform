@@ -6,7 +6,6 @@ import clm.demo.models.DocumentTemplate;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.enums.DocumentFormat;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public final class TestDataFactory {
@@ -30,10 +29,6 @@ public final class TestDataFactory {
         Contract c = Contract.builder()
                 .clientId(42)
                 .contractStatus(status)
-                .contractValue(BigDecimal.valueOf(10_000))
-                .contractBalance(BigDecimal.valueOf(5_000))
-                .contractStartDate(LocalDate.of(2026, 1, 1))
-                .contractEndDate(LocalDate.of(2027, 1, 1))
                 .build();
         setId(c, id);
         return c;

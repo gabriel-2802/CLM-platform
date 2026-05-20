@@ -6,6 +6,7 @@ import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.RenegotiateContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
+import clm.demo.dto.responses.DetailedContractResponseDTO;
 import clm.demo.exceptions.exceptions.FileConversionException;
 import clm.demo.models.enums.DocumentFormat;
 import clm.demo.models.enums.DocumentType;
@@ -122,25 +123,25 @@ public class ContractController {
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(
-        summary     = "Apply renegotiation outcome to a contract",
-        description = """
-            Updates `contractValue` and/or `contractEndDate` on an ACTIVE contract.
-            Called automatically by the negotiation-service when a negotiation is accepted.
-            Only ACTIVE contracts can be renegotiated.
-            """
-    )
-    @ApiResponse(responseCode = "200", description = "Contract updated",
-        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
-    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
-    @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
-    @PatchMapping("/{contractId}/renegotiate")
-    public ResponseEntity<ContractResponseDTO> renegotiateContract(
-            @Parameter(description = "Contract ID", required = true, example = "88")
-            @PathVariable Long contractId,
-            @RequestBody RenegotiateContractRequest request) {
-        return ResponseEntity.ok(contractService.renegotiateContract(contractId, request));
-    }
+//    @Operation(
+//        summary     = "Apply renegotiation outcome to a contract",
+//        description = """
+//            Updates `contractValue` and/or `contractEndDate` on an ACTIVE contract.
+//            Called automatically by the negotiation-service when a negotiation is accepted.
+//            Only ACTIVE contracts can be renegotiated.
+//            """
+//    )
+//    @ApiResponse(responseCode = "200", description = "Contract updated",
+//        content = @Content(schema = @Schema(implementation = ContractResponseDTO.class)))
+//    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+//    @ApiResponse(responseCode = "409", description = "Contract is not ACTIVE", content = @Content)
+//    @PatchMapping("/{contractId}/renegotiate")
+//    public ResponseEntity<ContractResponseDTO> renegotiateContract(
+//            @Parameter(description = "Contract ID", required = true, example = "88")
+//            @PathVariable Long contractId,
+//            @RequestBody RenegotiateContractRequest request) {
+//        return ResponseEntity.ok(contractService.renegotiateContract(contractId, request));
+//    }
 
     @Operation(
         summary     = "Toggle auto-renewal status",
@@ -171,6 +172,20 @@ public class ContractController {
             @Parameter(description = "Contract ID", required = true)
             @PathVariable Long contractId) {
         return ResponseEntity.ok(contractService.getById(contractId));
+    }
+
+    @Operation(
+        summary     = "Get full contract history",
+        description = "Returns the contract with the complete list of all ContractDetails records (every amendment), rather than just the currently-valid values."
+    )
+    @ApiResponse(responseCode = "200", description = "Detailed contract returned",
+        content = @Content(schema = @Schema(implementation = DetailedContractResponseDTO.class)))
+    @ApiResponse(responseCode = "404", description = "Contract not found", content = @Content)
+    @GetMapping("/{contractId}/detailed")
+    public ResponseEntity<DetailedContractResponseDTO> getDetailed(
+            @Parameter(description = "Contract ID", required = true)
+            @PathVariable Long contractId) {
+        return ResponseEntity.ok(contractService.getDetailedById(contractId));
     }
 
     @Operation(

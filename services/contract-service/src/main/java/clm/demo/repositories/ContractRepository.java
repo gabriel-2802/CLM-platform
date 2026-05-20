@@ -1,6 +1,7 @@
 package clm.demo.repositories;
 
 import clm.demo.models.Contract;
+import clm.demo.models.ContractDetails;
 import clm.demo.models.enums.ContractStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -18,22 +19,28 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
 
     @Modifying
     @Transactional
-    @Query("""
-        UPDATE Contract c
-        SET c.contractStatus = :archived
-        WHERE c.contractStatus = :active
-        AND c.autoRenew = false
-        AND c.contractEndDate < :today
-    """)
-    int archiveExpiredContracts(@Param("archived") ContractStatus archived,
-                                @Param("active")   ContractStatus active,
-                                @Param("today")    LocalDate today);
+    @Query(value = """
+        UPDATE clm.contract
+        SET contract_status = 'ARCHIVED'
+        WHERE document_id IN (
+            SELECT c.document_id FROM clm.contract c
+            WHERE c.contract_status = 'ACTIVE'
+            AND c.auto_renew = false
+            AND (
+                SELECT MAX(cd.end_date)
+                FROM clm.contract_details cd
+                WHERE cd.contract_id = c.document_id
+            ) < :today
+        )
+    """, nativeQuery = true)
+    int archiveExpiredContracts(@Param("today") LocalDate today);
 
     @Query("""
-        SELECT c FROM Contract c
+        SELECT DISTINCT c FROM Contract c
+        JOIN c.contractDetailsList cd
         WHERE c.contractStatus = :status
-        AND c.contractEndDate BETWEEN :from AND :to
-        ORDER BY c.contractEndDate ASC
+        AND cd.endDate BETWEEN :from AND :to
+        ORDER BY cd.endDate ASC
     """)
     List<Contract> findExpiringContracts(@Param("status") ContractStatus status,
                                          @Param("from")   LocalDate from,
@@ -52,28 +59,18 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
                                        @Param("today")           LocalDate today);
 
     /**
-     * Finds ACTIVE contracts for clients who have not had a rate change within the look-back window.
-     *
-     * A client qualifies when every contract they hold within the last {@code months} months
-     * carries the same {@code contractValue} as their current ACTIVE contract — i.e. no
-     * renegotiation of the monetary terms has occurred in that period.
-     *
-     * NULL values are treated as equal to each other and different from any non-NULL value.
+     * Finds ACTIVE contracts that have had no renegotiation (new ContractDetails with
+     * a backing appendix) within the look-back window defined by {@code cutoffDate}.
      */
     @Query("""
         SELECT c FROM Contract c
         WHERE c.contractStatus = :status
         AND c.generatedAt < :cutoffDate
         AND NOT EXISTS (
-            SELECT c2 FROM Contract c2
-            WHERE c2.clientId = c.clientId
-            AND c2.id <> c.id
-            AND c2.generatedAt >= :cutoffDate
-            AND NOT (
-                (c2.contractValue IS NOT NULL AND c.contractValue IS NOT NULL
-                    AND c2.contractValue = c.contractValue)
-                OR (c2.contractValue IS NULL AND c.contractValue IS NULL)
-            )
+            SELECT cd FROM ContractDetails cd
+            WHERE cd.contract = c
+            AND cd.appendix IS NOT NULL
+            AND cd.createdAt >= :cutoffDate
         )
         ORDER BY c.clientId ASC
     """)

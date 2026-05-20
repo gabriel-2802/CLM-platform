@@ -6,15 +6,21 @@ import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.GenContractRequest;
 import clm.demo.dto.requests.SearchRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
+import clm.demo.dto.responses.DetailedContractResponseDTO;
 import clm.demo.exceptions.exceptions.*;
+import clm.demo.mappers.ContractDetailsMapper;
 import clm.demo.mappers.ContractGenerationMapper;
 import clm.demo.mappers.GeneratedContractMapper;
+import clm.demo.models.Appendix;
 import clm.demo.models.Contract;
+import clm.demo.models.ContractDetails;
 import clm.demo.models.DocumentFieldValue;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.TemplateField;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.enums.DocumentFormat;
+import clm.demo.repositories.AppendixRepository;
+import clm.demo.repositories.ContractDetailsRepository;
 import clm.demo.repositories.ContractRepository;
 import clm.demo.repositories.DocumentFieldValueRepository;
 import clm.demo.repositories.DocumentTemplateRepository;
@@ -36,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -55,23 +62,16 @@ public class ContractService {
 
     private final DocumentTemplateRepository   templateRepository;
     private final ContractRepository           contractRepository;
+    private final ContractDetailsRepository    contractDetailsRepository;
+    private final AppendixRepository           appendixRepository;
     private final DocumentFieldValueRepository fieldValueRepository;
     private final ContractGenerationMapper     generationMapper;
     private final GeneratedContractMapper      contractMapper;
+    private final ContractDetailsMapper        contractDetailsMapper;
     private final ContractSpecification        contractSpecification;
     private final FileUtils                    fileUtils;
     private final DocumentGenerationUtil       documentGenerationUtil;
 
-    /**
-     * Generates a new contract from a template with provided field mappings.
-     * Client data (name, CUI, address, etc.) is automatically fetched from the
-     * public schema and merged with user-provided mappings before field injection.
-     *
-     * @param request the contract generation request
-     * @return a ContractResponseDTO with the newly generated contract details
-     * @throws ResourceNotFoundException      if template is not found
-     * @throws MissingMandatoryFieldException if required fields are missing values
-     */
     @Transactional
     public ContractResponseDTO generateContract(GenContractRequest request) {
         DocumentTemplate template = templateRepository.findById(request.templateId())
@@ -103,17 +103,22 @@ public class ContractService {
                     "Failed to generate contract document: " + e.getMessage());
         }
 
+        ContractDetails initialDetails = ContractDetails.builder()
+                .contract(contract)
+                .contractValue(request.value())
+                .contractBalance(request.contractBalance())
+                .startDate(request.startDate())
+                .endDate(request.endDate())
+                .createdAt(LocalDateTime.now())
+                .createdByUserId(request.userId().intValue())
+                .appendix(null)
+                .build();
+        contractDetailsRepository.save(initialDetails);
+        contract.getContractDetailsList().add(initialDetails);
+
         return contractMapper.toResponseDTO(contract);
     }
 
-    /**
-     * Uploads a signed contract document, converts it to PDF if necessary,
-     * and transitions the contract status to ACTIVE.
-     *
-     * @param contractId the ID of the contract to update
-     * @param fileBytes  the signed document file bytes (DOCX or PDF)
-     * @return ContractResponseDTO with updated contract details
-     */
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO uploadSignedContract(Long contractId, byte[] fileBytes, Integer userId) {
@@ -161,14 +166,6 @@ public class ContractService {
         contractRepository.save(contract);
     }
 
-    /**
-     * Toggles the auto-renewal flag for a contract.
-     * If autoRenew is false, it will be set to true and vice versa.
-     *
-     * @param contractId the ID of the contract to update
-     * @return ContractResponseDTO with updated auto-renewal status
-     * @throws ResourceNotFoundException if contract is not found
-     */
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO toggleAutoRenewal(Long contractId) {
@@ -192,27 +189,54 @@ public class ContractService {
         return contractMapper.toResponseDTO(contract);
     }
 
-    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
-    @Transactional
-    public ContractResponseDTO renegotiateContract(Long contractId,
-                                                   clm.demo.dto.requests.RenegotiateContractRequest request) {
+    @Transactional(readOnly = true)
+    public DetailedContractResponseDTO getDetailedById(Long contractId) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
-
-        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
-            throw new InvalidContractStateException(
-                    "Cannot renegotiate contract in status: " + contract.getContractStatus()
-                            + ". Only ACTIVE contracts can be renegotiated.");
-        }
-
-        if (request.getContractValue() != null)  contract.setContractValue(request.getContractValue());
-        if (request.getContractEndDate() != null) contract.setContractEndDate(request.getContractEndDate());
-
-        contract = contractRepository.save(contract);
-        log.info("Contract {} renegotiated — value={}, endDate={}", contractId,
-                contract.getContractValue(), contract.getContractEndDate());
-        return contractMapper.toResponseDTO(contract);
+        return contractDetailsMapper.toDetailedResponseDTO(contract);
     }
+
+//    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
+//    @Transactional
+//    public ContractResponseDTO renegotiateContract(Long contractId,
+//                                                   @Valid RenegotiateContractRequest request) {
+//        Contract contract = contractRepository.findById(contractId)
+//                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
+//
+//        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
+//            throw new InvalidContractStateException(
+//                    "Cannot renegotiate contract in status: " + contract.getContractStatus()
+//                            + ". Only ACTIVE contracts can be renegotiated.");
+//        }
+//
+//        Appendix appendix = appendixRepository.findById(Long.valueOf(request.getAppendixId()))
+//                .orElseThrow(() -> new ResourceNotFoundException(
+//                        "Appendix not found: " + request.getAppendixId()));
+//
+//        ContractDetails current = resolvePresentValid(contract.getContractDetailsList());
+//
+//        ContractDetails updated = ContractDetails.builder()
+//                .contract(contract)
+//                .contractValue(request.getContractValue() != null
+//                        ? request.getContractValue()
+//                        : (current != null ? current.getContractValue() : null))
+//                .contractBalance(current != null ? current.getContractBalance() : java.math.BigDecimal.ZERO)
+//                .startDate(current != null ? current.getStartDate() : null)
+//                .endDate(request.getContractEndDate() != null
+//                        ? request.getContractEndDate()
+//                        : (current != null ? current.getEndDate() : null))
+//                .createdAt(LocalDateTime.now())
+//                .createdByUserId(request.getUserId())
+//                .appendix(appendix)
+//                .build();
+//
+//        contractDetailsRepository.save(updated);
+//        contract.getContractDetailsList().add(updated);
+//
+//        log.info("Contract {} renegotiated — value={}, endDate={}", contractId,
+//                updated.getContractValue(), updated.getEndDate());
+//        return contractMapper.toResponseDTO(contract);
+//    }
 
     @Transactional(readOnly = true)
     public Page<ContractResponseDTO> getAll(int page, int size) {
@@ -244,29 +268,71 @@ public class ContractService {
 
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
-    public ContractResponseDTO updateContractTerms(Long contractId, @Valid ContractUpdateRequest request) {
+    public ContractResponseDTO updateContractTerms(Long contractId, ContractUpdateRequest request) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Contract not found: " + contractId));
 
-        if (Objects.nonNull(request.contractEndDate())) {
-            contract.setContractEndDate(request.contractEndDate());
-        }
-        if (Objects.nonNull(request.balance())) {
-            contract.setContractBalance(request.balance());
-        }
-        if (Objects.nonNull(request.value())) {
-            contract.setContractValue(request.value());
+        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
+            throw new InvalidContractStateException(
+                    "Cannot update contract terms in status: " + contract.getContractStatus()
+                            + ". Only ACTIVE contracts can be updated.");
         }
 
-        contract.setModifiedAt(LocalDateTime.now());
-        contract.setModifiedByUserId(request.userId());
+        Appendix appendix = appendixRepository.findById(Long.valueOf(request.appendixId()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Appendix not found: " + request.appendixId()));
+
+        ContractDetails currentDetails = getCurentlyActiveContractDetails(contract.getContractDetailsList());
+
+        if(request.startDate().isBefore(currentDetails.getStartDate())) {
+            throw new InvalidContractUpdateException(
+                    "New start date cannot be before current start date: " + currentDetails.getStartDate());
+        }
+
+        LocalDate endDate = request.contractEndDate() != null
+                ? request.contractEndDate()
+                : currentDetails.getEndDate();
+
+
+
+        ContractDetails updated = ContractDetails.builder()
+                .contract(contract)
+                .contractValue(request.value() != null
+                        ? request.value()
+                        : currentDetails.getContractValue())
+                .contractBalance(request.balance() != null
+                        ? request.balance()
+                        : currentDetails.getContractBalance())
+                .startDate(request.startDate())
+                .endDate(endDate)
+                .createdAt(LocalDateTime.now())
+                .createdByUserId(request.userId())
+                .appendix(appendix)
+                .build();
+
+        contractDetailsRepository.save(updated);
+        contract.getContractDetailsList().add(updated);
 
         log.info("Contract {} terms updated by user {}: endDate={}, balance={}, value={}",
                 contractId, request.userId(),
-                request.contractEndDate(), request.balance(), request.value());
+                updated.getEndDate(), updated.getContractBalance(), updated.getContractValue());
 
-        return contractMapper.toResponseDTO(contractRepository.save(contract));
+        return contractMapper.toResponseDTO(contract);
+    }
+
+    private ContractDetails getCurentlyActiveContractDetails(List<ContractDetails> details) {
+        if (details == null || details.isEmpty()) {
+            throw new IllegalStateException("All Contracts must have at least one ContractDetails.");
+        }
+        if (details.size() == 1) {
+            return details.getFirst();
+        }
+
+        return details.stream()
+                .filter(d -> !d.getStartDate().isAfter(LocalDate.now()) && !d.getEndDate().isBefore(LocalDate.now()))
+                .max(Comparator.comparing(ContractDetails::getCreatedAt))
+                .orElseThrow(() -> new IllegalStateException("No active ContractDetails found."));
     }
 
     private Contract fillAndPersistDocument(
