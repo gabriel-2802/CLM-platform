@@ -215,3 +215,6 @@ nuke-test:
 	             clm-client-service-test clm-client-test \
 	             clm-prometheus-test clm-grafana-test clm-nginx-test 2>/dev/null || true; \
 	echo "$(GREEN)✓ Testing stack and volumes removed$(NC)"
+
+
+# ─── soft wipe (data only, keeps flyway schema history) ──────────────────────

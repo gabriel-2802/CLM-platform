@@ -9,11 +9,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 
 /**
- * Scheduled job that archives contracts whose end date has passed.
- *
- * <p>Runs daily at midnight (configurable via {@code job.archive-contracts.cron}).
- * Transitions every {@link ContractStatus#ACTIVE} contract whose
- * {@code contractEndDate < today} to {@link ContractStatus#ARCHIVED}.</p>
  */
 @Slf4j
 @Component

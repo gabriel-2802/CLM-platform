@@ -344,22 +344,6 @@ class CachePerformanceTest {
                     new ContractTerminationRequest(LocalDate.now(), 1, "end of service"));
             // ↑ terminateContract loads the contract internally via findById (#2), then evicts the cache.
 
-            contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
-            verify(contractRepository, times(3)).findById(CONTRACT_ID);
-        }
-
-        @Test
-        @DisplayName("toggleAutoRenewal evicts the cache entry -> next read re-fetches from DB")
-        void toggleAutoRenewalEvictsCache() {
-            var contract = TestDataFactory.contract(CONTRACT_ID, ContractStatus.ACTIVE);
-            when(contractRepository.findById(CONTRACT_ID)).thenAnswer(inv -> {
-                Thread.sleep(DB_LATENCY_MS);
-                return Optional.of(contract);
-            });
-            when(contractRepository.save(any())).thenReturn(contract);
-
-            contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
-            contractService.toggleAutoRenewal(CONTRACT_ID); // findById internally (#2), then evicts cache
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
             verify(contractRepository, times(3)).findById(CONTRACT_ID);

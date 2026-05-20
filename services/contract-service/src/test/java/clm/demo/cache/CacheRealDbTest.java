@@ -391,25 +391,5 @@ class CacheRealDbTest {
             assertThat(missCount(CacheNames.CONTRACTS)).isEqualTo(2);
             assertThat(hitCount(CacheNames.CONTRACTS)).isEqualTo(0);
         }
-
-        @Test
-        @DisplayName("toggleAutoRenewal evicts entry — cache is empty, next read is a miss")
-        void toggle_auto_renewal_evicts_cache_entry() {
-            Long id = seededContract.getId();
-
-            contractService.getById(id); // miss #1 — populate
-            assertThat(isAbsent(CacheNames.CONTRACTS, id)).isFalse();
-
-            contractService.toggleAutoRenewal(id); // evict
-
-            assertThat(isAbsent(CacheNames.CONTRACTS, id))
-                    .as("cache must not hold a stale entry after toggleAutoRenewal")
-                    .isTrue();
-
-            contractService.getById(id); // miss #2
-
-            assertThat(missCount(CacheNames.CONTRACTS)).isEqualTo(2);
-            assertThat(hitCount(CacheNames.CONTRACTS)).isEqualTo(0);
-        }
     }
 }

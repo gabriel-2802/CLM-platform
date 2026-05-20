@@ -41,9 +41,8 @@ public class Contract extends Document {
     @Builder.Default
     private ContractStatus contractStatus = ContractStatus.PENDING_SIGNATURE;
 
-    @Column(name = "auto_renew", nullable = false)
-    @Builder.Default
-    private Boolean autoRenew = false;
+    @Column(name = "start_date", nullable = false)
+    private LocalDate startDate;
 
     @Column(name = "termination_date")
     private LocalDate terminationDate;

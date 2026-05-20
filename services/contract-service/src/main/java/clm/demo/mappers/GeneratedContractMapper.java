@@ -26,7 +26,7 @@ public interface GeneratedContractMapper {
     @Mapping(source = "entity.terminatedByUserId",    target = "terminatedByUserId")
     @Mapping(source = "contractDetails.contractValue",      target = "contractValue")
     @Mapping(source = "contractDetails.contractBalance",    target = "contractBalance")
-    @Mapping(source = "contractDetails.startDate",          target = "contractStartDate")
+    @Mapping(source = "entity.startDate",          target = "contractStartDate")
     @Mapping(source = "contractDetails.endDate",            target = "contractEndDate")
     @Mapping(source = "contractDetails.createdAt",          target = "modifiedAt")
     @Mapping(source = "contractDetails.createdByUserId",    target = "modifiedByUserId")
