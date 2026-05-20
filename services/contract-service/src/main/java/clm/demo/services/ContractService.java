@@ -153,7 +153,7 @@ public class ContractService {
                             + ". Only ACTIVE contracts can be terminated.");
         }
 
-        contract.setContractStatus(ContractStatus.TERMINATED);
+        contract.setContractStatus(ContractStatus.TERMINATION_DUE);
         contract.setTerminatedByUserId(request.getUserId());
         contract.setTerminatedAt(LocalDateTime.now());
         contract.setTerminationDate(request.getTerminationDate());

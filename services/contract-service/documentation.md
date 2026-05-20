@@ -1089,6 +1089,35 @@ public void archiveExpiredContracts() {
 
 ---
 
+### `ContractTerminationJob`
+
+```java
+@Scheduled(cron = "${job.process-termination.cron:0 0 0 * * *}")
+public void processTerminationDueContracts() {
+    int count = contractRepository.processTerminationDueContracts(
+            ContractStatus.TERMINATED,
+            ContractStatus.TERMINATION_DUE,
+            LocalDate.now()
+    );
+    log.info("Processed {} termination-due contract(s) to TERMINATED", count);
+}
+```
+
+- Default schedule: `0 0 0 * * *` — midnight every day
+- Configurable via `job.process-termination.cron` property
+- Single bulk `UPDATE` statement (no individual entity loads):
+  ```sql
+  UPDATE clm.contract
+  SET contract_status = :terminated
+  WHERE contract_status = :terminationDue
+    AND termination_date = :today
+  ```
+- Automatically transitions contracts with `TERMINATION_DUE` status to `TERMINATED` when their `termination_date` equals the current date
+- No in-memory processing — all work is performed in a direct database UPDATE
+- Runs in parallel with `ContractArchiveJob` thanks to the `ThreadPoolTaskScheduler` with 5 concurrent workers
+
+---
+
 ## 12. REST API Surface
 
 ### `ContractController` — `/api/contracts`

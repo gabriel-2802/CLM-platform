@@ -39,6 +39,18 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
                                          @Param("from")   LocalDate from,
                                          @Param("to")     LocalDate to);
 
+    @Modifying
+    @Transactional
+    @Query("""
+        UPDATE Contract c
+        SET c.contractStatus = :terminated
+        WHERE c.contractStatus = :terminationDue
+        AND c.terminationDate = :today
+    """)
+    int processTerminationDueContracts(@Param("terminated")      ContractStatus terminated,
+                                       @Param("terminationDue")  ContractStatus terminationDue,
+                                       @Param("today")           LocalDate today);
+
     /**
      * Finds ACTIVE contracts for clients who have not had a rate change within the look-back window.
      *
