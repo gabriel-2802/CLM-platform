@@ -228,6 +228,12 @@ public class ContractService {
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
     @Transactional
     public ContractResponseDTO updateContractTerms(Long contractId, ContractUpdateRequest request) {
+
+        if (Objects.isNull(request.value()) && Objects.isNull(request.balance()) && Objects.isNull(request.contractEndDate())) {
+            throw new InvalidContractUpdateException(
+                    "At least one of value, balance, or contractEndDate must be provided for update.");
+        }
+
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Contract not found: " + contractId));
@@ -241,6 +247,14 @@ public class ContractService {
         Appendix appendix = appendixRepository.findById(Long.valueOf(request.appendixId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Appendix not found: " + request.appendixId()));
+
+        if (contract.getContractDetailsList().stream()
+                .map(ContractDetails::getAppendix)
+                .filter(Objects::nonNull)
+                .anyMatch(a -> a.getId().equals(appendix.getId()))) {
+            throw new InvalidContractUpdateException(
+                    "An Appendix has already modified this contract: " + contract.getId());
+        }
 
         ContractDetails currentDetails = getCurentlyActiveContractDetails(contract.getContractDetailsList());
 
