@@ -13,6 +13,8 @@ import clm.demo.mappers.GeneratedContractMapper;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.Appendix;
+import clm.demo.models.Contract;
+import clm.demo.models.ContractDetails;
 import clm.demo.repositories.AppendixRepository;
 import clm.demo.repositories.ContractDetailsRepository;
 import clm.demo.repositories.ContractRepository;
@@ -275,7 +277,7 @@ class CachePerformanceTest {
                 Thread.sleep(DB_LATENCY_MS);
                 return Optional.of(contract);
             });
-            when(generatedContractMapper.toResponseDTO(any())).thenReturn(stubResponseDTO);
+            when(generatedContractMapper.toResponseDTO(any(Contract.class), any(ContractDetails.class))).thenReturn(stubResponseDTO);
         }
 
         @Test
@@ -308,26 +310,6 @@ class CachePerformanceTest {
         }
 
         @Test
-        @DisplayName("renegotiateContract evicts the cache entry -> next read re-fetches from DB")
-        void renegotiateEvictsCache() {
-            var contract = TestDataFactory.contract(CONTRACT_ID, ContractStatus.ACTIVE);
-            when(contractRepository.findById(CONTRACT_ID)).thenAnswer(inv -> {
-                Thread.sleep(DB_LATENCY_MS);
-                return Optional.of(contract);
-            });
-            when(contractRepository.save(any())).thenReturn(contract);
-
-            when(appendixRepository.findById(any())).thenReturn(Optional.of(mock(Appendix.class)));
-            contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
-            contractService.renegotiateContract(CONTRACT_ID,
-                    new RenegotiateContractRequest(1, 1, BigDecimal.valueOf(20_000), LocalDate.of(2028, 1, 1)));
-            //  renegotiateContract loads the contract internally via findById (#2), then evicts the cache.
-
-            contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
-            verify(contractRepository, times(3)).findById(CONTRACT_ID);
-        }
-
-        @Test
         @DisplayName("updateContractTerms evicts the cache entry -> next read re-fetches from DB")
         void updateTermsEvictsCache() {
             var contract = TestDataFactory.contract(CONTRACT_ID, ContractStatus.ACTIVE);
@@ -340,7 +322,7 @@ class CachePerformanceTest {
             when(appendixRepository.findById(any())).thenReturn(Optional.of(mock(Appendix.class)));
             contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
             contractService.updateContractTerms(CONTRACT_ID,
-                    new ContractUpdateRequest(1, 1, LocalDate.of(2028, 6, 1), null, null));
+                    new ContractUpdateRequest(1, 1, LocalDate.of(2028, 6, 1), null, null, null));
             // ↑ updateContractTerms loads the contract internally via findById (#2), then evicts the cache.
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)

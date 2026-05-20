@@ -31,7 +31,7 @@ public class ReportService {
         List<Contract> contracts = contractRepository.findExpiringContracts(
                 ContractStatus.ACTIVE, today, deadline);
 
-        return contracts.stream().map(contractMapper::toResponseDTO).toList();
+        return contracts.stream().map(c -> contractMapper.toResponseDTO(c, ContractService.getCurentlyActiveContractDetails(c.getContractDetailsList()))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -43,6 +43,6 @@ public class ReportService {
         List<Contract> contracts = contractRepository.findInactiveClientContracts(
                 ContractStatus.ACTIVE, cutoffDate);
 
-        return contracts.stream().map(contractMapper::toResponseDTO).toList();
+        return contracts.stream().map(c -> contractMapper.toResponseDTO(c, ContractService.getCurentlyActiveContractDetails(c.getContractDetailsList()))).toList();
     }
 }

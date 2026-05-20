@@ -116,7 +116,7 @@ public class ContractService {
         contractDetailsRepository.save(initialDetails);
         contract.getContractDetailsList().add(initialDetails);
 
-        return contractMapper.toResponseDTO(contract);
+        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
 
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
@@ -142,7 +142,7 @@ public class ContractService {
                     "Failed to process signed document: " + e.getMessage(), e);
         }
 
-        return contractMapper.toResponseDTO(contract);
+        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
 
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
@@ -178,7 +178,7 @@ public class ContractService {
         log.info("Auto-renewal toggled for contract {}: new state = {}",
                 contractId, contract.getAutoRenew());
 
-        return contractMapper.toResponseDTO(contract);
+        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
 
     @Cacheable(value = CacheNames.CONTRACTS, key = "#contractId")
@@ -186,7 +186,7 @@ public class ContractService {
     public ContractResponseDTO getById(Long contractId) {
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
-        return contractMapper.toResponseDTO(contract);
+        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
 
     @Transactional(readOnly = true)
@@ -196,54 +196,13 @@ public class ContractService {
         return contractDetailsMapper.toDetailedResponseDTO(contract);
     }
 
-//    @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
-//    @Transactional
-//    public ContractResponseDTO renegotiateContract(Long contractId,
-//                                                   @Valid RenegotiateContractRequest request) {
-//        Contract contract = contractRepository.findById(contractId)
-//                .orElseThrow(() -> new ResourceNotFoundException("Contract not found: " + contractId));
-//
-//        if (contract.getContractStatus() != ContractStatus.ACTIVE) {
-//            throw new InvalidContractStateException(
-//                    "Cannot renegotiate contract in status: " + contract.getContractStatus()
-//                            + ". Only ACTIVE contracts can be renegotiated.");
-//        }
-//
-//        Appendix appendix = appendixRepository.findById(Long.valueOf(request.getAppendixId()))
-//                .orElseThrow(() -> new ResourceNotFoundException(
-//                        "Appendix not found: " + request.getAppendixId()));
-//
-//        ContractDetails current = resolvePresentValid(contract.getContractDetailsList());
-//
-//        ContractDetails updated = ContractDetails.builder()
-//                .contract(contract)
-//                .contractValue(request.getContractValue() != null
-//                        ? request.getContractValue()
-//                        : (current != null ? current.getContractValue() : null))
-//                .contractBalance(current != null ? current.getContractBalance() : java.math.BigDecimal.ZERO)
-//                .startDate(current != null ? current.getStartDate() : null)
-//                .endDate(request.getContractEndDate() != null
-//                        ? request.getContractEndDate()
-//                        : (current != null ? current.getEndDate() : null))
-//                .createdAt(LocalDateTime.now())
-//                .createdByUserId(request.getUserId())
-//                .appendix(appendix)
-//                .build();
-//
-//        contractDetailsRepository.save(updated);
-//        contract.getContractDetailsList().add(updated);
-//
-//        log.info("Contract {} renegotiated — value={}, endDate={}", contractId,
-//                updated.getContractValue(), updated.getEndDate());
-//        return contractMapper.toResponseDTO(contract);
-//    }
 
     @Transactional(readOnly = true)
     public Page<ContractResponseDTO> getAll(int page, int size) {
         PageRequest pageable = PageRequest.of(page, size,
                 Sort.by(Sort.Direction.DESC, SORT_FIELD_GENERATED_AT));
         return contractRepository.findAll(pageable)
-                .map(contractMapper::toResponseDTO);
+                .map(c -> contractMapper.toResponseDTO(c, getCurentlyActiveContractDetails(c.getContractDetailsList())));
     }
 
     @Transactional(readOnly = true)
@@ -263,7 +222,7 @@ public class ContractService {
                 result.getNumberOfElements(), result.getTotalElements(),
                 result.getNumber(), result.getTotalPages());
 
-        return result.map(contractMapper::toResponseDTO);
+        return result.map( c -> contractMapper.toResponseDTO(c, getCurentlyActiveContractDetails(c.getContractDetailsList())));
     }
 
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")
@@ -318,10 +277,10 @@ public class ContractService {
                 contractId, request.userId(),
                 updated.getEndDate(), updated.getContractBalance(), updated.getContractValue());
 
-        return contractMapper.toResponseDTO(contract);
+        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
 
-    private ContractDetails getCurentlyActiveContractDetails(List<ContractDetails> details) {
+    public static ContractDetails getCurentlyActiveContractDetails(List<ContractDetails> details) {
         if (details == null || details.isEmpty()) {
             throw new IllegalStateException("All Contracts must have at least one ContractDetails.");
         }

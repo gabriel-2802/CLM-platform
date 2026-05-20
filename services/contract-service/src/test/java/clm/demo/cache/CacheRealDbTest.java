@@ -351,30 +351,6 @@ class CacheRealDbTest {
         }
 
         @Test
-        @DisplayName("renegotiateContract evicts entry — cache is empty, next read is a miss")
-        void renegotiate_evicts_cache_entry() {
-            Long id = seededContract.getId();
-
-            contractService.getById(id); // miss #1 — populate
-            contractService.getById(id); // hit  #1
-            assertThat(isAbsent(CacheNames.CONTRACTS, id)).isFalse();
-
-            contractService.renegotiateContract(id,
-                    new RenegotiateContractRequest(
-                            1, seededAppendix.getId().intValue(),
-                            BigDecimal.valueOf(20_000), LocalDate.of(2028, 1, 1)));
-
-            assertThat(isAbsent(CacheNames.CONTRACTS, id))
-                    .as("cache must not hold a stale entry after renegotiateContract")
-                    .isTrue();
-
-            contractService.getById(id); // miss #2 — re-fetches from DB
-
-            assertThat(missCount(CacheNames.CONTRACTS)).isEqualTo(2);
-            assertThat(hitCount(CacheNames.CONTRACTS)).isEqualTo(1);
-        }
-
-        @Test
         @DisplayName("terminateContract evicts entry — cache is empty, next read is a miss")
         void terminate_evicts_cache_entry() {
             Long id = seededContract.getId();
@@ -404,7 +380,7 @@ class CacheRealDbTest {
             assertThat(isAbsent(CacheNames.CONTRACTS, id)).isFalse();
 
             contractService.updateContractTerms(id,
-                    new ContractUpdateRequest(1, seededAppendix.getId().intValue(), LocalDate.of(2028, 6, 1), null, null));
+                    new ContractUpdateRequest(1, seededAppendix.getId().intValue(), LocalDate.of(2028, 6, 1), null, null, null));
 
             assertThat(isAbsent(CacheNames.CONTRACTS, id))
                     .as("cache must not hold a stale entry after updateContractTerms")
