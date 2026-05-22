@@ -35,7 +35,7 @@
 		<docx4j.version>11.5.11</docx4j.version>
 		<jaxb-impl.version>4.0.7</jaxb-impl.version>
 		<jakarta.xml.bind.version>4.0.5</jakarta.xml.bind.version>
-		<jakarta.servlet.version>6.2.0-M1</jakarta.servlet.version>
+		<jakarta.servlet.version>6.1.0</jakarta.servlet.version>
 		<slf4j.version>2.0.17</slf4j.version>
 		<byte-buddy.version>1.17.8</byte-buddy.version>
 		<commons-io.version>2.16.1</commons-io.version>

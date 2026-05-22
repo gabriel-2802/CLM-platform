@@ -20,3 +20,4 @@ datasources:
       httpMethod: POST
       # Grafana 10+: keep exemplar support available for trace correlation.
       exemplarTraceIdDestinations: []
+

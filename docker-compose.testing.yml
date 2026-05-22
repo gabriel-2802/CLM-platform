@@ -92,7 +92,7 @@ services:
   user-service:
     build:
       context: services/user-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.normal
     container_name: clm-user-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
@@ -145,7 +145,7 @@ services:
   contracts:
     build:
       context: services/contract-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.normal
     container_name: clm-contracts
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
@@ -205,7 +205,7 @@ services:
   client-service:
     build:
       context: services/client-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.normal
     container_name: clm-client-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
@@ -310,7 +310,7 @@ services:
   negotiation-service:
     build:
       context: services/negotiation-service
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.normal
     container_name: clm-negotiation-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-negotiations:5432/${DB_NEGOTIATIONS_NAME:-clm_negotiations}
@@ -379,17 +379,11 @@ services:
   frontend:
     build:
       context: frontend
-      dockerfile: Dockerfile
-      target: development
+      dockerfile: Dockerfile.normal
     container_name: clm-frontend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     environment:
-      NODE_ENV:                 development
+      NODE_ENV:                 production
       NEXT_TELEMETRY_DISABLED:  "1"
-      WATCHPACK_POLLING:        "true"
       # Browser-side URLs — all go through Nginx now.
       NEXT_PUBLIC_API_BASE_URL:          ${NEXT_PUBLIC_API_BASE_URL:-https://localhost}
       NEXT_PUBLIC_CONTRACTS_API_URL:     ${NEXT_PUBLIC_CONTRACTS_API_URL:-https://localhost/api/contracts}
@@ -524,7 +518,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80"]
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
       interval: 15s
       timeout: 5s
       retries: 5
