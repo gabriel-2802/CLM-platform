@@ -1,6 +1,8 @@
 spring:
   application:
     name: demo
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
 
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5433/demo_clm}
@@ -9,6 +11,7 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:clm_password}
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
     show-sql: ${SPRING_JPA_SHOW_SQL:false}

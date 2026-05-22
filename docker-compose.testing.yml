@@ -101,7 +101,7 @@ services:
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
       SPRING_JPA_SHOW_SQL:                         "false"
-      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: users
       SPRING_FLYWAY_ENABLED:        "true"
       SPRING_FLYWAY_LOCATIONS:      classpath:db/migration
@@ -126,6 +126,8 @@ services:
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_USER_DEMO:       DEBUG
+      LOGGING_LEVEL_ORG_SPRINGDOC_CORE_EVENTS: ERROR
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY_CONFIG_ANNOTATION_AUTHENTICATION_CONFIGURATION: ERROR
     depends_on:
       postgres-users:
         condition: service_healthy
@@ -152,7 +154,7 @@ services:
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
       SPRING_JPA_SHOW_SQL:                         "false"
-      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
       SPRING_FLYWAY_ENABLED:   "true"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
@@ -185,6 +187,7 @@ services:
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_DEMO:            DEBUG
+      LOGGING_LEVEL_ORG_SPRINGDOC_CORE_EVENTS: ERROR
     depends_on:
       postgres:
         condition: service_healthy
@@ -211,7 +214,6 @@ services:
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
       SPRING_JPA_SHOW_SQL:                         "false"
-      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clients
       SPRING_FLYWAY_ENABLED:   "true"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
@@ -229,6 +231,7 @@ services:
       JAVA_TOOL_OPTIONS: "-Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms"
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      LOGGING_LEVEL_ORG_SPRINGDOC_CORE_EVENTS: ERROR
     depends_on:
       postgres-clients:
         condition: service_healthy
@@ -316,7 +319,7 @@ services:
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
       SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
       SPRING_JPA_SHOW_SQL:                         "false"
-      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT:     org.hibernate.dialect.PostgreSQLDialect
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: negotiations
       SPRING_FLYWAY_ENABLED:   "true"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
@@ -335,6 +338,7 @@ services:
       LOGGING_LEVEL_ROOT:                INFO
       LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
       LOGGING_LEVEL_CLM_NEGOTIATION:     DEBUG
+      LOGGING_LEVEL_ORG_SPRINGDOC_CORE_EVENTS: ERROR
       SPRING_MAIL_HOST:                                   ${MAIL_HOST:-sandbox.smtp.mailtrap.io}
       SPRING_MAIL_PORT:                                   ${MAIL_PORT:-2525}
       SPRING_MAIL_USERNAME:                               ${MAIL_USERNAME:-your-mailtrap-username}
