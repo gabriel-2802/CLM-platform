@@ -102,8 +102,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HandlerMethodValidationException.class)
     public ProblemDetail handleHandlerMethodValidation(HandlerMethodValidationException e) {
         log.warn("Handler method validation failed: {}", e.getMessage());
-        return problem(HttpStatus.BAD_REQUEST, "Validation Failed",
-                "One or more request parameters failed validation.", "validation-failed");
+        return problem(HttpStatus.BAD_REQUEST, "Validation Failed", e.getMessage(), "validation-failed");
     }
 
     /**
@@ -181,12 +180,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ProblemDetail handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
-        log.warn("Unsupported HTTP method: {}", e.getMethod());
         String supported = Optional.ofNullable(e.getSupportedHttpMethods())
                 .map(methods -> methods.stream().map(Object::toString).toList())
                 .map(list -> String.join(", ", list))
                 .orElse("unknown");
         String detail = "Method '%s' is not supported. Supported: %s".formatted(e.getMethod(), supported);
+        log.warn("Unsupported HTTP method: {}", detail);
         return problem(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", detail, "method-not-allowed");
     }
 
@@ -265,9 +264,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(FileConversionException.class)
     public ProblemDetail handleFileConversion(FileConversionException e) {
-        log.error("Document conversion failed", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Document Conversion Failed",
-                "An error occurred during document conversion.", "conversion-failed");
+        log.error("Document conversion failed: {}", e.getMessage(), e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Document Conversion Failed", e.getMessage(), "conversion-failed");
     }
 
     /**
@@ -275,9 +273,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(TemplateUploadException.class)
     public ProblemDetail handleTemplateUpload(TemplateUploadException e) {
-        log.error("Template upload failed", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Template Upload Failed",
-                "An error occurred during template upload.", "upload-failed");
+        log.error("Template upload failed: {}", e.getMessage(), e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Template Upload Failed", e.getMessage(), "upload-failed");
     }
 
     /**
@@ -285,9 +282,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(TemplateDownloadException.class)
     public ProblemDetail handleTemplateDownload(TemplateDownloadException e) {
-        log.error("Template download failed", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Template Download Failed",
-                "An error occurred during template download.", "download-failed");
+        log.error("Template download failed: {}", e.getMessage(), e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Template Download Failed", e.getMessage(), "download-failed");
     }
 
     /**
@@ -295,9 +291,8 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(ContractGenerationFailException.class)
     public ProblemDetail handleContractGenerationFail(ContractGenerationFailException e) {
-        log.error("Contract generation failed", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Contract Generation Failed",
-                "An error occurred during contract generation.", "generation-failed");
+        log.error("Contract generation failed: {}", e.getMessage(), e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Contract Generation Failed", e.getMessage(), "generation-failed");
     }
 
     /**
@@ -316,9 +311,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(InvalidDataAccessResourceUsageException.class)
     public ProblemDetail handleInvalidDataAccess(InvalidDataAccessResourceUsageException e) {
-        log.warn("Invalid data access: {}", e.getMessage());
-        return problem(HttpStatus.BAD_REQUEST, "Data Validation Error",
-                resolveDataAccessMessage(e.getMessage()), "data-access-error");
+        String detail = resolveDataAccessMessage(e.getMessage());
+        log.warn("Invalid data access: {}", detail);
+        return problem(HttpStatus.BAD_REQUEST, "Data Validation Error", detail, "data-access-error");
     }
 
     /**
@@ -326,16 +321,16 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(DataAccessException.class)
     public ProblemDetail handleDataAccess(DataAccessException e) {
-        log.error("Database access error", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Database Error",
-                "A database error occurred. Please contact support.", "database-error");
+        String detail = "A database error occurred. Please contact support.";
+        log.error("Database access error: {}", detail, e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Database Error", detail, "database-error");
     }
 
     @ExceptionHandler
     public ProblemDetail handleUpdateException(InvalidContractUpdateException e) {
-        log.error("Invalid contract update", e);
-        return problem(HttpStatus.BAD_REQUEST, "Invalid Contract Update",
-                "The contract update is invalid. Please check the request and try again.", "invalid-contract-update");
+        String detail = "The contract update is invalid. Please check the request and try again.";
+        log.error("Invalid contract update: {}", detail, e);
+        return problem(HttpStatus.BAD_REQUEST, "Invalid Contract Update", detail, "invalid-contract-update");
     }
 
     /**
@@ -343,9 +338,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneral(Exception e) {
-        log.error("Unexpected internal error", e);
-        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
-                "An unexpected error occurred. Please contact support.", "internal-error");
+        String detail = "An unexpected error occurred. Please contact support.";
+        log.error("Unexpected internal error: {}", detail, e);
+        return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error", detail, "internal-error");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
