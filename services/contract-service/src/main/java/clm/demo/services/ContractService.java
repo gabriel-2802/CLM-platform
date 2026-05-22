@@ -218,11 +218,13 @@ public class ContractService {
     @Transactional
     public ContractResponseDTO updateContractTerms(Long contractId, ContractUpdateRequest request) {
 
+        log.info("Updating contract {} terms with request: {}", contractId, request);
         if (Objects.isNull(request.value()) && Objects.isNull(request.balance()) && Objects.isNull(request.contractEndDate())) {
             throw new InvalidContractUpdateException(
                     "At least one of value, balance, or contractEndDate must be provided for update.");
         }
 
+        log.info("Searching for contract with id: {}", contractId);
         Contract contract = contractRepository.findById(contractId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Contract not found: " + contractId));
@@ -233,10 +235,12 @@ public class ContractService {
                             + ". Only ACTIVE contracts can be updated.");
         }
 
+        log.info("Searching for appendix with id: {}", request.appendixId());
         Appendix appendix = appendixRepository.findById(Long.valueOf(request.appendixId()))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Appendix not found: " + request.appendixId()));
 
+        log.info("Checking if appendix has already modified this contract: {}", appendix.getId());
         if (contract.getContractDetailsList().stream()
                 .map(ContractDetails::getAppendix)
                 .filter(Objects::nonNull)
@@ -275,6 +279,7 @@ public class ContractService {
 
         contractDetailsRepository.save(updated);
         contract.getContractDetailsList().add(updated);
+        contract.setEndDate(endDate);
 
         log.info("Contract {} terms updated by user {}: endDate={}, balance={}, value={}",
                 contractId, request.userId(),

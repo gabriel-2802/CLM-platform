@@ -7,6 +7,7 @@ import clm.demo.dto.requests.FieldMappingRequest;
 import clm.demo.dto.requests.RenegotiateContractRequest;
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.dto.responses.TemplateResponseDTO;
+import clm.demo.mappers.ContractDetailsMapper;
 import clm.demo.mappers.ContractGenerationMapper;
 import clm.demo.mappers.DocumentTemplateMapper;
 import clm.demo.mappers.GeneratedContractMapper;
@@ -110,6 +111,7 @@ class CachePerformanceTest {
     @MockitoBean AppendixRepository           appendixRepository;
     @MockitoBean ContractGenerationMapper     contractGenerationMapper;
     @MockitoBean GeneratedContractMapper      generatedContractMapper;
+    @MockitoBean ContractDetailsMapper        contractDetailsMapper;
     @MockitoBean ContractSpecification        contractSpecification;
     @MockitoBean DocumentTemplateMapper       documentTemplateMapper;
     @MockitoBean FileUtils                    fileUtils;
@@ -322,7 +324,7 @@ class CachePerformanceTest {
             when(appendixRepository.findById(any())).thenReturn(Optional.of(mock(Appendix.class)));
             contractService.getById(CONTRACT_ID);           // DB call #1 (cache miss)
             contractService.updateContractTerms(CONTRACT_ID,
-                    new ContractUpdateRequest(1, 1, LocalDate.of(2028, 6, 1), null, null, null));
+                    new ContractUpdateRequest(1, 1, LocalDate.of(2026, 1, 1), LocalDate.of(2028, 6, 1), null, null));
             // ↑ updateContractTerms loads the contract internally via findById (#2), then evicts the cache.
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
@@ -343,7 +345,6 @@ class CachePerformanceTest {
             contractService.terminateContract(CONTRACT_ID,
                     new ContractTerminationRequest(LocalDate.now(), 1, "end of service"));
             // ↑ terminateContract loads the contract internally via findById (#2), then evicts the cache.
-
 
             contractService.getById(CONTRACT_ID);           // DB call #3 (cache was evicted)
             verify(contractRepository, times(3)).findById(CONTRACT_ID);

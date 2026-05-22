@@ -44,6 +44,9 @@ public class Contract extends Document {
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
 
+    @Column(name = "end_date", nullable = false)
+    private LocalDate endDate;
+
     @Column(name = "termination_date")
     private LocalDate terminationDate;
 

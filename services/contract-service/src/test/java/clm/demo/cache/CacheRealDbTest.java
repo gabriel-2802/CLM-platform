@@ -355,7 +355,6 @@ class CacheRealDbTest {
         void terminate_evicts_cache_entry() {
             Long id = seededContract.getId();
 
-            contractService.getById(id); // miss #1 — populate
             assertThat(isAbsent(CacheNames.CONTRACTS, id)).isFalse();
 
             contractService.terminateContract(id,

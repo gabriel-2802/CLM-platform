@@ -1,7 +1,6 @@
 package clm.demo.dto.requests;
 
 import jakarta.validation.constraints.NotNull;
-import org.springframework.cglib.core.Local;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

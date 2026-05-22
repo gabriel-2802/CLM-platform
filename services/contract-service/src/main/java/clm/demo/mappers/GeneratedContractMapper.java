@@ -27,7 +27,7 @@ public interface GeneratedContractMapper {
     @Mapping(source = "contractDetails.contractValue",      target = "contractValue")
     @Mapping(source = "contractDetails.contractBalance",    target = "contractBalance")
     @Mapping(source = "entity.startDate",          target = "contractStartDate")
-    @Mapping(source = "contractDetails.endDate",            target = "contractEndDate")
+    @Mapping(source = "entity.endDate",            target = "contractEndDate")
     @Mapping(source = "contractDetails.createdAt",          target = "modifiedAt")
     @Mapping(source = "contractDetails.createdByUserId",    target = "modifiedByUserId")
     ContractResponseDTO toResponseDTO(Contract entity, ContractDetails contractDetails);

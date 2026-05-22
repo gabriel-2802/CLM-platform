@@ -2,11 +2,15 @@ package clm.demo.support;
 
 import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.models.Contract;
+import clm.demo.models.ContractDetails;
 import clm.demo.models.DocumentTemplate;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.models.enums.DocumentFormat;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 
 public final class TestDataFactory {
 
@@ -29,8 +33,20 @@ public final class TestDataFactory {
         Contract c = Contract.builder()
                 .clientId(42)
                 .contractStatus(status)
+                .contractDetailsList(new ArrayList<>())
                 .build();
         setId(c, id);
+
+        ContractDetails details = ContractDetails.builder()
+                .contract(c)
+                .contractValue(BigDecimal.valueOf(10_000))
+                .contractBalance(BigDecimal.valueOf(10_000))
+                .startDate(LocalDate.of(2026, 1, 1))
+                .endDate(LocalDate.of(2027, 1, 1))
+                .createdAt(LocalDateTime.now())
+                .createdByUserId(1)
+                .build();
+        c.getContractDetailsList().add(details);
         return c;
     }
 

@@ -1,5 +1,6 @@
 package clm.demo.jobs;
 
+import clm.demo.models.enums.ContractStatus;
 import clm.demo.repositories.ContractRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +20,7 @@ public class ContractArchiveJob {
 
     @Scheduled(cron = "${job.archive-contracts.cron:0 0 0 * * *}")
     public void archiveExpiredContracts() {
-        int count = contractRepository.archiveExpiredContracts(LocalDate.now());
+        int count = contractRepository.archiveExpiredContracts(LocalDate.now(), ContractStatus.ACTIVE, ContractStatus.ARCHIVED);
         log.info("Archived {} expired contract(s)", count);
     }
 }
