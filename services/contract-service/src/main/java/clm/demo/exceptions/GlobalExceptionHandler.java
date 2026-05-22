@@ -331,6 +331,13 @@ public class GlobalExceptionHandler {
                 "A database error occurred. Please contact support.", "database-error");
     }
 
+    @ExceptionHandler
+    public ProblemDetail handleUpdateException(InvalidContractUpdateException e) {
+        log.error("Invalid contract update", e);
+        return problem(HttpStatus.BAD_REQUEST, "Invalid Contract Update",
+                "The contract update is invalid. Please check the request and try again.", "invalid-contract-update");
+    }
+
     /**
      * Catch-all for any unexpected exceptions to prevent 500 white-label error pages.
      */
