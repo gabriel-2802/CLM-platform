@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:20-alpine
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -7,7 +8,9 @@ ENV HOSTNAME=0.0.0.0
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci
+
 
 COPY . .
 
@@ -20,7 +23,8 @@ ENV NEXT_PUBLIC_NOTIFICATIONS_API_URL=$NEXT_PUBLIC_NOTIFICATIONS_API_URL
 ENV NEXT_PUBLIC_USER_SERVICE_URL=$NEXT_PUBLIC_USER_SERVICE_URL
 ENV NEXT_PUBLIC_CLIENT_SERVICE_URL=$NEXT_PUBLIC_CLIENT_SERVICE_URL
 
-RUN npm run build
+RUN --mount=type=cache,target=/root/.npm \
+    npm run build
 
 ENV NODE_ENV=production
 
@@ -35,5 +39,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=60s \
   CMD wget -q --spider http://127.0.0.1:3000 || exit 1
 
-# Using dev server to match the compose configuration, or standalone server if production
-CMD ["npm", "run", "dev"]
+# Using standard production server
+CMD ["npm", "start"]

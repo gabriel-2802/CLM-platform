@@ -38,6 +38,7 @@ During the benchmarking process, several environment anomalies were encountered 
 | `services/contract-service/` | 465MB | 3.31GB | 86.0% | ~16.7s | ~61.6s |
 | `services/negotiation-service/`| 298MB | 1.68GB | 82.3% | ~18.2s | ~12.1s |
 | `services/client-service/` | 297MB | 1.67GB | 82.2% | ~18.9s | ~14.8s |
+| `services/notification-service/` | 394MB | 1.28GB | 69.2% | ~20.7s | ~6.1s |
 | `nginx` | 76MB | 76MB | 0% | ~3.1s | ~3.1s |
 | `monitoring/grafana/` | 562MB | 562MB | 0% | ~2.0s | ~2.0s |
 | `monitoring/prometheus/` | 357MB | 357MB | 0% | ~0.9s | ~0.9s |
@@ -61,7 +62,21 @@ The massive size reduction achieved by multi-stage builds (e.g., 88% smaller for
 ### 5.3. Maintainability & Caching
 Multi-stage Dockerfiles enforce a clean separation of concerns. The builder stage exclusively manages dependency retrieval and compilation, while the runner stage only handles execution. As demonstrated by the `contract-service` single-stage benchmark (~61.6s rebuild), monolithic Dockerfiles often struggle to effectively utilize Docker's layer caching for complex dependency graphs.
 
-## 6. Appendix: Generated Single-Stage Example (Baseline)
+## 6. Investigation of Multi-Stage Rebuild Anomalies
+
+During incremental "hot-reload" benchmarking, an anomaly was observed where the Java services (e.g., `user-service`, `negotiation-service`, `client-service`) exhibited slightly **slower** rebuild times in multi-stage configurations (`~13-18s`) compared to single-stage configurations (`~11-14s`). 
+
+To investigate this, we performed a deep-dive analysis of the BuildKit execution logs to break down the time spent per layer.
+
+### Findings:
+1. **Compilation Speed:** The actual compilation step (`mvn package`) is ironically **faster** in multi-stage (e.g., `5.7s` vs `7.1s` for user-service). This is because the multi-stage configuration correctly leverages Docker BuildKit's native `--mount=type=cache,target=/root/.m2`, creating an ultra-fast temporary volume cache for Maven dependencies, whereas the single-stage relies on a static layer (`RUN mvn dependency:go-offline`).
+2. **BuildKit Multi-Stage Overhead:** Despite faster compilation, multi-stage builds take ~1-4 seconds longer *overall*. This is caused by the architectural overhead of resolving two distinct base images (the `jdk` builder and the `jre` runner) and evaluating 21 separate steps compared to 14 steps in single-stage.
+3. **Cross-Boundary Copying:** Extracting the 50MB+ Spring Boot Fat JAR from the isolated builder container and injecting it into a brand-new layer in the runner image (`COPY --from=builder /build/target/*.jar`) incurs a minor daemon I/O penalty that doesn't exist when compiling inline in a single stage.
+
+### Conclusion:
+The 1 to 4-second "penalty" observed in multi-stage rebuilds is purely an artifact of BuildKit's local graph evaluation and cross-container file copying. This micro-penalty is vastly outweighed by the macro-benefits: saving over 1.3 GB of bandwidth per deployment and preventing build SDKs from reaching production.
+
+## 7. Appendix: Generated Single-Stage Example (Baseline)
 > **Example: `services/user-service/Dockerfile.normal`**
 > ```dockerfile
 > FROM eclipse-temurin:21-jdk-alpine

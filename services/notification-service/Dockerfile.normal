@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM eclipse-temurin:21-jdk-alpine
+FROM eclipse-temurin:25-jdk-alpine
 
 RUN apk add --no-cache maven netcat-openbsd
 
@@ -17,18 +17,18 @@ RUN --mount=type=cache,target=/root/.m2 \
 RUN addgroup -g 1001 -S appgroup && \
     adduser  -u 1001 -S -G appgroup appuser
 
-RUN cp target/*.jar client-service.jar && \
-    chown appuser:appgroup client-service.jar
+RUN cp target/*.jar notifications.jar && \
+    chown appuser:appgroup notifications.jar
 
 USER appuser
 
-EXPOSE 8084
+EXPOSE 8082
 
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=40s \
-  CMD nc -z localhost 8084
+  CMD nc -z localhost 8082
 
 ENTRYPOINT ["java", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
   "-Djava.security.egd=file:/dev/./urandom", \
-  "-jar", "client-service.jar"]
+  "-jar", "notifications.jar"]
