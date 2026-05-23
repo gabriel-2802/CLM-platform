@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM eclipse-temurin:21-jdk-alpine
 
 RUN apk add --no-cache maven netcat-openbsd
@@ -6,13 +5,10 @@ RUN apk add --no-cache maven netcat-openbsd
 WORKDIR /app
 
 COPY pom.xml .
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn dependency:go-offline -q
-
+RUN mvn dependency:go-offline -q
 
 COPY src ./src
-RUN --mount=type=cache,target=/root/.m2 \
-    mvn package -DskipTests -q
+RUN mvn package -DskipTests -q
 
 RUN addgroup -g 1001 -S appgroup && \
     adduser  -u 1001 -S -G appgroup appuser
