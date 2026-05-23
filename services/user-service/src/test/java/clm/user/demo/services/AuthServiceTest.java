@@ -149,6 +149,19 @@ class AuthServiceTest {
                 .isInstanceOf(InvalidCredentialsException.class);
     }
 
+    @Test
+    void login_authenticationSucceedsButUserNotInDb_throwsInvalidCredentialsException() {
+        Authentication authentication = mock(Authentication.class);
+        UserDetails details = stubDetails("ROLE_USER");
+        given(authentication.getPrincipal()).willReturn(details);
+        given(authenticationManager.authenticate(any())).willReturn(authentication);
+
+        given(userRepository.findByEmail("ghost@test.com")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(loginRequest("ghost@test.com", "Password1!")))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
     // ─── helpers ──────────────────────────────────────────────────────────────
 
     private static RegisterRequest registerRequest(String email, String password, String adminCode) {

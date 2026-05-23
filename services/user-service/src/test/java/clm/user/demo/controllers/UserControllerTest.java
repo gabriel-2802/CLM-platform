@@ -24,6 +24,7 @@ import java.util.List;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
 import java.util.Set;
 
 import static org.mockito.BDDMockito.given;
@@ -197,5 +198,56 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.detail").value("User not found: 99"))
                 .andExpect(jsonPath("$.type").value("https://api.clm-user.demo/errors/resource-not-found"))
                 .andExpect(jsonPath("$.timestamp").exists());
+    }
+
+    // ─── PUT /api/users/{id} ──────────────────────────────────────────────────
+
+    @Test
+    void updateUser_validRequest_returns200() throws Exception {
+        given(userService.updateUser(any(Long.class), any())).willReturn(USER_RESPONSE);
+
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"user@test.com\", \"name\":\"Test User\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("user@test.com"));
+    }
+
+    @Test
+    void updateUser_invalidEmail_returns400() throws Exception {
+        mockMvc.perform(put("/api/users/1")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"invalid\", \"name\":\"Test User\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─── PATCH /api/users/{id}/password ───────────────────────────────────────
+
+    @Test
+    void resetPassword_validRequest_returns200() throws Exception {
+        given(userService.resetPassword(any(Long.class), any())).willReturn(USER_RESPONSE);
+
+        mockMvc.perform(patch("/api/users/1/password")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"NewPass1!\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void resetPassword_invalidPassword_returns400() throws Exception {
+        mockMvc.perform(patch("/api/users/1/password")
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"short\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    // ─── DELETE /api/users/{id} ───────────────────────────────────────────────
+
+    @Test
+    void deleteUser_returns204() throws Exception {
+        mockMvc.perform(delete("/api/users/1"))
+                .andExpect(status().isNoContent());
+        
+        org.mockito.Mockito.verify(userService).deleteUser(1L);
     }
 }

@@ -29,6 +29,7 @@ class UserServiceTest {
 
     @Mock UserRepository userRepository;
     @Mock RoleRepository roleRepository;
+    @Mock org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
     @InjectMocks UserService userService;
 
@@ -170,6 +171,74 @@ class UserServiceTest {
         given(userRepository.findById(99L)).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.setEnabled(99L, false))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ─── updates ──────────────────────────────────────────────────────────────
+
+    @Test
+    void updateUser_validRequest_updatesAndReturnsUser() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(testUser));
+        given(userRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        clm.user.demo.dto.requests.UpdateUserRequest req = new clm.user.demo.dto.requests.UpdateUserRequest("new@test.com", "New Name", null);
+        UserResponse resp = userService.updateUser(1L, req);
+
+        assertThat(resp.email()).isEqualTo("new@test.com");
+        assertThat(resp.name()).isEqualTo("New Name");
+    }
+
+    @Test
+    void updateUser_duplicateEmail_throwsDuplicateEmailException() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(testUser));
+        given(userRepository.existsByEmail("dup@test.com")).willReturn(true);
+
+        clm.user.demo.dto.requests.UpdateUserRequest req = new clm.user.demo.dto.requests.UpdateUserRequest("dup@test.com", "New Name", null);
+
+        assertThatThrownBy(() -> userService.updateUser(1L, req))
+                .isInstanceOf(clm.user.demo.exceptions.exceptions.DuplicateEmailException.class);
+    }
+
+    @Test
+    void updateUser_userNotFound_throwsResourceNotFoundException() {
+        given(userRepository.findById(99L)).willReturn(Optional.empty());
+        clm.user.demo.dto.requests.UpdateUserRequest req = new clm.user.demo.dto.requests.UpdateUserRequest("new@test.com", "New Name", null);
+
+        assertThatThrownBy(() -> userService.updateUser(99L, req))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // ─── reset password ───────────────────────────────────────────────────────
+
+    @Test
+    void resetPassword_updatesPassword() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(testUser));
+        given(passwordEncoder.encode("newPass123!")).willReturn("encodedPass");
+        given(userRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
+
+        clm.user.demo.dto.requests.ResetPasswordRequest req = new clm.user.demo.dto.requests.ResetPasswordRequest("newPass123!");
+        UserResponse resp = userService.resetPassword(1L, req);
+
+        assertThat(testUser.getPassword()).isEqualTo("encodedPass");
+        assertThat(resp.email()).isEqualTo("user@test.com");
+    }
+
+    // ─── delete ───────────────────────────────────────────────────────────────
+
+    @Test
+    void deleteUser_exists_deletesUser() {
+        given(userRepository.findById(1L)).willReturn(Optional.of(testUser));
+
+        userService.deleteUser(1L);
+
+        org.mockito.Mockito.verify(userRepository).delete(testUser);
+    }
+
+    @Test
+    void deleteUser_notFound_throwsResourceNotFoundException() {
+        given(userRepository.findById(99L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.deleteUser(99L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
