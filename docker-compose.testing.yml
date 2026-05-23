@@ -92,7 +92,7 @@ services:
   user-service:
     build:
       context: services/user-service
-      dockerfile: Dockerfile.normal
+      dockerfile: Dockerfile
     container_name: clm-user-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
@@ -135,7 +135,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8083"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8083/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -145,7 +145,7 @@ services:
   contracts:
     build:
       context: services/contract-service
-      dockerfile: Dockerfile.normal
+      dockerfile: Dockerfile
     container_name: clm-contracts
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
@@ -195,7 +195,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8081"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8081/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -205,7 +205,7 @@ services:
   client-service:
     build:
       context: services/client-service
-      dockerfile: Dockerfile.normal
+      dockerfile: Dockerfile
     container_name: clm-client-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
@@ -239,7 +239,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8084"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8084/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -276,12 +276,6 @@ services:
     networks:
       - data-net
     restart: on-failure:3
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8082"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 40s
 
   # ── Negotiation-service database ──────────────────────────────────────────
   postgres-negotiations:
@@ -310,7 +304,7 @@ services:
   negotiation-service:
     build:
       context: services/negotiation-service
-      dockerfile: Dockerfile.normal
+      dockerfile: Dockerfile
     container_name: clm-negotiation-service
     environment:
       SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-negotiations:5432/${DB_NEGOTIATIONS_NAME:-clm_negotiations}
@@ -357,7 +351,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "8085"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8085/actuator/health || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -379,7 +373,7 @@ services:
   frontend:
     build:
       context: frontend
-      dockerfile: Dockerfile.normal
+      dockerfile: Dockerfile
     container_name: clm-frontend
     environment:
       NODE_ENV:                 production
@@ -403,7 +397,7 @@ services:
       contracts:
         condition: service_healthy
       notifications:
-        condition: service_healthy
+        condition: service_started
       user-service:
         condition: service_healthy
       client-service:
