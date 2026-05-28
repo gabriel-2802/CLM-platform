@@ -91,6 +91,7 @@ export async function generateContract(payload: GenerateContractPayload) {
     const data = await res.json();
     revalidatePath("/clients", "page");
     revalidatePath("/clienti", "page");
+    revalidatePath("/contracts", "page");
     return { success: true, data };
   } catch (error) {
     console.error("Error generating contract:", error);
@@ -128,6 +129,7 @@ export async function uploadSignedContract(contractId: number, formData: FormDat
     const data = await res.json();
     revalidatePath("/clients", "page");
     revalidatePath("/clienti", "page");
+    revalidatePath("/contracts", "page");
     return { success: true, data };
   } catch (error) {
     console.error("Error uploading signed contract:", error);
@@ -153,6 +155,7 @@ export async function terminateContract(contractId: number, terminationDate: str
 
     revalidatePath("/clients", "page");
     revalidatePath("/clienti", "page");
+    revalidatePath("/contracts", "page");
     return { success: true };
   } catch (error) {
     console.error("Error terminating contract:", error);
@@ -175,6 +178,7 @@ export async function toggleAutoRenewal(contractId: number) {
     const data = await res.json();
     revalidatePath("/clients", "page");
     revalidatePath("/clienti", "page");
+    revalidatePath("/contracts", "page");
     return { success: true, data };
   } catch (error) {
     console.error("Error toggling auto-renew:", error);
