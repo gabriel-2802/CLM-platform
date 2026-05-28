@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 
 #  stage: development — hot-reload dev server 
 FROM node:20-alpine AS development

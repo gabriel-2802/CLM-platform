@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 # FIX: pinned to a specific minor version — 'latest' caused the provisioning
 #      format to silently break when Grafana 11 shipped new datasource schema.
 FROM grafana/grafana:10.4.3

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 
 #  stage 1: build ──
 FROM eclipse-temurin:25-jdk-alpine AS builder
