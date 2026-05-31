@@ -51,16 +51,19 @@ function formatMoney(value: number | null): string {
 function NegotiationTimeline({
   negotiations,
   onAction,
+  onAccepted,
 }: {
   negotiations: Negotiation[]
   onAction: () => void
+  onAccepted: () => void
 }) {
   const [busy, setBusy] = useState<Record<number, boolean>>({})
 
-  const run = async (id: number, fn: () => Promise<{ success: boolean; error?: string }>) => {
+  const run = async (id: number, fn: () => Promise<{ success: boolean; error?: string }>, isAccept = false) => {
     setBusy((b) => ({ ...b, [id]: true }))
     const res = await fn()
     if (res.success) {
+      if (isAccept) onAccepted()
       onAction()
     } else {
       toast.error(res.error ?? "Eroare necunoscută")
@@ -142,7 +145,7 @@ function NegotiationTimeline({
                     size="sm"
                     className="border-green-400 text-green-700 hover:bg-green-50"
                     disabled={busy[n.id]}
-                    onClick={() => run(n.id, () => acceptNegotiation(n.id))}
+                    onClick={() => run(n.id, () => acceptNegotiation(n.id), true)}
                   >
                     {busy[n.id] ? (
                       <Loader2 className="h-3 w-3 animate-spin" />
@@ -188,6 +191,7 @@ export function NegocieriDialog({
   const [view, setView] = useState<View>("list")
   const [negotiations, setNegotiations] = useState<Negotiation[]>([])
   const [loading, setLoading] = useState(false)
+  const [showAcceptedBanner, setShowAcceptedBanner] = useState(false)
 
   // form state
   const [proposedValue, setProposedValue] = useState("")
@@ -205,6 +209,7 @@ export function NegocieriDialog({
   useEffect(() => {
     if (!open) return
     setView("list")
+    setShowAcceptedBanner(false)
     load()
   }, [open, load])
 
@@ -238,7 +243,22 @@ export function NegocieriDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
+      <Dialog open={showAcceptedBanner} onOpenChange={setShowAcceptedBanner}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Negociere acceptată</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-700">
+            Negocierea a fost acceptată de ambele părți. Pentru ca noile date ale contractului să fie înregistrate, încărcați act adițional.
+          </p>
+          <DialogFooter>
+            <Button onClick={() => setShowAcceptedBanner(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         Negocieri
       </Button>
@@ -269,7 +289,11 @@ export function NegocieriDialog({
                 <Loader2 className="animate-spin h-5 w-5 text-muted-foreground" />
               </div>
             ) : (
-              <NegotiationTimeline negotiations={negotiations} onAction={load} />
+              <NegotiationTimeline
+                negotiations={negotiations}
+                onAction={load}
+                onAccepted={() => setShowAcceptedBanner(true)}
+              />
             )}
 
             {/* buton negociere nouă */}
@@ -355,5 +379,6 @@ export function NegocieriDialog({
         )}
       </DialogContent>
     </Dialog>
+    </>
   )
 }

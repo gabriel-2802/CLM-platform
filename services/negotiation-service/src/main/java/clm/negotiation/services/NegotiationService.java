@@ -72,9 +72,7 @@ public class NegotiationService {
         n.setStatus(NegotiationStatus.ACCEPTED);
         n.setResolvedAt(LocalDateTime.now());
         repository.save(n);
-
-        contractApiClient.applyRenegotiation(n.getContractId(), n.getProposedValue(), n.getProposedEndDate());
-        log.info("Negotiation {} accepted — contract {} updated", id, n.getContractId());
+        log.info("Negotiation {} accepted — contract {} unchanged (manual act adițional required)", id, n.getContractId());
         return mapper.toDto(n);
     }
 
