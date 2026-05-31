@@ -41,7 +41,10 @@ export async function getContractRows(): Promise<Row[]> {
 
   return contracts.map((contract: any) => {
     const client = clientMap.get(contract.clientId) ?? {}
-    const userIds: string[] = (client.userClients ?? []).map((uc: any) => String(uc.userId))
+    const generatorUser = contract.generatedByUser != null
+      ? (userMap.get(String(contract.generatedByUser)) as any)
+      : null
+    const generatorName = generatorUser ? (generatorUser.name || generatorUser.email) : null
 
     return {
       id: contract.clientId ?? 0,
@@ -52,13 +55,7 @@ export async function getContractRows(): Promise<Row[]> {
       administratie: client.administration,
       deLa: toISODate(contract.contractStartDate),
       panaLa: toISODate(contract.contractEndDate ?? contract.terminationDate),
-      users: userIds
-        .map((id) => {
-          const u = userMap.get(id) as any
-          return u ? (u.name || u.email) : null
-        })
-        .filter((s): s is string => !!s)
-        .sort((a, b) => a.localeCompare(b)),
+      users: generatorName ? [generatorName] : [],
       contractId: contract.id ? Number(contract.id) : undefined,
       contractStatus: contract.contractStatus ?? undefined,
       contractStartDate: toISODate(contract.contractStartDate),
