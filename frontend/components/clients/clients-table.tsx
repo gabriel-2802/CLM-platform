@@ -22,7 +22,7 @@ import { useAuthenticatedDownload } from "@/hooks/use-authenticated-download";
 type RowEditFields = { deLa: string; panaLa: string; tarifConta: string; tarifBilant: string }
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING_SIGNATURE: "In asteptare",
+  PENDING_SIGNATURE: "In asteptarea semnaturii",
   ACTIVE: "Activ",
   TERMINATED: "Incetat",
   ARCHIVED: "Arhivat",
@@ -186,11 +186,11 @@ function ClientDetailsDialog({
   return (
       <Dialog open={open} onOpenChange={setOpen}>
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-          Contract Info
+          Detalii contract
         </Button>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Contract Info - {clientName}</DialogTitle>
+            <DialogTitle>Detalii contract - {clientName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             {readOnly && (
@@ -348,7 +348,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
     },
     {
       id: "detalii",
-      header: "Contract Info",
+      header: "Detalii contract",
       enableSorting: false,
       cell: ({ row }) => {
         if (!row.original.contractId) {
@@ -386,13 +386,12 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
 
         const status = row.original.contractStatus ?? "";
         return row.original.contractId ? (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-1.5">
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"}`}>
                 {STATUS_LABELS[status] ?? "Generat"}
               </span>
               <button
-                  className="text-slate-400 hover:text-slate-700 transition-colors"
-                  title="Descarca nesemnat"
+                  className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
                   onClick={() =>
                     downloadWithAuth(
                       `/api/contracts/download/${row.original.contractId}/unsigned/pdf`,
@@ -403,7 +402,8 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
                     })
                   }
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3 h-3" />
+                Descarca contract generat
               </button>
             </div>
         ) : (
@@ -427,7 +427,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
         if (hasSigned) {
           return (
               <button
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800 transition-colors"
                   title="Descarca semnat"
                   onClick={() =>
                     downloadWithAuth(`/api/contracts/download/${contractId}/signed/pdf`, {
@@ -440,7 +440,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
                   }
               >
                 <Download className="w-3.5 h-3.5" />
-                semnat
+                Descarca semnat
               </button>
           );
         }
