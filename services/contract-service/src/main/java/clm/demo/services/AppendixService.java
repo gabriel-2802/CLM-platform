@@ -28,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.annotation.Validated;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
@@ -81,8 +82,6 @@ public class AppendixService {
                 .generatedByUser(Objects.nonNull(request.userId()) ? request.userId().intValue() : null)
                 .notes(request.notes())
                 .appendixStatus(AppendixStatus.DRAFT)
-                .effectiveDate(request.effectiveDate())
-                .signDate(request.signDate())
                 .build();
 
         appendix = appendixRepository.save(appendix);
@@ -158,7 +157,7 @@ public class AppendixService {
      * @throws InvalidAppendixStateException if the appendix is already {@link AppendixStatus#SIGNED}
      */
     @Transactional
-    public AppendixResponseDTO uploadSignedAppendix(Long appendixId, byte[] fileBytes, Integer userId) {
+    public AppendixResponseDTO uploadSignedAppendix(Long appendixId, byte[] fileBytes, Integer userId, LocalDate signDate, LocalDate effectiveDate) {
         log.info("Uploading signed document for appendix {}", appendixId);
 
         Appendix appendix = appendixRepository.findById(appendixId)
@@ -179,6 +178,8 @@ public class AppendixService {
             appendix.setSignedDocumentContent(fileUtils.compress(pdfBytes));
             appendix.setUploadedSignedAt(LocalDateTime.now());
             appendix.setUploadedSignedByUser(userId);
+            appendix.setSignDate(signDate);
+            appendix.setEffectiveDate(effectiveDate);
             appendix.setAppendixStatus(AppendixStatus.SIGNED);
             appendix = appendixRepository.save(appendix);
             log.info("Appendix {} transitioned DRAFT → SIGNED", appendixId);

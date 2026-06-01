@@ -22,6 +22,8 @@ export type GenerateAppendixPayload = {
     title: string
     notes?: string | null
     mappings: Record<string, string>
+    signDate?: string | null
+    effectiveDate?: string | null
 }
 
 type SessionUser = {
@@ -81,7 +83,7 @@ export async function terminateAppendix(appendixId: number) {
     }
 }
 
-export async function uploadSignedAppendix(appendixId: number, formData: FormData) {
+export async function uploadSignedAppendix(appendixId: number, formData: FormData, signDate?: string, effectiveDate?: string) {
     try {
         const session = await getSession()
         const user = session?.user as SessionUser | undefined
@@ -93,6 +95,8 @@ export async function uploadSignedAppendix(appendixId: number, formData: FormDat
         const backendFormData = new FormData()
         backendFormData.append("file", file)
         if (Number.isInteger(userId) && userId > 0) backendFormData.append("userId", String(userId))
+        if (signDate) backendFormData.append("signDate", signDate)
+        if (effectiveDate) backendFormData.append("effectiveDate", effectiveDate)
 
         const res = await contractsFetch(`/api/appendices/${appendixId}/upload-signed`, {
             method: "POST",
@@ -109,7 +113,7 @@ export async function uploadSignedAppendix(appendixId: number, formData: FormDat
     }
 }
 
-export async function uploadDirectAppendix(contractId: number, title: string, formData: FormData) {
+export async function uploadDirectAppendix(contractId: number, title: string, formData: FormData, signDate?: string, effectiveDate?: string) {
     try {
         const session = await getSession()
         const user = session?.user as SessionUser | undefined
@@ -124,6 +128,8 @@ export async function uploadDirectAppendix(contractId: number, title: string, fo
         backendFormData.append("file", file)
         if (Number.isInteger(userId) && userId > 0) backendFormData.append("userId", String(userId))
         if (user?.email) backendFormData.append("userMail", user.email)
+        if (signDate) backendFormData.append("signDate", signDate)
+        if (effectiveDate) backendFormData.append("effectiveDate", effectiveDate)
 
         const res = await contractsFetch("/api/appendices/upload", {
             method: "POST",

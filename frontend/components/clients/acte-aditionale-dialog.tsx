@@ -33,7 +33,7 @@ type View = "list" | "upload" | "generate" | "sign"
 
 const EXTRA_MAPPING_FIELDS = ["deLa", "panaLa", "tarifConta", "tarifBilant"]
 
-export type DetailVals = { deLa: string; panaLa: string; tarifConta: string; tarifBilant: string }
+export type DetailVals = { signDate: string; effectiveDate: string; panaLa: string; tarifConta: string; tarifBilant: string }
 
 export type ClientForAppendix = Record<string, unknown> & {
     id: number
@@ -68,7 +68,8 @@ export function ActeAditionaleDialog({
     const [signFile, setSignFile] = useState<File | null>(null)
     const [signUploading, setSignUploading] = useState(false)
     const [signModifica, setSignModifica] = useState(false)
-    const [signDeLa, setSignDeLa] = useState("")
+    const [signDate, setSignDate] = useState("")
+    const [effectiveDate, setEffectiveDate] = useState("")
     const [signPanaLa, setSignPanaLa] = useState("")
     const [signTarifConta, setSignTarifConta] = useState("")
     const [signTarifBilant, setSignTarifBilant] = useState("")
@@ -78,7 +79,6 @@ export function ActeAditionaleDialog({
     const [uploadFile, setUploadFile] = useState<File | null>(null)
     const [uploading, setUploading] = useState(false)
     const [uploadModifica, setUploadModifica] = useState(false)
-    const [uploadDeLa, setUploadDeLa] = useState("")
     const [uploadPanaLa, setUploadPanaLa] = useState("")
     const [uploadTarifConta, setUploadTarifConta] = useState("")
     const [uploadTarifBilant, setUploadTarifBilant] = useState("")
@@ -124,7 +124,8 @@ export function ActeAditionaleDialog({
 
     useEffect(() => {
         if (view !== "upload") return
-        setUploadDeLa(client.deLa ?? "")
+        setSignDate("")
+        setEffectiveDate(client.deLa ?? "")
         setUploadPanaLa(client.panaLa ?? "")
         setUploadTarifConta(client.tarifConta != null ? String(client.tarifConta) : "")
         setUploadTarifBilant(client.tarifBilant != null ? String(client.tarifBilant) : "")
@@ -197,7 +198,8 @@ export function ActeAditionaleDialog({
         setSignAppendixId(appendixId)
         setSignFile(null)
         setSignModifica(false)
-        setSignDeLa(client.deLa ?? "")
+        setSignDate("")
+        setEffectiveDate(client.deLa ?? "")
         setSignPanaLa(client.panaLa ?? "")
         setSignTarifConta(client.tarifConta != null ? String(client.tarifConta) : "")
         setSignTarifBilant(client.tarifBilant != null ? String(client.tarifBilant) : "")
@@ -209,11 +211,11 @@ export function ActeAditionaleDialog({
         setSignUploading(true)
         const fd = new FormData()
         fd.append("file", signFile)
-        const res = await uploadSignedAppendix(signAppendixId, fd)
+        const res = await uploadSignedAppendix(signAppendixId, fd, signDate || undefined, effectiveDate || undefined)
         if (res.success) {
             toast.success("Act adițional semnat încărcat.")
             if (signModifica && onUpdateDetails) {
-                onUpdateDetails({ deLa: signDeLa, panaLa: signPanaLa, tarifConta: signTarifConta, tarifBilant: signTarifBilant })
+                onUpdateDetails({ signDate, effectiveDate, panaLa: signPanaLa, tarifConta: signTarifConta, tarifBilant: signTarifBilant })
             }
             setView("list")
             loadAppendices()
@@ -240,11 +242,11 @@ export function ActeAditionaleDialog({
         setUploading(true)
         const fd = new FormData()
         fd.append("file", uploadFile)
-        const res = await uploadDirectAppendix(contractId, uploadTitle.trim(), fd)
+        const res = await uploadDirectAppendix(contractId, uploadTitle.trim(), fd, signDate || undefined, effectiveDate || undefined)
         if (res.success) {
             toast.success("Act adițional încărcat.")
             if (uploadModifica && onUpdateDetails) {
-                onUpdateDetails({ deLa: uploadDeLa, panaLa: uploadPanaLa, tarifConta: uploadTarifConta, tarifBilant: uploadTarifBilant })
+                onUpdateDetails({ signDate, effectiveDate, panaLa: uploadPanaLa, tarifConta: uploadTarifConta, tarifBilant: uploadTarifBilant })
             }
             setUploadTitle("")
             setUploadFile(null)
@@ -281,26 +283,26 @@ export function ActeAditionaleDialog({
     }
 
     const detailFields = (
-        deLa: string, setDeLa: (v: string) => void,
+        effectiveDate: string, setEffectiveDate: (v: string) => void,
         panaLa: string, setPanaLa: (v: string) => void,
         tarifConta: string, setTarifConta: (v: string) => void,
         tarifBilant: string, setTarifBilant: (v: string) => void
     ) => (
         <div className="grid grid-cols-2 gap-3 p-3 border rounded-md bg-muted/30">
-            <div className="space-y-1">
-                <Label>De la <span className="text-red-500">*</span></Label>
-                <Input type="date" value={deLa} onChange={(e) => setDeLa(e.target.value)} className="text-slate-900" />
+            <div className="col-span-2 space-y-1">
+                <Label>Data intrarii în vigoare a actului adițional</Label>
+                <Input type="date" value={effectiveDate} onChange={(e) => setEffectiveDate(e.target.value)} className="text-slate-900" />
             </div>
             <div className="space-y-1">
-                <Label>Pana la <span className="text-red-500">*</span></Label>
+                <Label>Pana la</Label>
                 <Input type="date" value={panaLa} onChange={(e) => setPanaLa(e.target.value)} className="text-slate-900" />
             </div>
             <div className="space-y-1">
-                <Label>Tarif servicii conta <span className="text-red-500">*</span></Label>
+                <Label>Tarif servicii conta</Label>
                 <Input type="number" value={tarifConta} onChange={(e) => setTarifConta(e.target.value)} className="text-slate-900" />
             </div>
-            <div className="space-y-1">
-                <Label>Tarif bilant <span className="text-red-500">*</span></Label>
+            <div className="col-span-2 space-y-1">
+                <Label>Tarif bilant</Label>
                 <Input type="number" value={tarifBilant} onChange={(e) => setTarifBilant(e.target.value)} className="text-slate-900" />
             </div>
         </div>
@@ -429,15 +431,19 @@ export function ActeAditionaleDialog({
                                 onChange={(e) => setSignFile(e.target.files?.[0] ?? null)}
                             />
                         </div>
+                        <div className="space-y-1">
+                            <Label>Data semnarii actului adițional <span className="text-red-500">*</span></Label>
+                            <Input type="date" value={signDate} onChange={(e) => setSignDate(e.target.value)} className="text-slate-900" />
+                        </div>
                         <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
                             <Checkbox
                                 checked={signModifica}
                                 onCheckedChange={(v) => setSignModifica(v === true)}
                             />
-                            <span>Modifica valoarea/data</span>
+                            <span>Modifica valoarea/data contractului</span>
                         </label>
                         {signModifica && detailFields(
-                            signDeLa, setSignDeLa,
+                            effectiveDate, setEffectiveDate,
                             signPanaLa, setSignPanaLa,
                             signTarifConta, setSignTarifConta,
                             signTarifBilant, setSignTarifBilant
@@ -447,7 +453,7 @@ export function ActeAditionaleDialog({
                                 <ChevronLeft className="h-4 w-4 mr-1" />
                                 Înapoi
                             </Button>
-                            <Button onClick={handleConfirmSign} disabled={!signFile || signUploading}>
+                            <Button onClick={handleConfirmSign} disabled={!signFile || !signDate || signUploading}>
                                 {signUploading ? (
                                     <><Loader2 className="animate-spin h-4 w-4 mr-1" />Se încarcă...</>
                                 ) : (
@@ -477,15 +483,19 @@ export function ActeAditionaleDialog({
                                 onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                             />
                         </div>
+                        <div className="space-y-1">
+                            <Label>Data semnarii actului adițional <span className="text-red-500">*</span></Label>
+                            <Input type="date" value={signDate} onChange={(e) => setSignDate(e.target.value)} className="text-slate-900" />
+                        </div>
                         <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
                             <Checkbox
                                 checked={uploadModifica}
                                 onCheckedChange={(v) => setUploadModifica(v === true)}
                             />
-                            <span>Modifica valoarea/data</span>
+                            <span>Modifica valoarea/data contractului</span>
                         </label>
                         {uploadModifica && detailFields(
-                            uploadDeLa, setUploadDeLa,
+                            effectiveDate, setEffectiveDate,
                             uploadPanaLa, setUploadPanaLa,
                             uploadTarifConta, setUploadTarifConta,
                             uploadTarifBilant, setUploadTarifBilant
@@ -497,7 +507,7 @@ export function ActeAditionaleDialog({
                             </Button>
                             <Button
                                 onClick={handleUpload}
-                                disabled={!uploadTitle.trim() || !uploadFile || uploading}
+                                disabled={!uploadTitle.trim() || !uploadFile || !signDate || uploading}
                             >
                                 {uploading ? (
                                     <><Loader2 className="animate-spin h-4 w-4 mr-1" />Se încarcă...</>

@@ -101,7 +101,7 @@ class AppendixServiceTest {
         void should_throw_when_appendix_not_found() {
             when(appendixRepository.findById(99L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> service.uploadSignedAppendix(99L, new byte[]{1}, 1))
+            assertThatThrownBy(() -> service.uploadSignedAppendix(99L, new byte[]{1}, 1, null, null))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining("99");
         }
@@ -111,7 +111,7 @@ class AppendixServiceTest {
             Appendix signed = appendix(1L, AppendixStatus.SIGNED);
             when(appendixRepository.findById(1L)).thenReturn(Optional.of(signed));
 
-            assertThatThrownBy(() -> service.uploadSignedAppendix(1L, new byte[]{1}, 1))
+            assertThatThrownBy(() -> service.uploadSignedAppendix(1L, new byte[]{1}, 1, null, null))
                     .isInstanceOf(InvalidAppendixStateException.class)
                     .hasMessageContaining("already SIGNED");
         }
@@ -129,7 +129,7 @@ class AppendixServiceTest {
 
             // PDF magic bytes: %PDF
             byte[] pdfBytes = new byte[]{0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3};
-            AppendixResponseDTO result = service.uploadSignedAppendix(1L, pdfBytes, 42);
+            AppendixResponseDTO result = service.uploadSignedAppendix(1L, pdfBytes, 42, null, null);
 
             assertThat(draft.getAppendixStatus()).isEqualTo(AppendixStatus.SIGNED);
             assertThat(draft.getUploadedSignedByUser()).isEqualTo(42);
@@ -220,8 +220,7 @@ class AppendixServiceTest {
         void should_throw_when_contract_not_found() {
             when(contractRepository.findById(99L)).thenReturn(Optional.empty());
 
-            GenAppendixRequest req = new GenAppendixRequest(99L, 1L, "Title", 1L, null, Map.of("k", "v"),
-                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+            GenAppendixRequest req = new GenAppendixRequest(99L, 1L, "Title", 1L, null, Map.of("k", "v"));
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -234,8 +233,7 @@ class AppendixServiceTest {
             when(contractRepository.findById(1L)).thenReturn(Optional.of(contract));
             when(templateRepository.findById(99L)).thenReturn(Optional.empty());
 
-            GenAppendixRequest req = new GenAppendixRequest(1L, 99L, "Title", 1L, null, Map.of("k", "v"),
-                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+            GenAppendixRequest req = new GenAppendixRequest(1L, 99L, "Title", 1L, null, Map.of("k", "v"));
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -250,8 +248,7 @@ class AppendixServiceTest {
             when(contractRepository.findById(1L)).thenReturn(Optional.of(contract));
             when(templateRepository.findById(2L)).thenReturn(Optional.of(template));
 
-            GenAppendixRequest req = new GenAppendixRequest(1L, 2L, "Title", 1L, null, Map.of("k", "v"),
-                    LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1));
+            GenAppendixRequest req = new GenAppendixRequest(1L, 2L, "Title", 1L, null, Map.of("k", "v"));
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(TemplateIncompleteException.class)

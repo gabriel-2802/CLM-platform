@@ -19,6 +19,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
+import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -117,6 +118,10 @@ public class AppendixController {
             @PathVariable Long appendixId,
             @Parameter(description = "User ID uploading the signed document", example = "42")
             @RequestParam(required = false) Integer userId,
+            @Parameter(description = "Date when the appendix was signed", required = true)
+            @RequestParam @NotNull LocalDate signDate,
+            @Parameter(description = "Date when the appendix takes effect")
+            @RequestParam(required = false) LocalDate effectiveDate,
             @Parameter(description = "Signed DOCX or PDF file", required = true)
             @RequestParam("file") @NotNull MultipartFile file) {
 
@@ -125,7 +130,7 @@ public class AppendixController {
         }
 
         try {
-            return ResponseEntity.ok(appendixService.uploadSignedAppendix(appendixId, file.getBytes(), userId));
+            return ResponseEntity.ok(appendixService.uploadSignedAppendix(appendixId, file.getBytes(), userId, signDate, effectiveDate));
         } catch (IOException e) {
             throw new FileConversionException("Failed to read uploaded file: " + e.getMessage(), e);
         }

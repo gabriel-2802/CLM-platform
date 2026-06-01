@@ -120,7 +120,7 @@ class AppendixControllerIT extends AbstractControllerTest {
         @Test
         void should_return_200_when_signed_document_uploaded() throws Exception {
             AppendixResponseDTO dto = appendixDto(1L, "SIGNED");
-            when(appendixService.uploadSignedAppendix(eq(1L), any(), any())).thenReturn(dto);
+            when(appendixService.uploadSignedAppendix(eq(1L), any(), any(), any(), any())).thenReturn(dto);
 
             MockMultipartFile file = new MockMultipartFile(
                     "file", "signed.pdf", "application/pdf",
@@ -128,7 +128,8 @@ class AppendixControllerIT extends AbstractControllerTest {
 
             mockMvc.perform(multipart("/api/appendices/1/upload-signed")
                             .file(file)
-                            .param("userId", "42"))
+                            .param("userId", "42")
+                            .param("signDate", "2026-06-01"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.appendixStatus").value("SIGNED"));
         }
@@ -145,7 +146,7 @@ class AppendixControllerIT extends AbstractControllerTest {
 
         @Test
         void should_return_404_when_appendix_not_found() throws Exception {
-            when(appendixService.uploadSignedAppendix(eq(99L), any(), any()))
+            when(appendixService.uploadSignedAppendix(eq(99L), any(), any(), any(), any()))
                     .thenThrow(new ResourceNotFoundException("Appendix not found: 99"));
 
             MockMultipartFile file = new MockMultipartFile(
@@ -159,7 +160,7 @@ class AppendixControllerIT extends AbstractControllerTest {
 
         @Test
         void should_return_409_when_appendix_already_signed() throws Exception {
-            when(appendixService.uploadSignedAppendix(eq(1L), any(), any()))
+            when(appendixService.uploadSignedAppendix(eq(1L), any(), any(), any(), any()))
                     .thenThrow(new InvalidAppendixStateException("Appendix 1 is already SIGNED"));
 
             MockMultipartFile file = new MockMultipartFile(

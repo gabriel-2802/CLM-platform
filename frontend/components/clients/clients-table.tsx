@@ -555,7 +555,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
           tarifBilant: getEdit(contractId, "tarifBilant") ? parseFloat(getEdit(contractId, "tarifBilant")) : undefined,
         };
         return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} onUpdateDetails={(vals) => {
-          setEdit(contractId, "deLa", vals.deLa)
+          setEdit(contractId, "deLa", vals.effectiveDate || vals.panaLa)
           setEdit(contractId, "panaLa", vals.panaLa)
           setEdit(contractId, "tarifConta", vals.tarifConta)
           setEdit(contractId, "tarifBilant", vals.tarifBilant)
