@@ -21,9 +21,15 @@ import { useAuthenticatedDownload } from "@/hooks/use-authenticated-download";
 
 type RowEditFields = { deLa: string; panaLa: string; tarifConta: string; tarifBilant: string }
 
+function formatDisplayDate(iso?: string | null): string {
+  if (!iso) return "—"
+  return new Date(iso).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" })
+}
+
 const STATUS_LABELS: Record<string, string> = {
   PENDING_SIGNATURE: "In asteptarea semnaturii",
   ACTIVE: "Activ",
+  TERMINATION_DUE: "In curs de incheiere",
   TERMINATED: "Incetat",
   ARCHIVED: "Arhivat",
 };
@@ -31,6 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_BADGE: Record<string, string> = {
   PENDING_SIGNATURE: "bg-amber-100 text-amber-800",
   ACTIVE: "bg-green-100 text-green-800",
+  TERMINATION_DUE: "bg-orange-100 text-orange-800",
   TERMINATED: "bg-red-100 text-red-700",
   ARCHIVED: "bg-slate-100 text-slate-400",
 };
@@ -385,11 +392,19 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
         };
 
         const status = row.original.contractStatus ?? "";
+        const terminationDate = row.original.terminationDate
+        const isTerminating = Boolean(terminationDate) || status === "TERMINATION_DUE" || status === "TERMINATED"
         return row.original.contractId ? (
             <div className="flex flex-col gap-1.5">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"}`}>
-                {STATUS_LABELS[status] ?? "Generat"}
-              </span>
+              {isTerminating ? (
+                <span className="text-xs text-red-600 font-medium">
+                  Contractul urmeaza sa fie incheiat la data de {formatDisplayDate(terminationDate ?? row.original.contractEndDate)}
+                </span>
+              ) : (
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${STATUS_BADGE[status] ?? "bg-slate-100 text-slate-600"}`}>
+                  {STATUS_LABELS[status] ?? "Generat"}
+                </span>
+              )}
               <button
                   className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 transition-colors"
                   onClick={() =>
@@ -418,7 +433,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
       cell: ({ row }) => {
         const contractId = row.original.contractId;
         const status = row.original.contractStatus;
-        const hasSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat);
+        const hasSigned = status === "ACTIVE" || status === "TERMINATION_DUE" || status === "TERMINATED" || Boolean(row.original.contractSemnat);
 
         if (!contractId) {
           return <span className="text-muted-foreground">—</span>;
@@ -529,12 +544,25 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
           return <span className="text-muted-foreground">—</span>;
         }
 
-        if (status === "TERMINATED") {
-          const date = row.original.contractEndDate;
-          return <span className="text-xs text-red-700">{date ?? "—"}</span>;
-        }
         if (status === "ARCHIVED") {
           return <span className="text-muted-foreground">—</span>;
+        }
+
+        const hasTermination = status === "TERMINATION_DUE" || status === "TERMINATED" || Boolean(row.original.terminationDate)
+        if (hasTermination) {
+          return (
+            <span title="A fost deja inregistrata o cerere de incheiere a contractului">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-200 bg-red-50 text-red-300 pointer-events-none"
+                tabIndex={-1}
+                aria-disabled="true"
+              >
+                Încheie
+              </Button>
+            </span>
+          )
         }
 
         return (

@@ -23,6 +23,7 @@ export type Row = {
   contractStatus?: string
   contractStartDate?: string
   contractEndDate?: string
+  terminationDate?: string
   contractValue?: number
   autoRenew?: boolean
   probleme?: string[]
