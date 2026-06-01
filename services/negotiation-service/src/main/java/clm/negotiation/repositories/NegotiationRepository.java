@@ -37,6 +37,9 @@ public interface NegotiationRepository extends JpaRepository<Negotiation, Long> 
     @Query("""
         SELECT n.clientId, MAX(n.createdAt)
         FROM Negotiation n
+        WHERE n.contractId NOT IN (
+            SELECT tc.contractId FROM TerminatedContract tc
+        )
         GROUP BY n.clientId
         HAVING MAX(n.createdAt) < :cutoff
         ORDER BY MAX(n.createdAt) ASC
