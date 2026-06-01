@@ -543,27 +543,6 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
       },
     },
     {
-      id: "autoRenew",
-      header: "Auto-renew",
-      enableSorting: false,
-      cell: ({ row }) => {
-        const contractId = row.original.contractId;
-        const status = row.original.contractStatus;
-        if (!contractId) {
-          return <span className="text-muted-foreground">—</span>;
-        }
-
-        const isBusy = Boolean(togglingAutoRenew[contractId]);
-        return (
-            <Checkbox
-                checked={Boolean(row.original.autoRenew)}
-                onCheckedChange={() => handleToggleAutoRenew(contractId)}
-                disabled={isBusy || status === "TERMINATED" || status === "ARCHIVED"}
-            />
-        );
-      },
-    },
-    {
       id: "acteAditionale",
       header: "Acte aditionale",
       enableSorting: false,
