@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getClient, updateClient } from "@/actions/clients";
 import PageTitleSetter from "@/components/page-title-setter";
 import ClientForm from "@/components/clients/client-form";
+import BackButton from "@/components/ui/back-button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientDetalii, upsertClientDetalii } from "@/actions/client-detalii";
 import ClientDetaliiForm from "@/components/clients/client-detalii-form";
@@ -37,6 +38,7 @@ export default async function EditClientPage({ params, searchParams }: { params:
   return (
     <div className="p-6 space-y-4">
       <PageTitleSetter title={`Clients / ${client.name} / Edit`} />
+      <BackButton />
       <h1 className="text-2xl font-semibold">Editeaza: {client.name}</h1>
       <Tabs defaultValue={defaultTab ?? "form"} className="w-full">
         <TabsList>
