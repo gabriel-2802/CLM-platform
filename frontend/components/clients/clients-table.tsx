@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Filter, ChevronDown, ChevronUp } from "lucide-react";
 import { type Row, getClientRows } from "@/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -264,10 +264,28 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
   const [openCabinet, setOpenCabinet] = useState(false);
   const [togglingAutoRenew, setTogglingAutoRenew] = useState<Record<number, boolean>>({});
 
+  const [showFilters, setShowFilters] = useState(false)
+  const [filterFirma, setFilterFirma] = useState("")
+  const [filterUser, setFilterUser] = useState("")
+  const [filterStartFrom, setFilterStartFrom] = useState("")
+  const [filterStartTo, setFilterStartTo] = useState("")
+  const [filterEndFrom, setFilterEndFrom] = useState("")
+  const [filterEndTo, setFilterEndTo] = useState("")
+  const [filterStatus, setFilterStatus] = useState("")
+
+  const todayStr = useMemo(() => new Date().toLocaleDateString("sv-SE"), [])
+
+  const hasFilters = filterFirma || filterUser || filterStartFrom || filterStartTo || filterEndFrom || filterEndTo || filterStatus
+  const clearFilters = () => {
+    setFilterFirma(""); setFilterUser(""); setFilterStartFrom(""); setFilterStartTo("")
+    setFilterEndFrom(""); setFilterEndTo(""); setFilterStatus("")
+  }
+
   const [rowEdits, setRowEdits] = useState<Record<number, RowEditFields>>(() => {
     const init: Record<number, RowEditFields> = {};
     rows.forEach((r) => {
-      init[r.id] = {
+      const key = r.contractId ?? r.id;
+      init[key] = {
         deLa: r.contractStartDate ?? r.deLa ?? "",
         panaLa: r.contractEndDate ?? r.panaLa ?? "",
         tarifConta: r.contractValue != null ? String(r.contractValue) : (r.tarifConta != null ? String(r.tarifConta) : ""),
@@ -326,7 +344,53 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const data = useMemo(() => (showFormer ? rows : rows.filter((r) => !r.panaLa)), [rows, showFormer]);
+  const data = useMemo(() => {
+    let result = showFormer ? rows : rows.filter((r) => !r.panaLa)
+
+    if (filterFirma.trim()) {
+      const q = filterFirma.trim().toLowerCase()
+      result = result.filter((r) => r.name?.toLowerCase().includes(q))
+    }
+    if (filterUser.trim()) {
+      const q = filterUser.trim().toLowerCase()
+      result = result.filter((r) => r.users?.some((u) => u.toLowerCase().includes(q)))
+    }
+    if (filterStartFrom) {
+      result = result.filter((r) => r.contractStartDate != null && r.contractStartDate >= filterStartFrom)
+    }
+    if (filterStartTo) {
+      result = result.filter((r) => r.contractStartDate != null && r.contractStartDate <= filterStartTo)
+    }
+    if (filterEndFrom) {
+      result = result.filter((r) => {
+        const d = r.contractEndDate ?? r.panaLa
+        return d != null && d >= filterEndFrom
+      })
+    }
+    if (filterEndTo) {
+      result = result.filter((r) => {
+        const d = r.contractEndDate ?? r.panaLa
+        return d != null && d <= filterEndTo
+      })
+    }
+    if (filterStatus) {
+      result = result.filter((r) => {
+        const s = r.contractStatus ?? ""
+        const td = r.terminationDate
+        const isIncetat = s === "TERMINATED" || (td != null && td <= todayStr)
+        const isTerminationDue = !isIncetat && (s === "TERMINATION_DUE" || td != null)
+        switch (filterStatus) {
+          case "ACTIVE":            return s === "ACTIVE" && !isIncetat && !isTerminationDue
+          case "TERMINATION_DUE":  return isTerminationDue
+          case "TERMINATED":       return isIncetat
+          case "PENDING_SIGNATURE": return s === "PENDING_SIGNATURE"
+          default:                 return true
+        }
+      })
+    }
+
+    return result
+  }, [rows, showFormer, filterFirma, filterUser, filterStartFrom, filterStartTo, filterEndFrom, filterEndTo, filterStatus, todayStr]);
 
   // Memoized with stable deps so TanStack Table never sees a new columns array —
   // this prevents cells from remounting on every rowEdits state change.
@@ -365,12 +429,12 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
         const contractSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat)
         return (
           <ClientDetailsDialog
-              clientId={row.original.id}
+              clientId={row.original.contractId ?? row.original.id}
               clientName={row.original.name ?? ""}
-              deLa={getEdit(row.original.id, "deLa")}
-              panaLa={getEdit(row.original.id, "panaLa")}
-              tarifConta={getEdit(row.original.id, "tarifConta")}
-              tarifBilant={getEdit(row.original.id, "tarifBilant")}
+              deLa={getEdit(row.original.contractId ?? row.original.id, "deLa")}
+              panaLa={getEdit(row.original.contractId ?? row.original.id, "panaLa")}
+              tarifConta={getEdit(row.original.contractId ?? row.original.id, "tarifConta")}
+              tarifBilant={getEdit(row.original.contractId ?? row.original.id, "tarifBilant")}
               onEdit={setEdit}
               readOnly={contractSigned}
           />
@@ -382,7 +446,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
       header: "Contract generat",
       enableSorting: false,
       cell: ({ row }) => {
-        const id = row.original.id;
+        const id = row.original.contractId ?? row.original.id;
         const enrichedClient = {
           ...row.original,
           deLa: getEdit(id, "deLa"),
@@ -506,19 +570,18 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
       cell: ({ row }) => {
         const contractId = row.original.contractId;
         if (!contractId) return <span className="text-muted-foreground">—</span>;
-        const id = row.original.id;
         const enrichedClient = {
           ...row.original,
-          deLa: getEdit(id, "deLa"),
-          panaLa: getEdit(id, "panaLa"),
-          tarifConta: getEdit(id, "tarifConta") ? parseFloat(getEdit(id, "tarifConta")) : undefined,
-          tarifBilant: getEdit(id, "tarifBilant") ? parseFloat(getEdit(id, "tarifBilant")) : undefined,
+          deLa: getEdit(contractId, "deLa"),
+          panaLa: getEdit(contractId, "panaLa"),
+          tarifConta: getEdit(contractId, "tarifConta") ? parseFloat(getEdit(contractId, "tarifConta")) : undefined,
+          tarifBilant: getEdit(contractId, "tarifBilant") ? parseFloat(getEdit(contractId, "tarifBilant")) : undefined,
         };
         return <ActeAditionaleDialog contractId={contractId} client={enrichedClient} onUpdateDetails={(vals) => {
-          setEdit(id, "deLa", vals.deLa)
-          setEdit(id, "panaLa", vals.panaLa)
-          setEdit(id, "tarifConta", vals.tarifConta)
-          setEdit(id, "tarifBilant", vals.tarifBilant)
+          setEdit(contractId, "deLa", vals.deLa)
+          setEdit(contractId, "panaLa", vals.panaLa)
+          setEdit(contractId, "tarifConta", vals.tarifConta)
+          setEdit(contractId, "tarifBilant", vals.tarifBilant)
         }} />;
       },
     },
@@ -616,6 +679,98 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
                   <span className="i-edit">✎</span> date cabinet
                 </Button>
               </div>
+            </div>
+
+            {/* Filtre */}
+            <div className="mb-4 rounded-lg border bg-muted/30">
+              <button
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-muted/60 transition-colors rounded-lg"
+                onClick={() => setShowFilters((v) => !v)}
+              >
+                <Filter className="h-4 w-4 text-slate-500" />
+                Aplicați filtre
+                {hasFilters && (
+                  <span className="ml-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    activ
+                  </span>
+                )}
+                <span className="ml-auto">
+                  {showFilters ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
+                </span>
+              </button>
+              {showFilters && (
+              <div className="px-3 pb-3 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Firma</Label>
+                  <Input
+                    placeholder="Cauta firma..."
+                    value={filterFirma}
+                    onChange={(e) => setFilterFirma(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">User</Label>
+                  <Input
+                    placeholder="Cauta user..."
+                    value={filterUser}
+                    onChange={(e) => setFilterUser(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Status contract</Label>
+                  <select
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="w-full h-8 text-sm rounded-md border border-input bg-background px-2 text-slate-900"
+                  >
+                    <option value="">Toate statusurile</option>
+                    <option value="ACTIVE">Activ</option>
+                    <option value="PENDING_SIGNATURE">Generat, neincărcat semnat</option>
+                    <option value="TERMINATION_DUE">Urmează să fie încetat</option>
+                    <option value="TERMINATED">Încetat</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <fieldset className="rounded-md border px-3 pb-3 pt-1">
+                  <legend className="text-xs text-muted-foreground px-1">Interval data de început</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">De la</Label>
+                      <Input type="date" value={filterStartFrom} onChange={(e) => setFilterStartFrom(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Până la</Label>
+                      <Input type="date" value={filterStartTo} onChange={(e) => setFilterStartTo(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                  </div>
+                </fieldset>
+                <fieldset className="rounded-md border px-3 pb-3 pt-1">
+                  <legend className="text-xs text-muted-foreground px-1">Interval data de încheiere</legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">De la</Label>
+                      <Input type="date" value={filterEndFrom} onChange={(e) => setFilterEndFrom(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Până la</Label>
+                      <Input type="date" value={filterEndTo} onChange={(e) => setFilterEndTo(e.target.value)} className="h-8 text-sm" />
+                    </div>
+                  </div>
+                </fieldset>
+              </div>
+              {hasFilters && (
+                <div className="flex justify-end">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground" onClick={clearFilters}>
+                    Șterge filtre
+                  </Button>
+                </div>
+              )}
+              </div>
+              )}
             </div>
 
             <DataTable
