@@ -393,11 +393,17 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
 
         const status = row.original.contractStatus ?? "";
         const terminationDate = row.original.terminationDate
-        const isTerminating = Boolean(terminationDate) || status === "TERMINATION_DUE" || status === "TERMINATED"
+        const todayStr = new Date().toLocaleDateString("sv-SE") // "YYYY-MM-DD" in local time
+        const isTerminated = status === "TERMINATED" || (terminationDate != null && terminationDate <= todayStr)
+        const isTerminating = !isTerminated && (Boolean(terminationDate) || status === "TERMINATION_DUE")
         return row.original.contractId ? (
             <div className="flex flex-col gap-1.5">
-              {isTerminating ? (
-                <span className="text-xs text-red-600 font-medium">
+              {isTerminated ? (
+                <span className="text-xs text-red-700 font-medium">
+                  Contractul a fost incetat la data de {formatDisplayDate(terminationDate ?? row.original.contractEndDate)}
+                </span>
+              ) : isTerminating ? (
+                <span className="text-xs text-orange-600 font-medium">
                   Contractul urmeaza sa fie incheiat la data de {formatDisplayDate(terminationDate ?? row.original.contractEndDate)}
                 </span>
               ) : (
