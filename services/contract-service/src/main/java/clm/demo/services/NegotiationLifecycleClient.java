@@ -1,6 +1,7 @@
 package clm.demo.services;
 
 import clm.negotiation.dto.requests.ContractActivatedRequest;
+import clm.negotiation.dto.requests.ContractDeactivatedRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
@@ -22,8 +23,8 @@ public class NegotiationLifecycleClient {
         log.debug("Activation payload: clientId={}, startDate={}, endDate={}, value={}",
                 request.clientId(), request.startDate(), request.endDate(), request.contractValue());
         try {
-                String token = jwtTokenProvider.generateServiceToken();
-                var response = negotiationRestClient.post()
+            String token = jwtTokenProvider.generateServiceToken();
+            var response = negotiationRestClient.post()
                     .uri("/api/negotiations/contracts/activated")
                     .header("Authorization", "Bearer " + token)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -37,4 +38,24 @@ public class NegotiationLifecycleClient {
                     request.contractId(), e.getMessage());
         }
     }
+
+        public void notifyContractsDeactivated(ContractDeactivatedRequest request) {
+        log.info("Sending contract deactivation to negotiation-service for {} contract(s)",
+            request.contractIds().size());
+        log.debug("Deactivation payload: contractIds={}", request.contractIds());
+        try {
+            String token = jwtTokenProvider.generateServiceToken();
+            var response = negotiationRestClient.post()
+                .uri("/api/negotiations/contracts/deactivated")
+                .header("Authorization", "Bearer " + token)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(request)
+                .retrieve()
+                .toBodilessEntity();
+            log.info("Negotiation-service deactivation accepted (status={})",
+                response.getStatusCode());
+        } catch (RestClientException e) {
+            log.warn("Failed to notify negotiation-service about deactivations: {}", e.getMessage());
+        }
+        }
 }

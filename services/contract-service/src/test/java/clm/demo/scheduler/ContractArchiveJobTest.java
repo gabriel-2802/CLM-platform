@@ -4,25 +4,23 @@ import clm.demo.jobs.ContractArchiveJob;
 import clm.demo.models.enums.ContractStatus;
 import clm.demo.repositories.ContractRepository;
 import org.awaitility.Awaitility;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class ContractArchiveJobTest {
@@ -31,65 +29,66 @@ class ContractArchiveJobTest {
 
     @InjectMocks ContractArchiveJob job;
 
-    // ── Direct invocation unit tests ─────────────────────────────────────────
-
     @Test
-    void should_call_archive_with_today_active_and_archived_statuses() {
-        when(contractRepository.archiveExpiredContracts(any(), any(), any())).thenReturn(3);
+    void should_archive_single_batch_and_log_ids() {
+        List<Long> ids = List.of(1L, 2L, 3L);
+        when(contractRepository.findExpiredContractIds(any(), any(), any()))
+                .thenReturn(ids)
+                .thenReturn(List.of());
 
         job.archiveExpiredContracts();
 
-        ArgumentCaptor<LocalDate> dateCaptor = ArgumentCaptor.forClass(LocalDate.class);
-        ArgumentCaptor<ContractStatus> activeCaptor = ArgumentCaptor.forClass(ContractStatus.class);
-        ArgumentCaptor<ContractStatus> archivedCaptor = ArgumentCaptor.forClass(ContractStatus.class);
-
-        verify(contractRepository).archiveExpiredContracts(
-                dateCaptor.capture(), activeCaptor.capture(), archivedCaptor.capture());
-
-        assertThat(dateCaptor.getValue()).isEqualTo(LocalDate.now());
-        assertThat(activeCaptor.getValue()).isEqualTo(ContractStatus.ACTIVE);
-        assertThat(archivedCaptor.getValue()).isEqualTo(ContractStatus.ARCHIVED);
+        verify(contractRepository).archiveContractsByIds(eq(ids), eq(ContractStatus.ARCHIVED));
     }
 
     @Test
-    void should_process_zero_contracts_when_none_expired() {
-        when(contractRepository.archiveExpiredContracts(any(), any(), any())).thenReturn(0);
-
-        job.archiveExpiredContracts(); // must complete without throwing
-
-        verify(contractRepository).archiveExpiredContracts(any(), any(), any());
-    }
-
-    @Test
-    void should_process_multiple_expired_contracts() {
-        when(contractRepository.archiveExpiredContracts(any(), any(), any())).thenReturn(42);
+    void should_do_nothing_when_no_expired_contracts() {
+        when(contractRepository.findExpiredContractIds(any(), any(), any())).thenReturn(List.of());
 
         job.archiveExpiredContracts();
 
-        verify(contractRepository).archiveExpiredContracts(
-                eq(LocalDate.now()),
-                eq(ContractStatus.ACTIVE),
-                eq(ContractStatus.ARCHIVED));
+        verify(contractRepository, never()).archiveContractsByIds(any(), any());
     }
 
-    // ── Awaitility-based async invocation test ────────────────────────────────
+    @Test
+    void should_process_multiple_batches_until_partial() {
+        List<Long> fullBatch = List.of(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L, 9L, 10L,
+                11L, 12L, 13L, 14L, 15L, 16L, 17L, 18L, 19L, 20L,
+                21L, 22L, 23L, 24L, 25L, 26L, 27L, 28L, 29L, 30L,
+                31L, 32L, 33L, 34L, 35L, 36L, 37L, 38L, 39L, 40L,
+                41L, 42L, 43L, 44L, 45L, 46L, 47L, 48L, 49L, 50L);
+        List<Long> lastBatch = List.of(51L, 52L);
+
+        when(contractRepository.findExpiredContractIds(any(), any(), any()))
+                .thenReturn(fullBatch)
+                .thenReturn(lastBatch);
+
+        job.archiveExpiredContracts();
+
+        verify(contractRepository, times(2)).findExpiredContractIds(
+                eq(LocalDate.now()), eq(ContractStatus.ACTIVE), eq(PageRequest.of(0, 50)));
+        verify(contractRepository).archiveContractsByIds(eq(fullBatch), eq(ContractStatus.ARCHIVED));
+        verify(contractRepository).archiveContractsByIds(eq(lastBatch), eq(ContractStatus.ARCHIVED));
+    }
+
+    @Test
+    void should_use_today_and_active_status_when_querying() {
+        when(contractRepository.findExpiredContractIds(any(), any(), any())).thenReturn(List.of());
+
+        job.archiveExpiredContracts();
+
+        verify(contractRepository).findExpiredContractIds(
+                eq(LocalDate.now()), eq(ContractStatus.ACTIVE), eq(PageRequest.of(0, 50)));
+    }
 
     @Nested
     class AwaitilityPattern {
 
-        /**
-         * Demonstrates the Awaitility pattern for asserting side effects
-         * when a scheduled job completes asynchronously.
-         *
-         * Here we call the method directly and use Awaitility to verify
-         * the side-effect (repository call) occurs within the time budget.
-         * In a real Spring context test, the scheduler would trigger the call.
-         */
         @Test
         void should_invoke_archive_query_within_expected_time() {
             AtomicInteger callCount = new AtomicInteger(0);
-            doAnswer(inv -> { callCount.incrementAndGet(); return 0; })
-                    .when(contractRepository).archiveExpiredContracts(any(), any(), any());
+            doAnswer(inv -> { callCount.incrementAndGet(); return List.of(); })
+                    .when(contractRepository).findExpiredContractIds(any(), any(), any());
 
             Thread schedulerThread = new Thread(job::archiveExpiredContracts);
             schedulerThread.start();

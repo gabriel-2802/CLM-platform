@@ -3,6 +3,7 @@ package clm.demo.repositories;
 import clm.demo.models.Contract;
 import clm.demo.models.ContractDetails;
 import clm.demo.models.enums.ContractStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -17,17 +18,25 @@ import java.util.List;
 @Repository
 public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSpecificationExecutor<Contract> {
 
+    @Query("""
+        SELECT c.id FROM Contract c
+        WHERE c.contractStatus = :active
+        AND c.endDate < :today
+        ORDER BY c.id ASC
+    """)
+    List<Long> findExpiredContractIds(@Param("today") LocalDate today,
+                                      @Param("active") ContractStatus active,
+                                      Pageable pageable);
+
     @Modifying
     @Transactional
     @Query("""
         UPDATE Contract c
         SET c.contractStatus = :archived
-        WHERE c.contractStatus = :active
-        AND c.endDate < :today
+        WHERE c.id IN :ids
     """)
-    int archiveExpiredContracts(@Param("today") LocalDate today,
-                                @Param("active") ContractStatus active,
-                                @Param("archived") ContractStatus archived);
+    void archiveContractsByIds(@Param("ids") List<Long> ids,
+                               @Param("archived") ContractStatus archived);
 
     @Query("""
         SELECT c FROM Contract c
