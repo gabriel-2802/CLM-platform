@@ -95,6 +95,18 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
   const [salariati, setSalariati] = useState<string>(initial?.salariati ?? "NU");
 
   async function handleAction(data: FormData) {
+    const missing: string[] = []
+    if (!denumire.trim())       missing.push("Denumire")
+    if (!cui.trim())            missing.push("CUI")
+    if (!dataVerificarii)       missing.push("Data verificarii")
+    if (!adresa.trim())         missing.push("Adresa")
+    if (!tip)                   missing.push("Tip")
+    if (!administratie)         missing.push("Administratie")
+    if (!platitorTVA)           missing.push("Platitor TVA")
+    if (missing.length > 0) {
+      toast.error(`Câmpuri obligatorii necompletate: ${missing.join(", ")}`)
+      return
+    }
     setBusy(true);
     try {
       const res = await onSubmit(data);
@@ -166,11 +178,11 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
       <input type="hidden" name="platitorTVA" value={platitorTVA} />
       <input type="hidden" name="salariati" value={salariati} />
       <div>
-        <Label className="mb-2 text-indigo-800">Denumire</Label>
+        <Label className="mb-2 text-indigo-800">Denumire <span className="text-red-500">*</span></Label>
         <Input name="denumire" value={denumire} onChange={(e) => setDenumire(e.target.value)} required />
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">Tip</Label>
+        <Label className="mb-2 text-indigo-800">Tip <span className="text-red-500">*</span></Label>
         <Select value={tip} onValueChange={setTip}>
           <SelectTrigger><SelectValue placeholder="Selecteaza tip" /></SelectTrigger>
           <SelectContent>
@@ -179,19 +191,19 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
         </Select>
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">CUI</Label>
+        <Label className="mb-2 text-indigo-800">CUI <span className="text-red-500">*</span></Label>
         <Input name="cui" value={cui} onChange={(e) => setCui(e.target.value)} required />
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">Data verificarii</Label>
+        <Label className="mb-2 text-indigo-800">Data verificarii <span className="text-red-500">*</span></Label>
         <Input type="date" name="dataVerificarii" value={dataVerificarii} onChange={(e) => setDataVerificarii(e.target.value)} />
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">Adresa</Label>
+        <Label className="mb-2 text-indigo-800">Adresa <span className="text-red-500">*</span></Label>
         <Input name="adresa" value={adresa} onChange={(e) => setAdresa(e.target.value)} />
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">Administratie</Label>
+        <Label className="mb-2 text-indigo-800">Administratie <span className="text-red-500">*</span></Label>
         <Select value={administratie} onValueChange={setAdministratie}>
           <SelectTrigger><SelectValue placeholder="Selecteaza administratie" /></SelectTrigger>
           <SelectContent>
@@ -209,7 +221,7 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
         </Select>
       </div>
       <div>
-        <Label className="mb-2 text-indigo-800">Platitor TVA</Label>
+        <Label className="mb-2 text-indigo-800">Platitor TVA <span className="text-red-500">*</span></Label>
         <Select value={platitorTVA} onValueChange={setPlatitorTVA}>
           <SelectTrigger><SelectValue placeholder="Selecteaza" /></SelectTrigger>
           <SelectContent>

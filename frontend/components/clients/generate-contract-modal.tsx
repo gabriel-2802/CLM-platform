@@ -259,7 +259,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
                       <Input type="date" value={localPanaLa} onChange={(e) => setLocalPanaLa(e.target.value)} className="h-8 text-sm" />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Tarif conta</Label>
+                      <Label className="text-xs">Tarif conta <span className="text-red-500">*</span></Label>
                       <Input type="number" value={localTarifConta} onChange={(e) => setLocalTarifConta(e.target.value)} className="h-8 text-sm" placeholder="0.00" />
                     </div>
                     <div className="space-y-1">
