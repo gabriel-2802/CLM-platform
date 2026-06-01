@@ -425,8 +425,6 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
         if (!row.original.contractId) {
           return <span className="text-muted-foreground text-xs">—</span>
         }
-        const status = row.original.contractStatus
-        const contractSigned = status === "ACTIVE" || status === "TERMINATED" || Boolean(row.original.contractSemnat)
         return (
           <ClientDetailsDialog
               clientId={row.original.contractId ?? row.original.id}
@@ -436,7 +434,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
               tarifConta={getEdit(row.original.contractId ?? row.original.id, "tarifConta")}
               tarifBilant={getEdit(row.original.contractId ?? row.original.id, "tarifBilant")}
               onEdit={setEdit}
-              readOnly={contractSigned}
+              readOnly={true}
           />
         )
       },
