@@ -12,6 +12,8 @@ export type Row = {
   cui?: string
   adresa?: string
   administratie?: string
+  dataVerificarii?: string
+  platitorTVA?: string
   deLa?: string
   panaLa?: string
   users?: string[]
@@ -161,6 +163,8 @@ export async function getClientRows(): Promise<Row[]> {
       cui: c.taxId,
       adresa: c.address,
       administratie: c.administration,
+      dataVerificarii: toISODate(c.verificationDate),
+      platitorTVA: c.vatPayer,
       deLa: toISODate(earliestValidFrom ?? c.verificationDate) ?? contractStartDate ?? undefined,
       panaLa: toISODate(latestValidTo) ?? contractEndDate ?? undefined,
       users: userIds
