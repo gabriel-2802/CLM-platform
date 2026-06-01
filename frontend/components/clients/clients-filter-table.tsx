@@ -66,6 +66,16 @@ export function ClientsFilterTable({ rows }: { rows: Row[] }) {
 
   return (
     <>
+      {/* Search bar */}
+      <div className="mb-3">
+        <Input
+          placeholder="Caută după numele clientului..."
+          value={filterDenumire}
+          onChange={(e) => setFilterDenumire(e.target.value)}
+          className="max-w-sm"
+        />
+      </div>
+
       {/* Collapsible filter panel */}
       <div className="mb-4 rounded-lg border bg-muted/30">
         <button
