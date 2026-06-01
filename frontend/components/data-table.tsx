@@ -42,6 +42,8 @@ export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComp
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState<string>(initialSearch);
 
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
   const globalContains: FilterFn<TData> = React.useCallback((row, _columnId, filterValue) => {
     const query = String(filterValue ?? "").toLowerCase();
     if (!query) return true;
@@ -49,8 +51,21 @@ export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComp
     const vals = Object.values(row.original as Record<string, unknown>);
     for (const v of vals) {
       if (v === null || v === undefined) continue;
+      // For arrays (e.g. users), check each element individually
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (item != null && String(item).toLowerCase().includes(query)) return true;
+        }
+        continue;
+      }
       const text = String(v).toLowerCase();
       if (text.includes(query)) return true;
+      // Also match ISO dates typed in Romanian format (dd.mm.yyyy)
+      if (typeof v === "string" && ISO_DATE_RE.test(v)) {
+        const [year, month, day] = v.split("-");
+        const romanian = `${day}.${month}.${year}`;
+        if (romanian.includes(query)) return true;
+      }
     }
     return false;
   }, []);
