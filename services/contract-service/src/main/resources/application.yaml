@@ -56,6 +56,10 @@ job:
   archive-contracts:
     cron: ${JOB_ARCHIVE_CONTRACTS_CRON:0 0 0 * * *}
 
+negotiation:
+  service:
+    url: ${NEGOTIATION_SERVICE_URL:http://negotiation-service:8085}
+
 placeholder:
   pattern: ${PLACEHOLDER_PATTERN:\\.{4,}(?:[ \\t]*\\.+)*}
   default: ${PLACEHOLDER_DEFAULT:....}

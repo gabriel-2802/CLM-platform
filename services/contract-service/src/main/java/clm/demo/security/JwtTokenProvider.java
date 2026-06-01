@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.util.Date;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -47,6 +48,20 @@ public class JwtTokenProvider {
      */
     public boolean validateToken(String token) {
         return parseClaims(token).isPresent();
+    }
+
+    /**
+     * Issues a short-lived service token for internal service-to-service calls.
+     */
+    public String generateServiceToken() {
+        long now = System.currentTimeMillis();
+        return Jwts.builder()
+                .subject("contract-service")
+                .claim("role", "SERVICE")
+                .issuedAt(new Date(now))
+                .expiration(new Date(now + 3_600_000L))
+                .signWith(signingKey)
+                .compact();
     }
 
     /**

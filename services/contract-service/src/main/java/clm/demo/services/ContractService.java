@@ -32,6 +32,7 @@ import clm.demo.utils.file.FileUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
@@ -48,6 +49,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+
+import clm.demo.events.ContractActivatedEvent;
 
 import static clm.demo.utils.Constants.DEFAULT_PAGE;
 import static clm.demo.utils.Constants.DEFAULT_PAGE_SIZE;
@@ -70,7 +73,8 @@ public class ContractService {
     private final ContractDetailsMapper        contractDetailsMapper;
     private final ContractSpecification        contractSpecification;
     private final FileUtils                    fileUtils;
-    private final DocumentGenerationUtil       documentGenerationUtil;
+        private final DocumentGenerationUtil       documentGenerationUtil;
+        private final ApplicationEventPublisher    eventPublisher;
 
     @Transactional
     public ContractResponseDTO generateContract(GenContractRequest request) {
@@ -118,6 +122,21 @@ public class ContractService {
 
         contract.setStartDate(request.startDate());
         contract = contractRepository.save(contract);
+
+        ContractActivatedEvent activationEvent = new ContractActivatedEvent(
+                contract.getId(),
+                contract.getClientId(),
+                request.startDate(),
+                request.endDate(),
+                request.value()
+        );
+        log.info("Publishing contract activation event: contractId={}, clientId={}, startDate={}, endDate={}, value={}",
+                activationEvent.contractId(),
+                activationEvent.clientId(),
+                activationEvent.startDate(),
+                activationEvent.endDate(),
+                activationEvent.contractValue());
+        eventPublisher.publishEvent(activationEvent);
 
         return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
