@@ -1,0 +1,834 @@
+# ==============================================================================
+# CLM Platform — Docker Swarm Stack (production)
+# ==============================================================================
+# Deploy:
+#   docker stack deploy \
+#     --compose-file docker-stack.yml \
+#     --env-file .env.production \
+#     --with-registry-auth \
+#     clm
+#
+# BEFORE DEPLOYING (see swarm.md for details):
+#   1. Build and push all custom images to ${REGISTRY} (build: is not supported
+#      by docker stack deploy — only image: is honoured).
+#   2. Apply node labels:
+#        docker node update --label-add role=db         <db-node-id>
+#        docker node update --label-add role=monitoring <monitoring-node-id>
+#   3. Create all Docker secrets listed at the bottom of this file.
+#   4. Spring Boot services require a wrapper entrypoint that reads
+#      /run/secrets/* and exports them as environment variables before the JVM
+#      starts. See swarm.md § "Spring Boot Secret Injection".
+# ==============================================================================
+
+version: "3.9"
+
+services:
+
+  # ── Contracts database ────────────────────────────────────────────────────
+  postgres:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-postgres:${IMAGE_TAG:-latest}
+    environment:
+      POSTGRES_USER:        ${DB_USER:-clm_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password   # native _FILE support
+      POSTGRES_DB:          ${DB_NAME:-clm_platform}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_NAME:-clm_platform}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == db
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Users database ────────────────────────────────────────────────────────
+  postgres-users:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:        ${DB_USER:-clm_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB:          ${DB_USERS_NAME:-clm_users}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_users_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_USERS_NAME:-clm_users}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == db
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Clients database ──────────────────────────────────────────────────────
+  postgres-clients:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:        ${DB_USER:-clm_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB:          ${DB_CLIENTS_NAME:-clm_clients}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_clients_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_CLIENTS_NAME:-clm_clients}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == db
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Negotiations database ─────────────────────────────────────────────────
+  postgres-negotiations:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER:        ${DB_USER:-clm_user}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+      POSTGRES_DB:          ${DB_NEGOTIATIONS_NAME:-clm_negotiations}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+    volumes:
+      - postgres_negotiations_data:/var/lib/postgresql/data
+    secrets:
+      - db_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${DB_USER:-clm_user}", "-d", "${DB_NEGOTIATIONS_NAME:-clm_negotiations}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == db
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── User service (auth / JWT) ─────────────────────────────────────────────
+  # Secrets are mounted at /run/secrets/ and exported as env vars by the
+  # wrapper entrypoint baked into the image (see swarm.md § 5).
+  user-service:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-user-service:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-users:5432/${DB_USERS_NAME:-clm_users}?currentSchema=users
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: users
+      SPRING_FLYWAY_ENABLED:        "true"
+      SPRING_FLYWAY_LOCATIONS:      classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:        users
+      SPRING_FLYWAY_DEFAULT_SCHEMA: users
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-2592000000}
+      APP_ADMIN_EMAIL:  ${ADMIN_EMAIL:-admin@example.com}
+      APP_ADMIN_NAME:   ${ADMIN_NAME:-Admin}
+      APP_CORS_ALLOWED_ORIGINS: ${FRONTEND_URL}
+      SPRINGDOC_SWAGGER_UI_PATH: /api/users/swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH:   /api/users/v3/api-docs
+      SERVER_PORT: 8083
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       user-service
+      JAVA_TOOL_OPTIONS: >-
+        -Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true
+        -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+    secrets:
+      - db_password
+      - jwt_secret
+      - admin_register_code
+      - admin_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8083/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        max_failure_ratio: 0.1
+        order: start-first
+
+  # ── Contract service ───────────────────────────────────────────────────────
+  contracts:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-contracts:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres:5432/${DB_NAME:-clm_platform}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clm
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   clm
+      APP_JWT_EXPIRATION:  ${JWT_EXPIRATION:-2592000000}
+      SPRING_MAIL_HOST:    ${MAIL_HOST}
+      SPRING_MAIL_PORT:    ${MAIL_PORT:-587}
+      SPRING_MAIL_FROM:    ${MAIL_FROM}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:              "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:   "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: "false"
+      APP_EMAIL_VERIFICATION_EXPIRATION: ${EMAIL_VERIFICATION_EXPIRATION:-86400000}
+      APP_FRONTEND_URL:  ${FRONTEND_URL}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS: ${FRONTEND_URL}
+      LIBREOFFICE_PATH:  ${LIBREOFFICE_PATH:-/usr/bin/libreoffice}
+      SPRINGDOC_SWAGGER_UI_PATH: /api/contracts/swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH:   /api/contracts/v3/api-docs
+      SERVER_PORT: 8081
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       contract-service
+      JAVA_TOOL_OPTIONS: >-
+        -Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true
+        -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+    secrets:
+      - db_password
+      - jwt_secret
+      - admin_register_code
+      - mail_username
+      - mail_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8081/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1536M    # LibreOffice PDF conversions are memory-intensive
+        reservations:
+          cpus: "0.50"
+          memory: 768M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        max_failure_ratio: 0.1
+        order: start-first
+
+  # ── Client service ─────────────────────────────────────────────────────────
+  client-service:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-client-service:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-clients:5432/${DB_CLIENTS_NAME:-clm_clients}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: clients
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   clients
+      CORS_ALLOWED_ORIGINS: ${FRONTEND_URL}
+      SPRINGDOC_SWAGGER_UI_PATH: /api/clients/swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH:   /api/clients/v3/api-docs
+      SERVER_PORT: 8084
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       client-service
+      JAVA_TOOL_OPTIONS: >-
+        -Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true
+        -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+    secrets:
+      - db_password
+      - jwt_secret
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8084/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        max_failure_ratio: 0.1
+        order: start-first
+
+  # ── Notification service ───────────────────────────────────────────────────
+  # Single replica: event-driven emailer — duplicate replicas risk sending
+  # the same notification twice.
+  notifications:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-notifications:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_MAIL_HOST:  ${MAIL_HOST}
+      SPRING_MAIL_PORT:  ${MAIL_PORT:-587}
+      SPRING_MAIL_FROM:  ${MAIL_FROM}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:            "true"
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "true"
+      CONTRACTS_SERVICE_URL:   http://contracts:8081
+      CONTRACTS_API_BASE_URL:  http://contracts:8081
+      NOTIFICATION_RECIPIENTS: ${NOTIFICATION_RECIPIENTS:-}
+      APP_FRONTEND_URL:                ${FRONTEND_URL}
+      SPRING_WEB_CORS_ALLOWED_ORIGINS: ${FRONTEND_URL}
+      SERVER_PORT: 8082
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+    secrets:
+      - jwt_secret
+      - mail_username
+      - mail_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8082/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Negotiation service ────────────────────────────────────────────────────
+  # Single replica: contains a monthly cron job (NEGOTIATION_NOTIFICATION_CRON)
+  # that would fire once per replica, risking duplicate notifications.
+  negotiation-service:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-negotiation-service:${IMAGE_TAG:-latest}
+    environment:
+      SPRING_DATASOURCE_URL:               jdbc:postgresql://postgres-negotiations:5432/${DB_NEGOTIATIONS_NAME:-clm_negotiations}
+      SPRING_DATASOURCE_USERNAME:          ${DB_USER:-clm_user}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_HIBERNATE_DDL_AUTO:               validate
+      SPRING_JPA_SHOW_SQL:                         "false"
+      SPRING_JPA_OPEN_IN_VIEW:                     "false"
+      SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: negotiations
+      SPRING_FLYWAY_ENABLED:   "true"
+      SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      SPRING_FLYWAY_SCHEMAS:   negotiations
+      CONTRACTS_SERVICE_URL: http://contracts:8081
+      SPRINGDOC_SWAGGER_UI_PATH: /api/negotiations/swagger-ui.html
+      SPRINGDOC_API_DOCS_PATH:   /api/negotiations/v3/api-docs
+      SERVER_PORT: 8085
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: prometheus,health,metrics,info
+      MANAGEMENT_ENDPOINTS_WEB_BASE_PATH:        /actuator
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS:   always
+      MANAGEMENT_METRICS_TAGS_APPLICATION:       negotiation-service
+      JAVA_TOOL_OPTIONS: >-
+        -Dmanagement.metrics.distribution.percentiles-histogram.http.server.requests=true
+        -Dmanagement.metrics.distribution.slo.http.server.requests=500ms,2000ms
+      LOGGING_LEVEL_ROOT:                INFO
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK: INFO
+      SPRING_MAIL_HOST:  ${MAIL_HOST}
+      SPRING_MAIL_PORT:  ${MAIL_PORT:-587}
+      NOTIFICATION_FROM: ${MAIL_FROM}
+      NOTIFICATION_RECIPIENTS:       ${NOTIFICATION_RECIPIENTS:-}
+      NEGOTIATION_NOTIFICATION_CRON: ${NEGOTIATION_NOTIFICATION_CRON:-0 0 9 1 * *}
+    secrets:
+      - db_password
+      - jwt_secret
+      - mail_username
+      - mail_password
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8085/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Swagger hub ────────────────────────────────────────────────────────────
+  swagger-hub:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-swagger-hub:${IMAGE_TAG:-latest}
+    environment:
+      PORT: "8090"
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:8090/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        order: start-first
+
+  # ── Frontend (Next.js standalone) ─────────────────────────────────────────
+  # NEXT_PUBLIC_* vars are baked into the bundle at build time.
+  # At runtime, only NEXTAUTH_* and server-side service URLs are needed.
+  frontend:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-frontend:${IMAGE_TAG:-latest}
+    environment:
+      NODE_ENV:                production
+      NEXT_TELEMETRY_DISABLED: "1"
+      CONTRACTS_SERVICE_URL:     http://contracts:8081
+      NOTIFICATIONS_SERVICE_URL: http://notifications:8082
+      USER_SERVICE_URL:          http://user-service:8083
+      CLIENT_SERVICE_URL:        http://client-service:8084
+      NEGOTIATION_SERVICE_URL:   http://negotiation-service:8085
+      ADMIN_REGISTER_CODE_FILE:  /run/secrets/admin_register_code
+      NEXTAUTH_URL: ${FRONTEND_URL}
+    secrets:
+      - nextauth_secret
+      - admin_register_code
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 60s
+        max_failure_ratio: 0.1
+        order: start-first
+
+  # ── Prometheus ─────────────────────────────────────────────────────────────
+  # Uses the official image; prometheus.yml is injected via Docker config.
+  # Single replica — Swarm does not support Prometheus HA natively (use
+  # Thanos or Cortex for multi-replica metrics if required).
+  prometheus:
+    image: prom/prometheus:v2.51.2
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles
+      - --web.enable-lifecycle
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+        mode: 0444
+    volumes:
+      - prometheus_data:/prometheus
+    environment:
+      - TZ=UTC
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == monitoring
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Grafana ────────────────────────────────────────────────────────────────
+  # Dashboards and datasources are baked into the custom image.
+  grafana:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-grafana:${IMAGE_TAG:-latest}
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_SERVER_ROOT_URL=${FRONTEND_URL}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - TZ=UTC
+    secrets:
+      - source: grafana_admin_password
+        target: /run/secrets/grafana_admin_password
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == monitoring
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 30s
+        failure_action: rollback
+        monitor: 60s
+        order: stop-first
+
+  # ── Nginx (TLS termination + reverse proxy) ────────────────────────────────
+  # Config is baked into the image. TLS cert/key are injected via Docker secrets
+  # and mounted at the paths the nginx config expects (/etc/nginx/certs/).
+  nginx:
+    image: ${REGISTRY:-registry.example.com/clm}/clm-nginx:${IMAGE_TAG:-latest}
+    ports:
+      - target:    80
+        published: 80
+        protocol:  tcp
+        mode:      ingress
+      - target:    443
+        published: 443
+        protocol:  tcp
+        mode:      ingress
+    secrets:
+      - source: nginx_tls_cert
+        target: /etc/nginx/certs/clm.crt
+        mode: 0444
+      - source: nginx_tls_key
+        target: /etc/nginx/certs/clm.key
+        mode: 0400
+    networks:
+      - dmz-net
+      - data-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0.1
+        order: start-first
+
+# ==============================================================================
+# Networks
+# ==============================================================================
+networks:
+  dmz-net:
+    driver: overlay
+    attachable: false
+
+  data-net:
+    driver: overlay
+    attachable: false
+
+# ==============================================================================
+# Volumes
+# All volumes use driver: local. Combined with the node.labels.role == db /
+# monitoring placement constraints, the container always lands on the same node
+# as its data directory, preventing data loss on reschedule.
+#
+# For multi-node HA databases, replace local volumes with a network-attached
+# storage driver (e.g. rexray/ebs, local-persist + NFS) and remove the
+# placement constraints.
+# ==============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  postgres_users_data:
+    driver: local
+  postgres_clients_data:
+    driver: local
+  postgres_negotiations_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+# ==============================================================================
+# Configs
+# ==============================================================================
+configs:
+  prometheus_config:
+    file: ./monitoring/prometheus/prometheus.yml
+
+# ==============================================================================
+# Secrets — all declared as external: true.
+# Create them on the Swarm BEFORE deploying (see swarm.md § 4).
+#
+#   echo -n "value" | docker secret create <name> -
+# ==============================================================================
+secrets:
+  db_password:
+    external: true
+  jwt_secret:
+    external: true
+  nextauth_secret:
+    external: true
+  admin_register_code:
+    external: true
+  admin_password:
+    external: true
+  mail_username:
+    external: true
+  mail_password:
+    external: true
+  grafana_admin_password:
+    external: true
+  nginx_tls_cert:
+    external: true
+  nginx_tls_key:
+    external: true

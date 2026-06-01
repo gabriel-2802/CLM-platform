@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -27,6 +28,8 @@ public class AppendixResponseDTO {
     private LocalDateTime uploadedSignedAt;
     private Integer uploadedSignedByUser;
     private String notes;
+    private LocalDate signDate;
+    private LocalDate effectiveDate;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;
 }

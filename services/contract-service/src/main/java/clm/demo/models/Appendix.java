@@ -7,6 +7,8 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.LocalDate;
+
 /**
  * Auxiliary document attached to a {@link Contract}.
  * Can be fillable (generated from a template, then signed) or non-fillable
@@ -40,4 +42,10 @@ public class Appendix extends Document {
     @Column(name = "appendix_status", nullable = false)
     @Builder.Default
     private AppendixStatus appendixStatus = AppendixStatus.DRAFT;
+
+    @Column(name = "sign_date")
+    private LocalDate signDate;
+
+    @Column(name = "effective_date")
+    private LocalDate effectiveDate;
 }

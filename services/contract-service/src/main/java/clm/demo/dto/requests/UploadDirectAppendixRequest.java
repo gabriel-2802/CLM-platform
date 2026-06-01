@@ -5,7 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
+import org.springframework.cglib.core.Local;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.time.LocalDate;
 
 @Data
 @NoArgsConstructor
@@ -23,4 +26,9 @@ public class UploadDirectAppendixRequest {
 
     private Integer userId;
     private String notes;
+
+    @NotNull(message = "Sign date is required")
+    private LocalDate signDate;
+    private LocalDate effectiveDate;
 }
+

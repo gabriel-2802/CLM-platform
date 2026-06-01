@@ -81,6 +81,8 @@ public class AppendixService {
                 .generatedByUser(Objects.nonNull(request.userId()) ? request.userId().intValue() : null)
                 .notes(request.notes())
                 .appendixStatus(AppendixStatus.DRAFT)
+                .effectiveDate(request.effectiveDate())
+                .signDate(request.signDate())
                 .build();
 
         appendix = appendixRepository.save(appendix);
@@ -135,6 +137,8 @@ public class AppendixService {
                     .uploadedSignedAt(LocalDateTime.now())
                     .uploadedSignedByUser(request.getUserId())
                     .appendixStatus(AppendixStatus.SIGNED)
+                    .effectiveDate(request.getEffectiveDate())
+                    .signDate(request.getSignDate())
                     .build();
 
             AppendixResponseDTO response = appendixMapper.toResponseDTO(appendixRepository.save(appendix));

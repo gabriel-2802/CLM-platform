@@ -1418,3 +1418,177 @@ Measured against a live PostgreSQL 16 container with full Flyway schema, JPA/Hib
 ---
 
 *Documentation generated from source analysis of the `contract-service` module. For schema details see also `DATABASE_DOCUMENTATION.md` and the migration files under `src/main/resources/db/migration/`.*
+
+
+% ============================================================
+%  CHAPTER 4 — PROPOSED SOLUTION  (contract service section)
+% ============================================================
+
+\section{Contract service}
+
+The platform requires a service that owns the full lifecycle of legally significant
+documents: from the moment a template is uploaded to the moment a contract is
+archived or terminated. The existing Next.js monolith had no such capability. The
+contract service was built as a standalone Spring Boot microservice to fill this
+gap. It is the document management core of the CLM platform.
+
+\subsection{Responsibilities}
+
+The service has six responsibilities. It manages document templates: accepting DOCX
+and PDF uploads, extracting placeholder positions, and storing a normalised internal
+representation. It generates contracts: filling template placeholders with
+user-supplied values, rendering the result to PDF, and persisting the document with
+a full audit trail. It manages appendices: supplementary documents attached to a
+parent contract, either generated from a template or uploaded directly. It serves
+document downloads in DOCX or PDF format for any document type it manages. It
+exposes two reporting endpoints consumed by the notification service: one for
+contracts approaching expiry, one for contracts with no renegotiation within a
+configurable period. Finally, it runs two nightly scheduled jobs that perform bulk
+status transitions on expired and termination-due contracts.
+
+\subsection{Data model}
+
+The service owns six tables in the dedicated PostgreSQL schema \texttt{clm}. Schema
+isolation means the application database user has no access to any other service's
+schema, and Flyway's migration history is scoped to this schema exclusively.
+
+The central design decision in the schema is JPA JOINED inheritance for the
+\texttt{document} base table, with \texttt{contract} and \texttt{appendix} as
+subclass tables. Contracts and appendices share a large common footprint: binary
+content, template reference, creator information, field values, and timestamps.
+Three inheritance strategies were considered. SINGLE\_TABLE was rejected because
+it requires nullable columns for every subclass-specific field and makes constraint
+modelling fragile. TABLE\_PER\_CLASS was rejected because
+\texttt{document\_field\_value} needs a single, strongly-typed foreign key to the
+parent entity; with TABLE\_PER\_CLASS this would require a polymorphic foreign key
+to multiple tables, which relational databases do not support. JOINED inheritance
+provides a normalised schema where \texttt{document\_field\_value} references
+\texttt{document.id} regardless of whether the document is a contract or appendix,
+at the cost of one extra join per subclass fetch.
+
+The entity-relationship structure is shown in Figure~\ref{fig:contract-service-erd}.
+
+% TODO: Insert contract service ERD figure here
+% \begin{figure}[h]
+%   \centering
+%   \includegraphics[width=0.85\textwidth]{figures/contract_db.png}
+%   \caption{Entity-relationship diagram for the contract service.}
+%   \label{fig:contract-service-erd}
+% \end{figure}
+
+\texttt{document\_template} stores the uploaded template as GZIP-compressed DOCX,
+the count of extracted placeholder sequences, and an \texttt{is\_fully\_mapped}
+flag maintained automatically by a database trigger. \texttt{template\_field} stores
+one record per placeholder, carrying the field's zero-based position index in the
+document, its user-assigned label, data type, and a required flag that blocks
+contract generation if no value is supplied.
+
+\texttt{document} is the JOINED base table holding the binary content of both
+the unsigned and signed versions of a document, along with creator metadata and
+a \texttt{notes} field. \texttt{contract} is the subclass table holding the
+client reference, contract status, financial values, date range, auto-renewal
+flag, and six audit columns tracking who generated, signed, and terminated the
+contract and when. \texttt{appendix} is the subclass table linking a supplementary
+document to its parent contract. \texttt{document\_field\_value} is an
+immutable audit log recording every value injected into every placeholder at
+generation time.
+
+\subsection{Contract lifecycle}
+
+A contract passes through a defined set of statuses, shown in
+Figure~\ref{fig:contract-lifecycle}. It begins in \texttt{PENDING\_SIGNATURE}
+after generation. Once the signed document is uploaded it transitions to
+\texttt{ACTIVE}. From \texttt{ACTIVE} it can be moved to \texttt{TERMINATION\_DUE}
+by a user supplying a future termination date, which the nightly job converts to
+\texttt{TERMINATED} on that date. Contracts whose end date has passed and whose
+\texttt{auto\_renew} flag is false are moved to \texttt{ARCHIVED} by the nightly
+archival job.
+
+\begin{figure}[h]
+  \centering
+  % TODO: Insert contract lifecycle state machine diagram here
+  \caption{Contract lifecycle state machine.}
+  \label{fig:contract-lifecycle}
+\end{figure}
+
+\subsection{API surface}
+
+The service exposes three groups of REST endpoints, summarised in
+Table~\ref{tab:contract-api}. All endpoints except the OpenAPI documentation paths
+and actuator endpoints require a valid JWT in the \texttt{Authorization} header.
+
+\begin{table}[h]\small\linespread{1}
+\caption{Contract service REST API surface}
+\label{tab:contract-api}
+\begin{tabular}{l l l >{\raggedright\arraybackslash}p{4.5cm}}
+\textbf{Group} & \textbf{Method} & \textbf{Path} & \textbf{Description} \\\hline
+Templates
+  & POST   & \texttt{/api/templates/upload}
+  & Upload template, extract fields \\
+  & GET    & \texttt{/api/templates}
+  & List all templates (paginated) \\
+  & GET    & \texttt{/api/templates/\{id\}}
+  & Get template with fields \\
+  & PUT    & \texttt{/api/templates/\{id\}/labels}
+  & Batch-update field labels \\
+  & DELETE & \texttt{/api/templates/\{id\}}
+  & Delete template \\
+  & GET    & \texttt{/api/templates/download/\{id\}/\{format\}}
+  & Download template \\\hline
+Contracts
+  & POST   & \texttt{/api/contracts/generate}
+  & Generate contract from template \\
+  & POST   & \texttt{/api/contracts/\{id\}/upload-signed}
+  & Upload signed document \\
+  & PUT    & \texttt{/api/contracts/terminate/\{id\}}
+  & Terminate active contract \\
+  & PUT    & \texttt{/api/contracts/\{id\}/toggle-auto-renew}
+  & Toggle auto-renewal flag \\
+  & GET    & \texttt{/api/contracts/all}
+  & List all contracts (paginated) \\
+  & POST   & \texttt{/api/contracts/search}
+  & Dynamic search \\
+  & GET    & \texttt{/api/contracts/download/\{id\}/\{type\}/\{format\}}
+  & Download document \\
+  & GET    & \texttt{/api/contracts/report/expiring}
+  & Contracts expiring within N days \\
+  & GET    & \texttt{/api/contracts/report/inactive-clients}
+  & Clients with no rate change in M months \\\hline
+Appendices
+  & POST   & \texttt{/api/appendices/generate}
+  & Generate appendix from template \\
+  & POST   & \texttt{/api/appendices/upload}
+  & Upload direct appendix \\
+  & POST   & \texttt{/api/appendices/\{id\}/upload-signed}
+  & Upload signed appendix \\
+  & GET    & \texttt{/api/appendices/contract/\{contractId\}}
+  & List appendices for a contract \\
+  & DELETE & \texttt{/api/appendices/\{id\}}
+  & Delete appendix \\
+  & GET    & \texttt{/api/appendices/download/\{id\}/\{type\}/\{format\}}
+  & Download appendix \\\hline
+\end{tabular}
+\end{table}
+
+\subsection{Role-based access control}
+
+The contract service does not implement operation-level role restrictions beyond
+requiring a valid authenticated token for all endpoints. Access to reporting
+endpoints is consumed by the notification service over the internal Docker network.
+Table~\ref{tab:contract-rbac} summarises the access matrix.
+
+\begin{table}[h]\small\linespread{1}
+\caption{Role-based access control matrix for the contract service}
+\label{tab:contract-rbac}
+\begin{tabular}{>{\raggedright\arraybackslash}p{8cm}
+                  >{\centering\arraybackslash}p{2cm}
+                  >{\centering\arraybackslash}p{2cm}}
+\textbf{Operation} & \textbf{Authenticated} & \textbf{Public} \\\hline
+All template operations         & \checkmark & \\
+All contract operations         & \checkmark & \\
+All appendix operations         & \checkmark & \\
+Reporting endpoints             & \checkmark & \\
+OpenAPI documentation           &            & \checkmark \\
+Actuator health endpoints       &            & \checkmark \\\hline
+\end{tabular}
+\end{table}
