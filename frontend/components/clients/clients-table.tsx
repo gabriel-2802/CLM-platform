@@ -571,6 +571,22 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
           )
         }
 
+        if (status !== "ACTIVE") {
+          return (
+            <span title="Nu poate fi incetat un contract care nu a fost incarcat semnat">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-red-200 bg-red-50 text-red-300 pointer-events-none"
+                tabIndex={-1}
+                aria-disabled="true"
+              >
+                Încheie
+              </Button>
+            </span>
+          )
+        }
+
         return (
             <TerminateContractDialog
                 contractId={contractId}
