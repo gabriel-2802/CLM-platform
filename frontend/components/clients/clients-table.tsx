@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { GenerateContractModal } from "@/components/clients/generate-contract-modal";
 import { ActeAditionaleDialog } from "@/components/clients/acte-aditionale-dialog";
 import { NegocieriDialog } from "@/components/clients/negocieri-dialog";
+import { ContractAuditDialog } from "@/components/clients/contract-audit-dialog";
 import { terminateContract, toggleAutoRenewal, uploadSignedContract } from "@/actions/contracts";
 import { toast } from "sonner";
 import { useAuthenticatedDownload } from "@/hooks/use-authenticated-download";
@@ -575,6 +576,21 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
             clientId={row.original.id}
             clientName={row.original.name ?? undefined}
             contractStatus={row.original.contractStatus ?? undefined}
+          />
+        );
+      },
+    },
+    {
+      id: "audit",
+      header: "Audit",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const contractId = row.original.contractId;
+        if (!contractId) return <span className="text-muted-foreground">—</span>;
+        return (
+          <ContractAuditDialog
+            contractId={contractId}
+            clientName={row.original.name ?? undefined}
           />
         );
       },

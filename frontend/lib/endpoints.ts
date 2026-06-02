@@ -85,6 +85,7 @@ export const CONTRACTS_SERVICE = {
     uploadSigned: (id: number | string) => `/api/contracts/${id}/upload-signed`,
     downloadPdf:  (id: number | string, type: "unsigned" | "signed") =>
             `/api/contracts/download/${id}/${type}/pdf`,
+    detailed:     (id: number | string) => `/api/contracts/${id}/detailed`,
   },
 
   templates: {

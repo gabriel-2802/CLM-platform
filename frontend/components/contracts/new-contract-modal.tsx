@@ -186,7 +186,7 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 backdrop-blur-[2px] transition-all duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0" />
         <DialogPrimitive.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 rounded-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Contract nou{selectedClientName ? ` — ${selectedClientName}` : ""}</DialogTitle>
+            <DialogTitle>Contract nou{selectedClientName ? ` - ${selectedClientName}` : ""}</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
