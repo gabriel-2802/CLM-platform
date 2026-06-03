@@ -8,7 +8,7 @@ Thumbs.db
 *.swp
 *.swo
 .idea/
-.vscode/
+
 nginx/.claude/
 # ── Environment files (real secrets) ─────────────────────────────────────────
 # .env.testing is intentionally committed (safe dev defaults only).
