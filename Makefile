@@ -27,7 +27,8 @@ NC     := \033[0m
         swarm-ps swarm-logs \
         swarm-db swarm-db-users swarm-db-clients \
         prometheus-reload-swarm nginx-reload-swarm \
-        swarm-rebuild swarm-restart
+        swarm-rebuild swarm-restart \
+        frontend-dev
 
 # ─── help ─────────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ help:
 	@echo "  $(YELLOW)make swarm-rebuild name=<svc>$(NC)  Rebuild image + rolling update (e.g. name=contracts)"
 	@echo "  $(YELLOW)make swarm-restart name=<svc>$(NC)  Rolling restart without rebuild"
 	@echo "  $(YELLOW)make swarm-deploy-test$(NC)         Redeploy whole stack (idempotent)"
+	@echo "  $(YELLOW)make frontend-dev$(NC)              Hot-reload dev server at http://localhost:3000"
 	@echo ""
 	@echo "$(BOLD)SWARM — MAINTENANCE$(NC)"
 	@echo "  $(YELLOW)make swarm-config-update$(NC)  Recreate prometheus config (after prometheus.yml changes)"
@@ -488,3 +490,31 @@ swarm-restart: check-docker
 	@[ -n "$(name)" ] || { echo "$(RED)Usage: make swarm-restart name=<service>$(NC)"; exit 1; }
 	@docker service update --force $(STACK_TEST)_$(name)
 	@echo "$(GREEN)✓ $(name) restarting$(NC)"
+
+# ─── frontend dev mode (hot-reload) ───────────────────────────────────────────
+# Runs Next.js in dev mode with source mounted live — changes are instant.
+# Backend services must already be up via make swarm-deploy-test.
+# Ctrl+C to stop. Nginx on :443 still routes to the swarm frontend; use
+# http://localhost:3000 directly while this is running.
+frontend-dev: check-docker
+	@echo "$(BLUE)Starting frontend dev server (hot-reload)...$(NC)"
+	@echo "$(YELLOW)  Open: http://localhost:3000$(NC)"
+	@echo "$(YELLOW)  Stop: Ctrl+C$(NC)"
+	@echo ""
+	@docker run --rm -it \
+	  --network $(STACK_TEST)_clm-backend \
+	  -v "$(PWD)/frontend:/app" \
+	  -w /app \
+	  -p 3000:3000 \
+	  -e NEXTAUTH_SECRET="$$(cat /run/secrets/clm_nextauth_secret 2>/dev/null || grep NEXTAUTH_SECRET .env.testing | cut -d= -f2-)" \
+	  -e NEXTAUTH_URL=https://localhost \
+	  -e CONTRACTS_SERVICE_URL=http://contracts:8081 \
+	  -e USER_SERVICE_URL=http://user-service:8083 \
+	  -e CLIENT_SERVICE_URL=http://client-service:8084 \
+	  -e NEGOTIATION_SERVICE_URL=http://negotiation-service:8085 \
+	  -e NOTIFICATIONS_SERVICE_URL=http://notifications:8082 \
+	  -e ADMIN_REGISTER_CODE="$$(grep ADMIN_REGISTER_CODE .env.testing | cut -d= -f2-)" \
+	  -e NODE_TLS_REJECT_UNAUTHORIZED=0 \
+	  -e NODE_ENV=development \
+	  -e NEXT_TELEMETRY_DISABLED=1 \
+	  node:20-alpine sh -c "npm install --prefer-offline 2>/dev/null; npm run dev"

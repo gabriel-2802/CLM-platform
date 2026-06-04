@@ -294,7 +294,7 @@ export function TemplateMappingModal({
                     <p className="mt-1 text-xs">
                       Pentru a vedea documentul complet cu dropdown-urile integrate în text, încarcă un{" "}
                       <strong>.docx</strong> care conține și textul real al contractului (cu{" "}
-                      <code>....</code> la locurile de completat). Poți totuși configura maparea câmpurilor mai jos.
+                      <code>....</code> la locurile de completat). Poți totuși configura etichetarea câmpurilor mai jos.
                     </p>
                   </div>
               )}
@@ -346,7 +346,7 @@ export function TemplateMappingModal({
                 /* Fallback: numbered field mapping list */
                 <div className="p-6 space-y-3">
                   <p className="text-xs text-muted-foreground italic mb-4">
-                    Configurează maparea câmpurilor detectate în ordinea apariției în document:
+                    Configurează etichetarea câmpurilor detectate în ordinea apariției în document:
                   </p>
                   {fields.map((field, idx) => (
                       <div
