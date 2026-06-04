@@ -9,4 +9,4 @@ COPY conf.d/clm.conf /etc/nginx/conf.d/clm.conf
 EXPOSE 80 443
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-  CMD wget -q --spider http://localhost:80 || exit 1
+  CMD wget -q -O /dev/null http://localhost:80/health || exit 1

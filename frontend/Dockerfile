@@ -65,6 +65,8 @@ WORKDIR /app
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static     ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public           ./public
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 USER nextjs
 
@@ -73,4 +75,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=60s \
   CMD wget -q --spider http://127.0.0.1:3000 || exit 1
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "server.js"]

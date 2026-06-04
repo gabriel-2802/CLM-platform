@@ -1,337 +1,318 @@
-# CLM Platform — Docker Swarm Deployment Guide
+# CLM Platform — Docker Swarm
 
-This document covers every architectural decision required to promote the CLM
-platform from the local `docker-compose.testing.yml` workflow to a
-production-grade Docker Swarm stack (`docker-stack.yml`).
+Single `docker-stack.yml` for both testing and production.  
+Only secrets and replica counts differ between environments.  
+Swagger-hub is disabled in production (`SWAGGER_HUB_REPLICAS=0`).
 
 ---
 
-## 1. Service Topology
+## Architecture
 
-| Service | Image | Port | Role |
+```
+                        ┌─────────────────────────────────────────────────────┐
+  Browser / Client      │  HOST                                               │
+  ─────────────────     │                                                     │
+  HTTPS :443  ──────────┼──▶  nginx  (clm-edge + clm-backend)                │
+  HTTP  :80   ──────────┼──▶  nginx  (redirect → HTTPS)                      │
+                        │       │                                             │
+                        │       │  clm-backend overlay network               │
+                        │       ├──▶  frontend       :3000  (Next.js)        │
+                        │       ├──▶  user-service   :8083  (Spring Boot)    │
+                        │       ├──▶  contracts      :8081  (Spring Boot)    │
+                        │       ├──▶  client-service :8084  (Spring Boot)    │
+                        │       ├──▶  notifications  :8082  (Spring Boot)    │
+                        │       ├──▶  negotiation-service :8085 (Spring Boot)│
+                        │       ├──▶  swagger-hub    :8090  (testing only)   │
+                        │       └──▶  grafana        :3000                   │
+                        │                                                     │
+                        └─────────────────────────────────────────────────────┘
+```
+
+### Services
+
+| Service | Port | Tech | Description |
 |---|---|---|---|
-| `postgres` | custom (`db/Dockerfile`) | 5432 | Contracts DB |
-| `postgres-users` | `postgres:16-alpine` | 5432 | Users DB |
-| `postgres-clients` | `postgres:16-alpine` | 5432 | Clients DB |
-| `postgres-negotiations` | `postgres:16-alpine` | 5432 | Negotiations DB |
-| `user-service` | custom (JRE 21) | 8083 | Auth / JWT |
-| `contracts` | custom (JRE 21 + LibreOffice) | 8081 | Contract CRUD + PDF |
-| `client-service` | custom (JRE 21) | 8084 | Client management |
-| `notifications` | custom (JRE 25) | 8082 | Email dispatch |
-| `negotiation-service` | custom (JRE 21) | 8085 | Negotiation + cron |
-| `swagger-hub` | custom (Python 3.13) | 8090 | API docs aggregator |
-| `frontend` | custom (Node 20, Next.js) | 3000 | SSR + Next.js API routes |
-| `prometheus` | `prom/prometheus:v2.51.2` | 9090 | Metrics collection |
-| `grafana` | custom (`monitoring/grafana/Dockerfile`) | 3000 | Metrics dashboards |
-| `nginx` | custom (`nginx/Dockerfile`) | 80, 443 | TLS termination + reverse proxy |
+| `nginx` | 80, 443 | nginx 1.27 | TLS termination, reverse proxy, rate limiting |
+| `frontend` | 3000 | Next.js 20 (standalone) | UI + server-side API routes |
+| `user-service` | 8083 | Spring Boot 21 | Auth, JWT issuance, user management |
+| `contracts` | 8081 | Spring Boot 21 + LibreOffice | Contract lifecycle, DOCX→PDF rendering |
+| `client-service` | 8084 | Spring Boot 21 | Client records, enums, task definitions |
+| `notifications` | 8082 | Spring Boot 25 | Email dispatch |
+| `negotiation-service` | 8085 | Spring Boot 21 | Negotiation workflows, scheduled reminders |
+| `swagger-hub` | 8090 | Python 3.13 | Aggregated API docs (testing only) |
+| `prometheus` | 9090 | prom/prometheus | Metrics scraping (internal only) |
+| `grafana` | 3000 | Grafana 10.4 | Dashboards at `/grafana/` |
 
-Traffic flow: all external requests enter on nginx ports 80/443. Nginx
-terminates TLS and proxies to the appropriate backend over the `data-net`
-overlay network. Databases are never reachable from outside the cluster.
+### Databases
 
----
+Each service owns a dedicated Postgres 16 instance. Schema isolation is enforced by Flyway.
 
-## 2. Image Registry Requirements
+| Container | Database | Schema | Owned by |
+|---|---|---|---|
+| `postgres` | `clm_platform` | `clm` | contracts |
+| `postgres-users` | `clm_users` | `users` | user-service |
+| `postgres-clients` | `clm_clients` | `clients` | client-service |
+| `postgres-negotiations` | `clm_negotiations` | `negotiations` | negotiation-service |
 
-`docker stack deploy` does **not** support the `build:` key. Every service
-that has a custom `Dockerfile` must be built locally and pushed to a container
-registry before deployment.
+### Request routing (nginx)
 
-### Build and push script
-
-```bash
-REGISTRY=registry.example.com/clm
-TAG=1.0.0
-
-# Custom-build images
-docker build -t ${REGISTRY}/clm-postgres:${TAG}           -f db/Dockerfile .
-docker build -t ${REGISTRY}/clm-user-service:${TAG}       services/user-service/
-docker build -t ${REGISTRY}/clm-contracts:${TAG}          services/contract-service/
-docker build -t ${REGISTRY}/clm-client-service:${TAG}     services/client-service/
-docker build -t ${REGISTRY}/clm-notifications:${TAG}      services/notification-service/
-docker build -t ${REGISTRY}/clm-negotiation-service:${TAG} services/negotiation-service/
-docker build -t ${REGISTRY}/clm-swagger-hub:${TAG}        swagger-hub/
-
-# Frontend — public NEXT_PUBLIC_* vars must be baked in at build time
-docker build \
-  --build-arg NEXT_PUBLIC_CONTRACTS_API_URL=https://clm.example.com/api/contracts \
-  --build-arg NEXT_PUBLIC_NOTIFICATIONS_API_URL=https://clm.example.com/api/notifications \
-  --build-arg NEXT_PUBLIC_USER_SERVICE_URL=https://clm.example.com/api/users \
-  --build-arg NEXT_PUBLIC_CLIENT_SERVICE_URL=https://clm.example.com/api/clients \
-  -t ${REGISTRY}/clm-frontend:${TAG} frontend/
-
-docker build -t ${REGISTRY}/clm-grafana:${TAG}            monitoring/grafana/
-docker build -t ${REGISTRY}/clm-nginx:${TAG}              nginx/
-
-# Push all images
-for svc in clm-postgres clm-user-service clm-contracts clm-client-service \
-           clm-notifications clm-negotiation-service clm-swagger-hub \
-           clm-frontend clm-grafana clm-nginx; do
-  docker push ${REGISTRY}/${svc}:${TAG}
-done
-```
-
-Set `REGISTRY` and `IMAGE_TAG` in `.env.production` before deploying.
-
----
-
-## 3. Node Labels
-
-Apply labels to Swarm nodes to enable placement constraints for stateful
-services. Databases are pinned to a dedicated node to guarantee that named
-volumes remain co-located with the containers that own them.
-
-```bash
-# Designate one node as the DB host (replace <node-id> with actual ID)
-docker node update --label-add role=db         <db-node-id>
-
-# Designate one node for monitoring (can be the manager node)
-docker node update --label-add role=monitoring  <monitoring-node-id>
-```
-
-Verify with:
-
-```bash
-docker node inspect --pretty <node-id> | grep Labels -A5
-```
-
----
-
-## 4. Secrets Management
-
-Sensitive values from `.env.production` are migrated to Docker Swarm Secrets.
-Secrets are encrypted at rest (in the Raft log) and in transit, and are only
-ever decrypted inside the container at `/run/secrets/<name>`.
-
-### Secret inventory
-
-| Secret name | Maps to (env var) | Consumer services |
+| Path | Upstream | Notes |
 |---|---|---|
-| `db_password` | `DB_PASSWORD` / `POSTGRES_PASSWORD` | all postgres instances, all Spring Boot services |
-| `jwt_secret` | `JWT_SECRET` | user-service, contracts, client-service, notifications, negotiation-service |
-| `nextauth_secret` | `NEXTAUTH_SECRET` | frontend |
-| `admin_register_code` | `ADMIN_REGISTER_CODE` | user-service, contracts |
-| `admin_password` | `APP_ADMIN_PASSWORD` | user-service |
-| `mail_username` | `SPRING_MAIL_USERNAME` | contracts, notifications, negotiation-service |
-| `mail_password` | `SPRING_MAIL_PASSWORD` | contracts, notifications, negotiation-service |
-| `grafana_admin_password` | `GF_SECURITY_ADMIN_PASSWORD` | grafana |
-| `nginx_tls_cert` | TLS certificate file | nginx |
-| `nginx_tls_key` | TLS private key file | nginx |
+| `/api/auth/login`, `/api/auth/register` | `user-service:8083` | Rate-limited, direct to service |
+| `/api/users/*` | `frontend:3000` | Admin-only, session-cookie auth in Next.js |
+| `/api/contracts/*`, `/api/templates/*`, `/api/appendices/*` | `contracts:8081` | Bearer token |
+| `/api/clients/*`, `/api/enums/*`, `/api/tasks/*` | `client-service:8084` | Bearer token |
+| `/api/negotiations/*` | `negotiation-service:8085` | Bearer token |
+| `/api/tasks/generate*` | `frontend:3000` | Basic auth + multi-service orchestration |
+| `/notifications/*` | `notifications:8082` | No auth (internal trigger) |
+| `/docs/*` | `swagger-hub:8090` | Testing only |
+| `/grafana/*` | `grafana:3000` | |
+| `/*` | `frontend:3000` | Catch-all |
 
-> **JWT / NextAuth alignment:** `jwt_secret` and `nextauth_secret` must hold
-> the same value. Spring Boot validates JWT tokens signed by NextAuth. Create
-> them separately on the Swarm so services can reference the name that matches
-> their env var, but populate both with the same `openssl rand -hex 32` output.
+Download endpoints (`/api/(templates\|contracts\|appendices)/download`) bypass the frontend and go directly to the contracts service with a 24 h proxy timeout.
 
-### Secret initialisation commands
+### Auth flow
 
-```bash
-# Generate strong values for secrets that need them
-JWT_VAL=$(openssl rand -hex 32)
-echo -n "$JWT_VAL" | docker secret create jwt_secret -
-echo -n "$JWT_VAL" | docker secret create nextauth_secret -
+```
+Browser
+  │  POST /api/auth/login  ──▶  user-service  (issues JWT)
+  │  JWT stored as HttpOnly cookie by Next.js
+  │
+  │  Subsequent requests  ──▶  nginx  ──▶  frontend (Next.js middleware validates JWT)
+  │                                    └──▶  backend services (Bearer header forwarded)
+```
 
-echo -n "$(openssl rand -base64 24)" | docker secret create db_password -
-echo -n "$(openssl rand -base64 16)" | docker secret create admin_register_code -
-echo -n "ChangeMe_StrongAdminPassword1!" | docker secret create admin_password -
+`JWT_SECRET` and `NEXTAUTH_SECRET` must be the same value — Next.js signs session tokens with `NEXTAUTH_SECRET` and Spring validates them with `JWT_SECRET`. Both are loaded from their respective Swarm secrets at container start via `docker-entrypoint.sh`.
 
-echo -n "your-smtp-username"  | docker secret create mail_username -
-echo -n "your-smtp-password"  | docker secret create mail_password -
-echo -n "$(openssl rand -base64 16)" | docker secret create grafana_admin_password -
+### Secret injection
 
-# TLS certificate and key (replace with your cert, e.g. from Let's Encrypt)
-docker secret create nginx_tls_cert /path/to/fullchain.pem
-docker secret create nginx_tls_key  /path/to/privkey.pem
+Postgres and Grafana read secrets natively via `*_FILE` env vars. All Spring Boot services and the Next.js frontend use a `docker-entrypoint.sh` wrapper that reads `/run/secrets/*` files into environment variables before the process starts, so no application code changes are needed.
+
+---
+
+## Networks & secrets model
+
+| Network | Who lives here |
+|---|---|
+| `clm-edge` | Nginx only — the external-facing tier |
+| `clm-backend` | All services + Nginx — internal only |
+
+Secrets are stored in the Swarm raft keystore and injected as files under `/run/secrets/` inside containers. No secret values appear in `docker-stack.yml` or any env file.
+
+| Secret | Used by |
+|---|---|
+| `clm_db_password` | All Postgres instances + Spring services |
+| `clm_jwt_secret` | user-service, contracts, client-service, notifications, negotiation-service |
+| `clm_nextauth_secret` | frontend (must equal `clm_jwt_secret`) |
+| `clm_admin_password` | user-service |
+| `clm_admin_register_code` | user-service, contracts, frontend |
+| `clm_mail_username` | contracts, notifications, negotiation-service |
+| `clm_mail_password` | contracts, notifications, negotiation-service |
+| `clm_grafana_password` | grafana |
+| `clm_tls_cert` | nginx (mounted at `/etc/nginx/certs/clm.crt`) |
+| `clm_tls_key` | nginx (mounted at `/etc/nginx/certs/clm.key`) |
+
+---
+
+## First-time setup
+
+### 1 — Initialise Swarm
+
+```sh
+make swarm-init
+```
+
+### 2 — TLS certificates (testing only)
+
+```sh
+make certs
+# Optional: trust the cert in your browser
+make trust-cert
+```
+
+For production, place your real cert and key paths in `.env.secrets` (`TLS_CERT_FILE` / `TLS_KEY_FILE`).
+
+### 3 — Create the Prometheus config
+
+```sh
+make swarm-config-create
+```
+
+This registers `monitoring/prometheus/prometheus.yml` as a Docker config named `clm_prometheus_config`.
+
+### 4 — Create secrets
+
+**Testing** — reads values from `.env.testing`:
+
+```sh
+make swarm-secrets-test
+```
+
+**Production** — reads values from `.env.secrets` (never committed):
+
+```sh
+cp .env.secrets.example .env.secrets
+# fill in all values
+make swarm-secrets-prod
+```
+
+Secrets are idempotent — existing ones are skipped. To rotate a secret:
+
+```sh
+docker secret rm clm_jwt_secret
+make swarm-secrets-test   # or prod
+make swarm-deploy-test    # pick up the new secret
+```
+
+### 5 — Build images
+
+**Testing** (builds locally, tag: `local`):
+
+```sh
+make swarm-build-test
+```
+
+**Production** — build and push to your registry. Set `IMAGE_PREFIX` and `IMAGE_TAG` in `.env.production` first:
+
+```sh
+make swarm-build-prod
+```
+
+### 6 — Deploy
+
+```sh
+make swarm-deploy-test    # stack name: clm-test
+make swarm-deploy-prod    # stack name: clm
+```
+
+`docker stack deploy` is idempotent — re-running it only updates services whose definition changed.
+
+---
+
+## Day-to-day
+
+### Rebuild one service after a code change
+
+```sh
+make swarm-rebuild name=contracts
+```
+
+Rebuilds the image locally and does a rolling update in the stack. Available service names:
+
+```
+postgres  user-service  contracts  client-service  notifications
+negotiation-service  swagger-hub  frontend  nginx  grafana
+```
+
+### Restart a service without rebuilding
+
+```sh
+make swarm-restart name=contracts
+```
+
+Useful after rotating a secret or changing an env var — redeploy the stack and then restart the affected service.
+
+### Redeploy the whole stack
+
+```sh
+make swarm-deploy-test
+```
+
+Only services whose image or config actually changed will be restarted.
+
+### Nginx config changed
+
+```sh
+make swarm-rebuild name=nginx
+# or hot-reload without a full rebuild:
+make nginx-reload-swarm
+```
+
+### Prometheus config changed
+
+```sh
+make swarm-config-update    # recreates clm_prometheus_config
+make swarm-deploy-test      # picks up the new config
+# or hot-reload:
+make prometheus-reload-swarm
 ```
 
 ---
 
-## 5. Spring Boot Secret Injection
+## Observe
 
-The official PostgreSQL image natively supports `POSTGRES_PASSWORD_FILE`.
-Spring Boot does **not** natively read environment variables from files using a
-`_FILE` suffix. To bridge this gap, add a thin wrapper entrypoint script to
-each Spring Boot image.
-
-### Wrapper script (`docker-entrypoint-wrapper.sh`)
-
-Place this in each Spring Boot service directory and reference it in the
-Dockerfile:
-
-```bash
-#!/bin/sh
-# Exports Docker Swarm secrets as environment variables before JVM starts.
-_read_secret() {
-  local name="$1"
-  local file="/run/secrets/${name}"
-  [ -r "$file" ] && cat "$file"
-}
-
-export SPRING_DATASOURCE_PASSWORD="$(_read_secret db_password)"
-export JWT_SECRET="$(_read_secret jwt_secret)"
-export APP_JWT_SECRET="$(_read_secret jwt_secret)"
-export APP_ADMIN_REGISTER_CODE="$(_read_secret admin_register_code)"
-export APP_ADMIN_PASSWORD="$(_read_secret admin_password)"
-export SPRING_MAIL_USERNAME="$(_read_secret mail_username)"
-export SPRING_MAIL_PASSWORD="$(_read_secret mail_password)"
-
-exec "$@"
+```sh
+make swarm-ps          # list stacks and services with replica counts
+make swarm-logs        # follow logs (nginx + frontend + contracts + user-service)
 ```
 
-Update each Spring Boot Dockerfile runtime stage:
+Tail a specific service:
 
-```dockerfile
-COPY docker-entrypoint-wrapper.sh /usr/local/bin/entrypoint-wrapper.sh
-RUN chmod +x /usr/local/bin/entrypoint-wrapper.sh
-
-ENTRYPOINT ["/usr/local/bin/entrypoint-wrapper.sh", "java", \
-  "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", \
-  "-Djava.security.egd=file:/dev/./urandom", "-jar", "<service>.jar"]
+```sh
+docker service logs -f clm-test_contracts
 ```
-
-For the frontend (`nextauth_secret`), Next.js reads `NEXTAUTH_SECRET` from the
-environment. Use the same wrapper pattern in the Node image, reading
-`/run/secrets/nextauth_secret` and exporting it as `NEXTAUTH_SECRET` before
-`node server.js` is called.
 
 ---
 
-## 6. High Availability & Replicas
+## Database access (testing)
 
-| Service | Replicas | Rationale |
+```sh
+make swarm-db           # psql → clm_platform  (main DB)
+make swarm-db-users     # psql → clm_users
+make swarm-db-clients   # psql → clm_clients
+```
+
+---
+
+## Tear down
+
+```sh
+make swarm-down-test    # removes stack, volumes are preserved
+make swarm-down-prod    # same — prompts for confirmation
+```
+
+To also delete volumes (destroys all data):
+
+```sh
+docker volume rm clm-test_postgres_data clm-test_postgres_users_data \
+  clm-test_postgres_clients_data clm-test_postgres_negotiations_data \
+  clm-test_prometheus_data clm-test_grafana_data
+```
+
+---
+
+## Environment variables
+
+Non-secret values come from the env file passed at deploy time. Key ones:
+
+| Variable | Testing | Production |
 |---|---|---|
-| `postgres` | 1 | Stateful; pinned to db node |
-| `postgres-users` | 1 | Stateful; pinned to db node |
-| `postgres-clients` | 1 | Stateful; pinned to db node |
-| `postgres-negotiations` | 1 | Stateful; pinned to db node |
-| `user-service` | 2 | Stateless; rolling update safe |
-| `contracts` | 2 | Stateless per-request; LibreOffice conversions are independent |
-| `client-service` | 2 | Stateless; rolling update safe |
-| `notifications` | 1 | Event-driven emailer; multiple replicas risk duplicate sends |
-| `negotiation-service` | 1 | Contains a monthly cron job; multiple replicas would fire it N times |
-| `swagger-hub` | 1 | Read-only; low traffic |
-| `frontend` | 2 | Stateless SSR; rolling update safe |
-| `prometheus` | 1 | Stateful TSDB; must be pinned to its data volume |
-| `grafana` | 1 | Stateful (SQLite); must be pinned to its data volume |
-| `nginx` | 2 | Entry point; Swarm routing mesh distributes incoming connections |
+| `IMAGE_PREFIX` | _(empty — local images)_ | `registry.example.com/clm/` |
+| `IMAGE_TAG` | `local` | `latest` |
+| `SWAGGER_HUB_REPLICAS` | `1` | `0` |
+| `FRONTEND_URL` | `https://localhost` | `https://your-domain.com` |
+| `SPRING_PROFILES_ACTIVE` | `test` | `prod` |
 
-### Common update_config for stateless services
-
-```yaml
-update_config:
-  parallelism: 1        # replace one replica at a time
-  delay: 10s            # wait between each replacement
-  failure_action: rollback
-  monitor: 60s          # time to watch each new task before declaring success
-  max_failure_ratio: 0.1
-  order: start-first    # new replica healthy before old is removed (zero downtime)
-```
-
-### Stateful / singleton services use `order: stop-first`
-
-Databases, Prometheus, and Grafana use `stop-first` to prevent two instances
-accessing the same volume simultaneously.
+`NEXT_PUBLIC_*` variables are baked into the frontend image at build time — changing them requires a rebuild (`make swarm-rebuild name=frontend`).
 
 ---
 
-## 7. State & Volumes
+## Cheatsheet
 
-All stateful services use **named Docker volumes** scoped to the node they run
-on. Combined with the `node.labels.role == db` and `node.labels.role ==
-monitoring` placement constraints, the container always lands on the same node
-as its data directory.
+```sh
+# First time
+make swarm-init && make certs && make swarm-config-create
+make swarm-secrets-test && make swarm-build-test && make swarm-deploy-test
 
-| Volume | Service | Contents |
-|---|---|---|
-| `postgres_data` | postgres | Contracts + schema `clm` |
-| `postgres_users_data` | postgres-users | Users + schema `users` |
-| `postgres_clients_data` | postgres-clients | Clients + schema `clients` |
-| `postgres_negotiations_data` | postgres-negotiations | Negotiations + schema `negotiations` |
-| `prometheus_data` | prometheus | TSDB blocks (15-day retention) |
-| `grafana_data` | grafana | Dashboards state, users, SQLite |
+# Changed contracts service
+make swarm-rebuild name=contracts
 
-> For larger production clusters, replace local volumes with an NFS share or a
-> cloud block-storage volume driver (e.g., `rexray/ebs` on AWS) so that the
-> placement constraint becomes unnecessary and the database can survive node
-> failure.
+# Restart any service
+make swarm-restart name=user-service
 
----
+# Check status
+make swarm-ps
 
-## 8. Networking
-
-| Network | Driver | Purpose |
-|---|---|---|
-| `dmz-net` | overlay | nginx ↔ Swarm ingress mesh |
-| `data-net` | overlay | all internal service-to-service communication |
-
-`nginx` is attached to **both** networks so it can accept external traffic
-(`dmz-net`) and proxy to backends (`data-net`). Every other service is
-attached to `data-net` only. No backend service publishes a host port, so they
-are unreachable from outside the overlay.
-
-Swarm's built-in overlay DNS resolves service names (e.g. `frontend`,
-`contracts`) to their respective Virtual IPs, which load-balance across all
-healthy replicas of that service. The existing nginx upstream blocks
-(`server frontend:3000`, `server contracts:8081`, etc.) work without
-modification.
-
----
-
-## 9. Deployment
-
-### Prerequisites checklist
-
-- [ ] Docker Swarm initialised (`docker swarm init`)
-- [ ] Node labels applied (§ 3)
-- [ ] All images built and pushed to registry (§ 2)
-- [ ] All Docker secrets created (§ 4)
-- [ ] `.env.production` filled in with all non-secret values
-- [ ] Prometheus config Docker config created or available locally
-
-### Deploy command
-
-```bash
-docker stack deploy \
-  --compose-file docker-stack.yml \
-  --env-file .env.production \
-  --with-registry-auth \
-  clm
-```
-
-### Useful operational commands
-
-```bash
-# List all running tasks
-docker stack ps clm
-
-# Watch service replicas converge
-docker service ls
-
-# Tail logs for a service
-docker service logs -f clm_contracts
-
-# Rolling update after pushing a new image
-docker service update --image registry.example.com/clm/clm-contracts:1.1.0 clm_contracts
-
-# Scale a stateless service
-docker service scale clm_user-service=3
-
-# Remove the entire stack
-docker stack rm clm
-```
-
----
-
-## 10. Post-deployment Verification
-
-```bash
-# All services should show replicas satisfied (e.g. 2/2)
-docker service ls
-
-# Nginx endpoints
-curl -k https://<swarm-node-ip>/api/users/actuator/health   # should 403 (blocked by nginx)
-curl -k https://<swarm-node-ip>/                            # Next.js frontend
-
-# Grafana
-open https://<swarm-node-ip>/grafana/
+# Tear down
+make swarm-down-test
 ```

@@ -25,7 +25,9 @@ RUN addgroup -g 1001 -S appgroup && \
 WORKDIR /app
 
 COPY --from=builder /build/target/*.jar negotiation-service.jar
-RUN chown appuser:appgroup negotiation-service.jar
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chown appuser:appgroup negotiation-service.jar /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
 USER appuser
 
@@ -34,7 +36,7 @@ EXPOSE 8085
 HEALTHCHECK --interval=15s --timeout=5s --retries=5 --start-period=40s \
   CMD nc -z localhost 8085
 
-ENTRYPOINT ["java", \
+ENTRYPOINT ["/docker-entrypoint.sh", "java", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
   "-Djava.security.egd=file:/dev/./urandom", \

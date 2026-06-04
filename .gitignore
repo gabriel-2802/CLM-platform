@@ -17,3 +17,4 @@ nginx/.claude/
 .env.local
 .env.production
 .env.*.local
+.env.secrets

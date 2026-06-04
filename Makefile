@@ -1,4 +1,6 @@
-COMPOSE_TEST := docker compose -p clm-test -f docker-compose.testing.yml --env-file .env.testing
+COMPOSE_TEST  := docker compose -p clm-test -f docker-compose.testing.yml --env-file .env.testing
+STACK_TEST    := clm-test
+STACK_PROD    := clm
 
 BLUE   := \033[0;34m
 GREEN  := \033[0;32m
@@ -15,7 +17,17 @@ NC     := \033[0m
         test-init \
         monitoring-logs prometheus-reload \
         nginx-logs nginx-reload \
-        clean nuke-test
+        clean nuke-test \
+        swarm-init \
+        swarm-build-test swarm-build-prod \
+        swarm-config-create swarm-config-update \
+        swarm-secrets-test swarm-secrets-prod \
+        swarm-deploy-test swarm-deploy-prod \
+        swarm-down-test swarm-down-prod \
+        swarm-ps swarm-logs \
+        swarm-db swarm-db-users swarm-db-clients \
+        prometheus-reload-swarm nginx-reload-swarm \
+        swarm-rebuild swarm-restart
 
 # ─── help ─────────────────────────────────────────────────────────────────────
 
@@ -30,7 +42,7 @@ help:
 	@echo "  $(YELLOW)make certs$(NC)                Generate self-signed TLS certs for Nginx (run once)"
 	@echo "  $(YELLOW)make trust-cert$(NC)           Trust the cert in macOS Keychain (run once, needs sudo)"
 	@echo ""
-	@echo "$(BOLD)TESTING STACK$(NC)  (all traffic via Nginx at https://localhost)"
+	@echo "$(BOLD)TESTING STACK (docker-compose)$(NC)  (all traffic via Nginx at https://localhost)"
 	@echo "  $(YELLOW)make test$(NC)                 Build images and start all services"
 	@echo "  $(YELLOW)make test-up$(NC)              Start testing stack (images must already exist)"
 	@echo "  $(YELLOW)make test-down$(NC)            Stop and remove testing containers"
@@ -42,17 +54,48 @@ help:
 	@echo "  $(YELLOW)make db-users-test$(NC)        Open psql shell in test users postgres (clm_users)"
 	@echo "  $(YELLOW)make db-clients-test$(NC)      Open psql shell in test clients postgres (clm_clients)"
 	@echo ""
-	@echo "$(BOLD)FIRST-RUN SETUP$(NC)"
+	@echo "$(BOLD)SWARM — FIRST-TIME SETUP$(NC)"
+	@echo "  $(YELLOW)make swarm-init$(NC)           Initialise Docker Swarm on this host (once)"
+	@echo "  $(YELLOW)make certs$(NC)                Generate TLS certs (testing only — run once)"
+	@echo "  $(YELLOW)make swarm-config-create$(NC)  Create prometheus Docker config"
+	@echo "  $(YELLOW)make swarm-secrets-test$(NC)   Create Swarm secrets from .env.testing"
+	@echo "  $(YELLOW)make swarm-secrets-prod$(NC)   Create Swarm secrets from .env.secrets"
+	@echo "  $(YELLOW)make swarm-build-test$(NC)     Build all images locally (tag: local)"
+	@echo ""
+	@echo "$(BOLD)SWARM — DEPLOY$(NC)"
+	@echo "  $(YELLOW)make swarm-deploy-test$(NC)    Deploy stack clm-test (.env.testing)"
+	@echo "  $(YELLOW)make swarm-deploy-prod$(NC)    Deploy stack clm      (.env.production)"
+	@echo "  $(YELLOW)make swarm-down-test$(NC)      Remove testing stack (data is preserved)"
+	@echo "  $(YELLOW)make swarm-down-prod$(NC)      Remove production stack (data is preserved)"
+	@echo "  $(YELLOW)make swarm-ps$(NC)             List all running stacks and services"
+	@echo "  $(YELLOW)make swarm-logs$(NC)           Follow logs for the testing stack"
+	@echo ""
+	@echo "$(BOLD)SWARM — DATABASES (testing)$(NC)"
+	@echo "  $(YELLOW)make swarm-db$(NC)             psql into clm_platform (main DB)"
+	@echo "  $(YELLOW)make swarm-db-users$(NC)       psql into clm_users"
+	@echo "  $(YELLOW)make swarm-db-clients$(NC)     psql into clm_clients"
+	@echo ""
+	@echo "$(BOLD)SWARM — DAY-TO-DAY$(NC)"
+	@echo "  $(YELLOW)make swarm-rebuild name=<svc>$(NC)  Rebuild image + rolling update (e.g. name=contracts)"
+	@echo "  $(YELLOW)make swarm-restart name=<svc>$(NC)  Rolling restart without rebuild"
+	@echo "  $(YELLOW)make swarm-deploy-test$(NC)         Redeploy whole stack (idempotent)"
+	@echo ""
+	@echo "$(BOLD)SWARM — MAINTENANCE$(NC)"
+	@echo "  $(YELLOW)make swarm-config-update$(NC)  Recreate prometheus config (after prometheus.yml changes)"
+	@echo "  $(YELLOW)make prometheus-reload-swarm$(NC)  Hot-reload Prometheus config in swarm"
+	@echo "  $(YELLOW)make nginx-reload-swarm$(NC)   Hot-reload Nginx config in swarm"
+	@echo ""
+	@echo "$(BOLD)FIRST-RUN SETUP (compose)$(NC)"
 	@echo "  $(YELLOW)make test-init$(NC)            Push Prisma schema + seed after first make test"
 	@echo "  $(YELLOW)                  $(NC)        Creates admin@example.com / Admin123!"
 	@echo ""
 	@echo "$(BOLD)MONITORING$(NC)"
 	@echo "  $(YELLOW)make monitoring-logs$(NC)      Follow logs for Prometheus and Grafana only"
-	@echo "  $(YELLOW)make prometheus-reload$(NC)    Hot-reload prometheus.yml without restarting"
+	@echo "  $(YELLOW)make prometheus-reload$(NC)    Hot-reload prometheus.yml (compose stack)"
 	@echo ""
 	@echo "$(BOLD)NGINX$(NC)"
-	@echo "  $(YELLOW)make nginx-logs$(NC)           Follow Nginx access + error logs"
-	@echo "  $(YELLOW)make nginx-reload$(NC)         Hot-reload Nginx config without downtime"
+	@echo "  $(YELLOW)make nginx-logs$(NC)           Follow Nginx access + error logs (compose)"
+	@echo "  $(YELLOW)make nginx-reload$(NC)         Hot-reload Nginx config (compose)"
 	@echo ""
 	@echo "$(BOLD)CLEANUP$(NC)"
 	@echo "  $(YELLOW)make clean$(NC)                Remove node_modules, .next, and build artifacts"
@@ -218,3 +261,230 @@ nuke-test:
 
 
 # ─── soft wipe (data only, keeps flyway schema history) ──────────────────────
+
+# ==============================================================================
+# SWARM TARGETS
+# ==============================================================================
+
+# ─── swarm init ───────────────────────────────────────────────────────────────
+
+swarm-init: check-docker
+	@docker info --format '{{.Swarm.LocalNodeState}}' | grep -q active && \
+		echo "$(YELLOW)Swarm already active$(NC)" || \
+		{ docker swarm init && echo "$(GREEN)✓ Swarm initialised$(NC)"; }
+
+# ─── build ────────────────────────────────────────────────────────────────────
+
+swarm-build-test: check-docker
+	@echo "$(BLUE)Building all CLM images (tag: local)...$(NC)"
+	docker build -t clm-db:local             -f db/Dockerfile .
+	docker build -t clm-user-service:local   services/user-service
+	docker build -t clm-contracts:local      services/contract-service
+	docker build -t clm-client-service:local services/client-service
+	docker build -t clm-notifications:local  services/notification-service
+	docker build -t clm-negotiation-service:local services/negotiation-service
+	docker build -t clm-swagger-hub:local    swagger-hub
+	docker build -t clm-nginx:local          nginx
+	docker build -t clm-grafana:local        monitoring/grafana
+	@set -a && . .env.testing && set +a && \
+	  docker build \
+	    --build-arg NEXT_PUBLIC_CONTRACTS_API_URL="$$NEXT_PUBLIC_CONTRACTS_API_URL" \
+	    --build-arg NEXT_PUBLIC_NOTIFICATIONS_API_URL="$$NEXT_PUBLIC_NOTIFICATIONS_API_URL" \
+	    --build-arg NEXT_PUBLIC_USER_SERVICE_URL="$$NEXT_PUBLIC_USER_SERVICE_URL" \
+	    --build-arg NEXT_PUBLIC_CLIENT_SERVICE_URL="$$NEXT_PUBLIC_CLIENT_SERVICE_URL" \
+	    -t clm-frontend:local \
+	    frontend
+	@echo "$(GREEN)✓ All images built (tag: local)$(NC)"
+
+swarm-build-prod: check-docker
+	@echo "$(BLUE)Building and pushing production images...$(NC)"
+	@set -a && . .env.production && set +a && \
+	  PREFIX="$${IMAGE_PREFIX}" TAG="$${IMAGE_TAG:-latest}" && \
+	  docker build -t "$${PREFIX}clm-db:$$TAG"             -f db/Dockerfile . && \
+	  docker build -t "$${PREFIX}clm-user-service:$$TAG"   services/user-service && \
+	  docker build -t "$${PREFIX}clm-contracts:$$TAG"      services/contract-service && \
+	  docker build -t "$${PREFIX}clm-client-service:$$TAG" services/client-service && \
+	  docker build -t "$${PREFIX}clm-notifications:$$TAG"  services/notification-service && \
+	  docker build -t "$${PREFIX}clm-negotiation-service:$$TAG" services/negotiation-service && \
+	  docker build -t "$${PREFIX}clm-swagger-hub:$$TAG"    swagger-hub && \
+	  docker build -t "$${PREFIX}clm-nginx:$$TAG"          nginx && \
+	  docker build -t "$${PREFIX}clm-grafana:$$TAG"        monitoring/grafana && \
+	  docker build \
+	    --build-arg NEXT_PUBLIC_CONTRACTS_API_URL="$$NEXT_PUBLIC_CONTRACTS_API_URL" \
+	    --build-arg NEXT_PUBLIC_NOTIFICATIONS_API_URL="$$NEXT_PUBLIC_NOTIFICATIONS_API_URL" \
+	    --build-arg NEXT_PUBLIC_USER_SERVICE_URL="$$NEXT_PUBLIC_USER_SERVICE_URL" \
+	    --build-arg NEXT_PUBLIC_CLIENT_SERVICE_URL="$$NEXT_PUBLIC_CLIENT_SERVICE_URL" \
+	    -t "$${PREFIX}clm-frontend:$$TAG" \
+	    frontend
+	@echo "$(BLUE)Pushing images...$(NC)"
+	@set -a && . .env.production && set +a && \
+	  PREFIX="$${IMAGE_PREFIX}" TAG="$${IMAGE_TAG:-latest}" && \
+	  for svc in clm-db clm-user-service clm-contracts clm-client-service \
+	             clm-notifications clm-negotiation-service clm-swagger-hub \
+	             clm-nginx clm-grafana clm-frontend; do \
+	    docker push "$${PREFIX}$$svc:$$TAG"; \
+	  done
+	@echo "$(GREEN)✓ All images built and pushed$(NC)"
+
+# ─── config (prometheus.yml) ──────────────────────────────────────────────────
+
+swarm-config-create:
+	@docker config inspect clm_prometheus_config > /dev/null 2>&1 && \
+	  echo "$(YELLOW)clm_prometheus_config already exists — use make swarm-config-update to refresh$(NC)" || \
+	  { docker config create clm_prometheus_config monitoring/prometheus/prometheus.yml && \
+	    echo "$(GREEN)✓ clm_prometheus_config created$(NC)"; }
+
+swarm-config-update:
+	@echo "$(BLUE)Updating prometheus config...$(NC)"
+	@docker config rm clm_prometheus_config 2>/dev/null || true
+	@docker config create clm_prometheus_config monitoring/prometheus/prometheus.yml
+	@echo "$(GREEN)✓ clm_prometheus_config updated$(NC)"
+	@echo "$(YELLOW)Note: redeploy the stack to apply the new config$(NC)"
+
+# ─── secrets ──────────────────────────────────────────────────────────────────
+
+swarm-secrets-test: check-docker
+	@bash scripts/secrets-init.sh testing
+
+swarm-secrets-prod: check-docker
+	@bash scripts/secrets-init.sh production
+
+# ─── deploy ───────────────────────────────────────────────────────────────────
+
+swarm-deploy-test: check-docker
+	@echo "$(BLUE)Deploying Swarm stack [$(STACK_TEST)]...$(NC)"
+	@set -a && . .env.testing && set +a && \
+	  docker stack deploy -c docker-stack.yml $(STACK_TEST)
+	@echo ""
+	@echo "$(GREEN)$(BOLD)╔═══════════════════════════════════════════════════╗$(NC)"
+	@echo "$(GREEN)$(BOLD)║      Testing swarm stack is deploying             ║$(NC)"
+	@echo "$(GREEN)$(BOLD)╚═══════════════════════════════════════════════════╝$(NC)"
+	@echo ""
+	@echo "  $(YELLOW)Frontend    =>$(NC)  https://localhost"
+	@echo "  $(YELLOW)API Docs    =>$(NC)  https://localhost/docs/  $(RED)(testing only)$(NC)"
+	@echo "  $(YELLOW)Grafana     =>$(NC)  https://localhost/grafana/"
+	@echo ""
+	@echo "  $(BLUE)Status:  make swarm-ps$(NC)"
+	@echo "  $(BLUE)Logs:    make swarm-logs$(NC)"
+	@echo "  $(BLUE)Stop:    make swarm-down-test$(NC)"
+	@echo ""
+
+swarm-deploy-prod: check-docker
+	@echo "$(BLUE)Deploying Swarm stack [$(STACK_PROD)]...$(NC)"
+	@set -a && . .env.production && set +a && \
+	  docker stack deploy -c docker-stack.yml --with-registry-auth $(STACK_PROD)
+	@echo "$(GREEN)✓ Production stack deploying — use make swarm-ps to monitor$(NC)"
+
+# ─── down ─────────────────────────────────────────────────────────────────────
+
+swarm-down-test:
+	@echo "$(BLUE)Removing swarm stack [$(STACK_TEST)] (volumes preserved)...$(NC)"
+	@docker stack rm $(STACK_TEST)
+	@echo "$(GREEN)✓ Stack removed$(NC)"
+
+swarm-down-prod:
+	@echo "$(RED)Removing PRODUCTION swarm stack [$(STACK_PROD)] (volumes preserved).$(NC)"
+	@printf "$(RED)Continue? [y/N]: $(NC)"; read r; \
+	[ "$$r" = "y" ] || [ "$$r" = "Y" ] || { echo "$(YELLOW)Cancelled$(NC)"; exit 0; }; \
+	docker stack rm $(STACK_PROD); \
+	echo "$(GREEN)✓ Production stack removed$(NC)"
+
+# ─── observe ──────────────────────────────────────────────────────────────────
+
+swarm-ps:
+	@echo "$(BLUE)Stacks:$(NC)"
+	@docker stack ls
+	@echo ""
+	@echo "$(BLUE)Services [$(STACK_TEST)]:$(NC)"
+	@docker stack services $(STACK_TEST) 2>/dev/null || true
+	@echo ""
+	@echo "$(BLUE)Services [$(STACK_PROD)]:$(NC)"
+	@docker stack services $(STACK_PROD) 2>/dev/null || true
+
+swarm-logs:
+	@echo "$(BLUE)Following logs for stack [$(STACK_TEST)] (Ctrl+C to stop)...$(NC)"
+	@docker service logs -f $(STACK_TEST)_nginx 2>/dev/null & \
+	  docker service logs -f $(STACK_TEST)_frontend 2>/dev/null & \
+	  docker service logs -f $(STACK_TEST)_contracts 2>/dev/null & \
+	  docker service logs -f $(STACK_TEST)_user-service 2>/dev/null & \
+	  wait
+
+# ─── database access (swarm — exec into running container) ────────────────────
+
+swarm-db:
+	@docker exec -it \
+	  $$(docker ps -qf "name=$(STACK_TEST)_postgres" | head -1) \
+	  psql -U clm_user -d clm_platform
+
+swarm-db-users:
+	@docker exec -it \
+	  $$(docker ps -qf "name=$(STACK_TEST)_postgres-users" | head -1) \
+	  psql -U clm_user -d clm_users
+
+swarm-db-clients:
+	@docker exec -it \
+	  $$(docker ps -qf "name=$(STACK_TEST)_postgres-clients" | head -1) \
+	  psql -U clm_user -d clm_clients
+
+# ─── maintenance ──────────────────────────────────────────────────────────────
+
+prometheus-reload-swarm:
+	@echo "$(BLUE)Reloading Prometheus in swarm...$(NC)"
+	@docker exec \
+	  $$(docker ps -qf "name=$(STACK_TEST)_prometheus" | head -1) \
+	  wget -q --post-data='' http://localhost:9090/-/reload -O - > /dev/null && \
+	  echo "$(GREEN)✓ Prometheus reloaded$(NC)" || \
+	  echo "$(RED)✗ Reload failed$(NC)"
+
+nginx-reload-swarm:
+	@echo "$(BLUE)Reloading Nginx in swarm...$(NC)"
+	@docker exec \
+	  $$(docker ps -qf "name=$(STACK_TEST)_nginx" | head -1) \
+	  nginx -s reload && \
+	  echo "$(GREEN)✓ Nginx reloaded$(NC)" || \
+	  echo "$(RED)✗ Reload failed$(NC)"
+
+# ─── rebuild / restart individual services ────────────────────────────────────
+# Usage:
+#   make swarm-rebuild name=contracts       rebuild image + rolling update
+#   make swarm-restart name=contracts       rolling restart without rebuild
+#
+# Service names (stack service name = what you pass as name=):
+#   postgres  user-service  contracts  client-service  notifications
+#   negotiation-service  swagger-hub  frontend  nginx  grafana
+
+swarm-rebuild: check-docker
+	@[ -n "$(name)" ] || { echo "$(RED)Usage: make swarm-rebuild name=<service>$(NC)"; exit 1; }
+	@set -a && . .env.testing && set +a; \
+	case "$(name)" in \
+	  postgres)            img=clm-db:local;                 ctx="-f db/Dockerfile ." ;; \
+	  user-service)        img=clm-user-service:local;       ctx="services/user-service" ;; \
+	  contracts)           img=clm-contracts:local;          ctx="services/contract-service" ;; \
+	  client-service)      img=clm-client-service:local;     ctx="services/client-service" ;; \
+	  notifications)       img=clm-notifications:local;      ctx="services/notification-service" ;; \
+	  negotiation-service) img=clm-negotiation-service:local; ctx="services/negotiation-service" ;; \
+	  swagger-hub)         img=clm-swagger-hub:local;        ctx="swagger-hub" ;; \
+	  nginx)               img=clm-nginx:local;              ctx="nginx" ;; \
+	  grafana)             img=clm-grafana:local;            ctx="monitoring/grafana" ;; \
+	  frontend) \
+	    img=clm-frontend:local; \
+	    docker build \
+	      --build-arg NEXT_PUBLIC_CONTRACTS_API_URL="$$NEXT_PUBLIC_CONTRACTS_API_URL" \
+	      --build-arg NEXT_PUBLIC_NOTIFICATIONS_API_URL="$$NEXT_PUBLIC_NOTIFICATIONS_API_URL" \
+	      --build-arg NEXT_PUBLIC_USER_SERVICE_URL="$$NEXT_PUBLIC_USER_SERVICE_URL" \
+	      --build-arg NEXT_PUBLIC_CLIENT_SERVICE_URL="$$NEXT_PUBLIC_CLIENT_SERVICE_URL" \
+	      -t $$img frontend; \
+	    docker service update --image $$img --force $(STACK_TEST)_$(name); \
+	    exit 0 ;; \
+	  *) echo "$(RED)Unknown service: $(name)$(NC)"; exit 1 ;; \
+	esac; \
+	echo "$(BLUE)Building $$img...$(NC)"; \
+	docker build -t $$img $$ctx; \
+	echo "$(BLUE)Updating $(STACK_TEST)_$(name)...$(NC)"; \
+	docker service update --image $$img --force $(STACK_TEST)_$(name); \
+	echo "$(GREEN)✓ $(name) rebuilt and updating$(NC)"
+
+swarm-restart: check-docker
+	@[ -n "$(name)" ] || { echo "$(RED)Usage: make swarm-restart name=<service>$(NC)"; exit 1; }
+	@docker service update --force $(STACK_TEST)_$(name)
+	@echo "$(GREEN)✓ $(name) restarting$(NC)"
