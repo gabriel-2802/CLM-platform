@@ -372,12 +372,16 @@ services:
 
   # ── Frontend (Next.js dev server) ──────────────────────────────────────────
   frontend:
-    build:
-      context: frontend
-      dockerfile: Dockerfile
+    image: node:20-alpine
     container_name: clm-frontend
+    working_dir: /app
+    command: sh -c "npm install --prefer-offline && node_modules/.bin/next dev"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
     environment:
-      NODE_ENV:                 production
+      NODE_ENV:                 development
       NEXT_TELEMETRY_DISABLED:  "1"
       # Browser-side URLs — all go through Nginx now.
       NEXT_PUBLIC_API_BASE_URL:          ${NEXT_PUBLIC_API_BASE_URL:-https://localhost}
@@ -410,8 +414,8 @@ services:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
       interval: 15s
       timeout: 5s
-      retries: 5
-      start_period: 60s
+      retries: 10
+      start_period: 300s
 
   # ── Prometheus ─────────────────────────────────────────────────────────────
   # data-net only — never exposed externally. Grafana reads from it internally.
@@ -497,7 +501,7 @@ services:
       - "443:443"
     depends_on:
       frontend:
-        condition: service_healthy
+        condition: service_started
       user-service:
         condition: service_healthy
       contracts:
@@ -513,7 +517,7 @@ services:
       - data-net
     restart: on-failure:3
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:80"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/health"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -539,4 +543,8 @@ volumes:
   prometheus_data:
     driver: local
   grafana_data:
+    driver: local
+  frontend_node_modules:
+    driver: local
+  frontend_next_cache:
     driver: local
