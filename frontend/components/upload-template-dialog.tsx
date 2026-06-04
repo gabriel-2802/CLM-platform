@@ -27,7 +27,7 @@ export function UploadTemplateDialog() {
     <>
       <button
         onClick={() => setIsOpen(true)}
-        className="bg-slate-700 hover:bg-slate-800 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors text-sm"
+        className="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-md shadow-sm border border-slate-200 transition-colors text-sm"
       >
         + Add Template
       </button>

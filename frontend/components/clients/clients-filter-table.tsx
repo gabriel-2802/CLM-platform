@@ -66,46 +66,35 @@ export function ClientsFilterTable({ rows }: { rows: Row[] }) {
 
   return (
     <>
-      {/* Search bar */}
-      <div className="mb-3">
+      {/* Toolbar: search + filter toggle on one row */}
+      <div className="mb-4 flex items-center gap-2">
         <Input
           placeholder="Caută după numele clientului..."
           value={filterDenumire}
           onChange={(e) => setFilterDenumire(e.target.value)}
           className="max-w-sm"
         />
-      </div>
-
-      {/* Collapsible filter panel */}
-      <div className="mb-4 rounded-lg border bg-muted/30">
         <button
           type="button"
           onClick={() => setShowFilters((v) => !v)}
-          className="flex w-full items-center gap-2 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-muted/50 rounded-lg transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-md border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors whitespace-nowrap"
         >
-          <Filter className="h-4 w-4 text-slate-500" />
-          <span>Aplicați filtre</span>
+          <Filter className="h-4 w-4 text-slate-400" />
+          <span>Filtre</span>
           {hasFilters && (
-            <span className="ml-1 rounded-full bg-indigo-600 px-1.5 py-0.5 text-xs font-semibold text-white">
+            <span className="rounded-full bg-slate-700 px-1.5 py-0.5 text-xs font-semibold text-white">
               activ
             </span>
           )}
-          <span className="ml-auto">{showFilters ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</span>
+          {showFilters ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
         </button>
+      </div>
 
-        {showFilters && (
-          <div className="border-t px-3 pb-3 pt-3 space-y-3">
-            {/* Row 1: Denumire, Tip, CUI */}
+      {/* Collapsible filter panel */}
+      {showFilters && (
+        <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50/60 px-3 pb-3 pt-3 space-y-3">
+            {/* Row 1: Tip, CUI */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-600">Denumire</label>
-                <Input
-                  placeholder="Caută după denumire..."
-                  value={filterDenumire}
-                  onChange={(e) => setFilterDenumire(e.target.value)}
-                  className="h-8 text-sm"
-                />
-              </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-600">Tip</label>
                 <Select value={filterTip} onValueChange={setFilterTip}>
@@ -195,9 +184,8 @@ export function ClientsFilterTable({ rows }: { rows: Row[] }) {
                 </Button>
               </div>
             )}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-hidden rounded-lg border border-slate-200 shadow-sm">

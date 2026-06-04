@@ -535,7 +535,7 @@ export function ActeAditionaleDialog({
                             <Label>Șablon de contract</Label>
                             <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Alege un șablon mapat..." />
+                                    <SelectValue placeholder="Alege un șablon etichetat..." />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {templates.map((t) => (
