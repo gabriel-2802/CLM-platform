@@ -143,7 +143,7 @@ export default function TasksTable({ rows, users }: { rows: TaskRow[]; users: Us
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">User</span>
               <Select value={userFilter} onValueChange={setUserFilter}>
-                <SelectTrigger className="w-56 h-8">
+                <SelectTrigger className="w-48 h-8 [&>span]:truncate [&>span]:block">
                   <SelectValue placeholder="Filtreaza dupa user" />
                 </SelectTrigger>
                 <SelectContent>
