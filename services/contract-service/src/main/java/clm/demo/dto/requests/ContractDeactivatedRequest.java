@@ -1,4 +1,4 @@
-package clm.negotiation.dto.requests;
+package clm.demo.dto.requests;
 
 import jakarta.validation.constraints.NotEmpty;
 

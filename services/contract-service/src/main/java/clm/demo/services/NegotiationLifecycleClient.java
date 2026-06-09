@@ -1,7 +1,7 @@
 package clm.demo.services;
 
-import clm.negotiation.dto.requests.ContractActivatedRequest;
-import clm.negotiation.dto.requests.ContractDeactivatedRequest;
+import clm.demo.dto.requests.ContractActivatedRequest;
+import clm.demo.dto.requests.ContractDeactivatedRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
