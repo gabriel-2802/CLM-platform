@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { clientServiceFetch } from "@/lib/client-service-fetch";
 import { getSession } from "@/lib/auth";
 import { getUsers, type ServiceUser } from "@/lib/user-service-client";
@@ -241,6 +242,16 @@ export async function updateTask(id: number, formData: FormData) {
     userId: t.userId,
     clientId: t.clientId,
   }
+}
+
+export async function markTaskDone(id: number) {
+  const res = await clientServiceFetch(`/api/tasks/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ done: true }),
+  })
+  if (!res.ok) throw new Error("Failed to mark task as done")
+  revalidatePath("/taskuri")
 }
 
 export async function deleteTask(id: number) {

@@ -213,10 +213,10 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
                 <div className="space-y-2">
                   <Label>Șablon de contract</Label>
                   <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
-                    <SelectTrigger><SelectValue placeholder="Alege un șablon mapat..." /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Alege un șablon etichetat..." /></SelectTrigger>
                     <SelectContent>
                       {templates.length === 0 ? (
-                        <SelectItem value="__none__" disabled>Niciun șablon complet mapat</SelectItem>
+                        <SelectItem value="__none__" disabled>Niciun șablon complet etichetat</SelectItem>
                       ) : (
                         templates.map((t) => <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>)
                       )}
@@ -256,7 +256,7 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
                       <Input placeholder="Detalii adiționale..." value={notes} onChange={(e) => setNotes(e.target.value)} />
                     </div>
                     <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                      Câmpurile mapate la fișa clientului sunt completate automat din baza de date.
+                      Câmpurile etichetate la fișa clientului sunt completate automat din baza de date.
                     </div>
                     {manualFields.length > 0 && (
                       <>

@@ -123,20 +123,6 @@ public class ContractService {
         contract.setStartDate(request.startDate());
         contract = contractRepository.save(contract);
 
-        ContractActivatedEvent activationEvent = new ContractActivatedEvent(
-                contract.getId(),
-                contract.getClientId(),
-                request.startDate(),
-                request.endDate(),
-                request.value()
-        );
-        log.info("Publishing contract activation event: contractId={}, clientId={}, startDate={}, endDate={}, value={}",
-                activationEvent.contractId(),
-                activationEvent.clientId(),
-                activationEvent.startDate(),
-                activationEvent.endDate(),
-                activationEvent.contractValue());
-        eventPublisher.publishEvent(activationEvent);
 
         return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
     }
@@ -164,7 +150,23 @@ public class ContractService {
                     "Failed to process signed document: " + e.getMessage(), e);
         }
 
-        return contractMapper.toResponseDTO(contract, getCurentlyActiveContractDetails(contract.getContractDetailsList()));
+        ContractDetails currentDetails = getCurentlyActiveContractDetails(contract.getContractDetailsList());
+        ContractActivatedEvent activationEvent = new ContractActivatedEvent(
+                contract.getId(),
+                contract.getClientId(),
+                currentDetails.getStartDate(),
+                currentDetails.getEndDate(),
+                currentDetails.getContractValue()
+        );
+        log.info("Publishing contract activation event: contractId={}, clientId={}, startDate={}, endDate={}, value={}",
+                activationEvent.contractId(),
+                activationEvent.clientId(),
+                activationEvent.startDate(),
+                activationEvent.endDate(),
+                activationEvent.contractValue());
+        eventPublisher.publishEvent(activationEvent);
+
+        return contractMapper.toResponseDTO(contract, currentDetails);
     }
 
     @CacheEvict(value = CacheNames.CONTRACTS, key = "#contractId")

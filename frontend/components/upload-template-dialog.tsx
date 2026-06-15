@@ -25,9 +25,9 @@ export function UploadTemplateDialog() {
 
   return (
     <>
-      <button 
+      <button
         onClick={() => setIsOpen(true)}
-        className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors text-sm"
+        className="bg-white hover:bg-slate-50 text-slate-700 font-medium py-2 px-4 rounded-md shadow-sm border border-slate-200 transition-colors text-sm"
       >
         + Add Template
       </button>
@@ -44,7 +44,7 @@ export function UploadTemplateDialog() {
                   type="text" 
                   name="name" 
                   required 
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm border p-2"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-slate-500 focus:ring-slate-500 sm:text-sm border p-2"
                   placeholder="e.g. Service Agreement 2026"
                 />
               </div>
@@ -60,8 +60,8 @@ export function UploadTemplateDialog() {
                     file:mr-4 file:py-2 file:px-4
                     file:rounded-md file:border-0
                     file:text-sm file:font-semibold
-                    file:bg-indigo-50 file:text-indigo-700
-                    hover:file:bg-indigo-100"
+                    file:bg-slate-100 file:text-slate-700
+                    hover:file:bg-slate-200"
                 />
               </div>
 
@@ -76,7 +76,7 @@ export function UploadTemplateDialog() {
                 <button 
                   type="submit" 
                   disabled={isUploading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-white bg-slate-700 hover:bg-slate-800 rounded-md disabled:opacity-50 transition-colors"
                 >
                   {isUploading ? "Uploading..." : "Upload"}
                 </button>

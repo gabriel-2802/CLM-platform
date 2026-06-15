@@ -47,17 +47,37 @@ public interface ContractRepository extends JpaRepository<Contract, Long>, JpaSp
     List<Contract> findExpiringContracts(@Param("status") ContractStatus status,
                                          @Param("from")   LocalDate from,
                                          @Param("to")     LocalDate to);
-    @Modifying
-    @Transactional
-    @Query("""
-        UPDATE Contract c
-        SET c.contractStatus = :terminated
-        WHERE c.contractStatus = :terminationDue
-        AND c.terminationDate = :today
-    """)
-    int processTerminationDueContracts(@Param("terminated")      ContractStatus terminated,
-                                       @Param("terminationDue")  ContractStatus terminationDue,
-                                       @Param("today")           LocalDate today);
+     @Query("""
+         SELECT c.id FROM Contract c
+         WHERE c.contractStatus = :terminationDue
+         AND c.terminationDate = :today
+         ORDER BY c.id ASC
+     """)
+     List<Long> findTerminationDueContractIds(@Param("today") LocalDate today,
+                                              @Param("terminationDue") ContractStatus terminationDue,
+                                              Pageable pageable);
+
+     @Modifying
+     @Transactional
+     @Query("""
+         UPDATE Contract c
+         SET c.contractStatus = :terminated
+         WHERE c.id IN :ids
+     """)
+     void terminateContractsByIds(@Param("ids") List<Long> ids,
+                                  @Param("terminated") ContractStatus terminated);
+
+     @Modifying
+     @Transactional
+     @Query("""
+         UPDATE Contract c
+         SET c.contractStatus = :terminated
+         WHERE c.contractStatus = :terminationDue
+         AND c.terminationDate = :today
+     """)
+     int processTerminationDueContracts(@Param("terminated")      ContractStatus terminated,
+                                        @Param("terminationDue")  ContractStatus terminationDue,
+                                        @Param("today")           LocalDate today);
 
     /**
      * Finds ACTIVE contracts that have had no renegotiation (new ContractDetails with

@@ -38,7 +38,27 @@ type TemplateSummaryResponse = {
   fieldCount?: number;
 };
 
-const EXTRA_TEMPLATE_FIELDS = ["deLa", "panaLa", "tarifConta", "tarifBilant"];
+// Maps raw field names to Romanian labels. Only fields listed here are shown in the dropdown;
+// internal/tracking fields (id, active, createdAt, updatedAt, etc.) are omitted.
+const CONTRACT_FIELD_LABELS: Record<string, string> = {
+  name:                    "Denumire client",
+  type:                    "Tip entitate",
+  taxId:                   "CUI / CIF",
+  address:                 "Adresă sediu",
+  administration:          "Administrație fiscală",
+  taxType:                 "Tip impozitare",
+  vatPayer:                "Plătitor TVA",
+  vatOnCollection:         "TVA la încasare",
+  euVatCode:               "Cod TVA intracomunitar",
+  euOperation:             "Operațiuni intracomunitare",
+  employees:               "Nr. angajați",
+  hqExpirationDate:        "Dată expirare sediu social",
+  adminMandateExpiration:  "Dată expirare mandat administrator",
+  deLa:                    "Data de început contract",
+  panaLa:                  "Data de sfârșit contract",
+  tarifConta:              "Tarif servicii contabilitate",
+  tarifBilant:             "Tarif bilanț",
+};
 
 export async function uploadTemplate(formData: FormData) {
   const file = formData.get("file") as File
@@ -126,12 +146,14 @@ export async function getClientTemplateFields(): Promise<TemplateMappingOption[]
   }
 
   const fields = (await res.json()) as string[];
-  const uniqueFields = Array.from(new Set([...fields, ...EXTRA_TEMPLATE_FIELDS]));
+  const allFields = Array.from(new Set([...fields, ...Object.keys(CONTRACT_FIELD_LABELS)]));
 
-  return uniqueFields.map((field) => ({
-    value: field,
-    label: field,
-  }));
+  return allFields
+    .filter((field) => field in CONTRACT_FIELD_LABELS)
+    .map((field) => ({
+      value: field,
+      label: CONTRACT_FIELD_LABELS[field],
+    }));
 }
 
 export async function updateTemplateMappings(templateId: number, mappings: { fieldId: number, fieldLabel: string, isRequired?: boolean }[]) {

@@ -208,12 +208,12 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
               <Label>Șablon de contract</Label>
               <Select value={selectedTemplate} onValueChange={setSelectedTemplate}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Alege un șablon mapat..." />
+                  <SelectValue placeholder="Alege un șablon etichetat..." />
                 </SelectTrigger>
                 <SelectContent>
                   {templates.length === 0 ? (
                       <SelectItem value="__none__" disabled>
-                        Niciun șablon complet mapat
+                        Niciun șablon complet etichetat
                       </SelectItem>
                   ) : (
                       templates.map((t) => (
@@ -279,7 +279,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
 
                   {/* Auto-filled fields info */}
                   <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
-                    Câmpurile mapate la fișa clientului sunt completate automat din baza de date.
+                    Câmpurile etichetate la fișa clientului sunt completate automat din baza de date.
                   </div>
 
                   {/* Manual / custom fields */}

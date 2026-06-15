@@ -772,7 +772,7 @@ export default function ClientsTable({ rows, headerExtra }: { rows: Row[]; heade
                 pageSize={10}
                 rowComponent={ClientRow}
                 stickyHeader
-                searchParamKey="q"
+                showGlobalSearch={false}
             />
           </div>
         </div>

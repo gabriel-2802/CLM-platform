@@ -28,7 +28,6 @@ export type Row = {
   terminationDate?: string
   contractValue?: number
   autoRenew?: boolean
-  probleme?: string[]
 }
 
 export type ClientDetails = {
@@ -37,7 +36,6 @@ export type ClientDetails = {
   tip: string
   deLa?: string
   panaLa?: string
-  probleme?: string[]
   denumire: string
   cui: string
   activa: boolean
@@ -136,11 +134,6 @@ export async function getClientRows(): Promise<Row[]> {
       .at(-1)
 
     const details = c.details ?? {}
-    const problems: string[] = []
-    if (!details.accountingPoliciesManual) problems.push("Manual pol. contabile")
-    if (!details.internalRules) problems.push("Regulament OI")
-    if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
-    if (!details.ucRegistry) problems.push("Registru UC")
 
     const userIds: string[] = (userAssignmentMap.get(c.id) ?? []).map(String)
 
@@ -183,7 +176,6 @@ export async function getClientRows(): Promise<Row[]> {
       tarifBilant: contractBalance != null ? Number(contractBalance) : undefined,
       contractValue: contractValue != null ? Number(contractValue) : undefined,
       autoRenew: autoRenew != null ? Boolean(autoRenew) : undefined,
-      probleme: problems.length ? problems : undefined,
     }
   })
 }
@@ -205,11 +197,6 @@ export async function getClient(id: number): Promise<ClientDetails | null> {
   const latestValidTo = workPoints.map((p: any) => p.validTo).filter(Boolean).sort().at(-1)
 
   const details = c.details ?? {}
-  const problems: string[] = []
-  if (!details.accountingPoliciesManual) problems.push("Manual pol. contabile")
-  if (!details.internalRules) problems.push("Regulament OI")
-  if (!details.moneyLaunderingOffice) problems.push("Of spalare bani")
-  if (!details.ucRegistry) problems.push("Registru UC")
 
   return {
     id: c.id,
@@ -237,7 +224,6 @@ export async function getClient(id: number): Promise<ClientDetails | null> {
     dataCertificatFiscal: toISODate(c.fiscalCertificateDate),
     dataFisaPlatitor: toISODate(c.payerSheetDate),
     dataVectFiscal: toISODate(c.fiscalVectorDate),
-    probleme: problems.length ? problems : undefined,
     detalii: details.id
       ? {
           manualPoliticiContabile: !!details.accountingPoliciesManual,

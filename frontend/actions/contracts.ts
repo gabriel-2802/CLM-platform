@@ -34,6 +34,22 @@ export type ContractLookup = {
   createdAt?: string | null;
 };
 
+export async function getContractsByClientId(clientId: number): Promise<ContractLookup[]> {
+  try {
+    const res = await contractsFetch("/api/contracts/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientId, page: 0, size: 200 }),
+    })
+    if (res.status === 204) return []
+    if (!res.ok) return []
+    const data = (await res.json()) as ContractLookup[]
+    return Array.isArray(data) ? data : []
+  } catch {
+    return []
+  }
+}
+
 export async function getContractByClientId(clientId: number): Promise<ContractLookup | null> {
   try {
     const res = await contractsFetch("/api/contracts/search", {

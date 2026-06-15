@@ -1,5 +1,0 @@
-HHH90000025 (PostgreSQLDialect explicit) — all 4 services 
-spring.jpa.open-in-view — all 3 services 
-InitializeUserDetailsManagerConfigurer AuthenticationProvider conflict — user-service 
-SpringDoc endpoint warnings — all services 
-Prometheus cache.size tag mismatch — contracts 

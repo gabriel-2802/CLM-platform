@@ -23,7 +23,7 @@ export default async function ContractTemplatesPage() {
               <tr className="bg-slate-700">
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Nume</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Fișier</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Mapat</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Etichetat</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Creat la</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Actualizat la</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Acțiuni</th>

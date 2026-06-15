@@ -1,7 +1,8 @@
-package clm.demo.services;
+package clm.demo.listeners;
 
 import clm.demo.events.ContractDeactivatedEvent;
-import clm.negotiation.dto.requests.ContractDeactivatedRequest;
+import clm.demo.services.NegotiationLifecycleClient;
+import clm.demo.dto.requests.ContractDeactivatedRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

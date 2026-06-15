@@ -39,8 +39,8 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & { header?: React.ReactNode }
+>(({ className, children, position = "popper", header, ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -53,6 +53,7 @@ const SelectContent = React.forwardRef<
       position={position}
       {...props}
     >
+      {header && <div className="border-b border-slate-100 bg-popover px-2 py-1.5">{header}</div>}
       <SelectPrimitive.ScrollUpButton className="flex cursor-default items-center justify-center py-1">
         <ChevronUpIcon />
       </SelectPrimitive.ScrollUpButton>
