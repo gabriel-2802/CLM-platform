@@ -38,7 +38,7 @@ public class ContractLifecycleService {
                 .proposedValue(request.contractValue())
                 .proposedEndDate(effectiveEndDate)
                 .status(NegotiationStatus.ACCEPTED)
-                .notes("Negociere inițială — contract semnat")
+                .notes("Negociere inițială - contract semnat")
                 .createdByUserId(0)
                 .createdAt(request.startDate().atStartOfDay())
                 .build();
@@ -55,9 +55,9 @@ public class ContractLifecycleService {
             if (!terminatedContractRepository.existsByContractId(contractId)) {
                 terminatedContractRepository.save(
                         TerminatedContract.builder().contractId(contractId).build());
-                log.info("Contract {} marked as terminated — excluded from inactivity emails", contractId);
+                log.info("Contract {} marked as terminated - excluded from inactivity emails", contractId);
             } else {
-                log.debug("Contract {} already marked as terminated — skipping", contractId);
+                log.debug("Contract {} already marked as terminated - skipping", contractId);
             }
         }
     }

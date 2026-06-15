@@ -68,6 +68,42 @@ export async function generateAppendix(payload: GenerateAppendixPayload) {
     }
 }
 
+export async function updateContractTerms(
+    contractId: number,
+    appendixId: number,
+    startDate: string,
+    contractEndDate?: string,
+    value?: number,
+    balance?: number,
+) {
+    try {
+        const session = await getSession()
+        const userId = Number((session?.user as any)?.id)
+        if (!Number.isInteger(userId) || userId <= 0) return { success: false, error: "Utilizator neautentificat" }
+
+        const res = await contractsFetch(`/api/contracts/${contractId}/update-terms`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                userId,
+                appendixId,
+                startDate,
+                contractEndDate: contractEndDate || null,
+                value: value ?? null,
+                balance: balance ?? null,
+            }),
+        })
+        if (!res.ok) return { success: false, error: await res.text() }
+        const data = await res.json()
+        revalidatePath("/clients", "page")
+        revalidatePath("/clienti", "page")
+        revalidatePath("/contracts", "page")
+        return { success: true, data }
+    } catch {
+        return { success: false, error: "Network error" }
+    }
+}
+
 export async function terminateAppendix(appendixId: number) {
     try {
         const res = await contractsFetch(`/api/appendices/${appendixId}/terminate`, {

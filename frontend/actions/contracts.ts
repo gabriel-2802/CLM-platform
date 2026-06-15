@@ -203,6 +203,40 @@ export type AuditEvent = {
   downloadUrl?: string
 }
 
+function fmtAuditDate(d: string | null | undefined): string | null {
+  if (!d) return null
+  return new Date(d).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" })
+}
+
+function fmtAuditValue(v: unknown): string | null {
+  if (v == null) return null
+  return `${Number(v).toLocaleString("ro-RO")} RON`
+}
+
+function buildInitialDetails(d: any): string | undefined {
+  if (!d) return undefined
+  const lines: string[] = []
+  if (d.startDate)               lines.push(`Data de start: ${fmtAuditDate(d.startDate)}`)
+  if (d.endDate)                 lines.push(`Data de sfârșit: ${fmtAuditDate(d.endDate)}`)
+  if (d.contractValue != null)   lines.push(`Tarif servicii conta: ${fmtAuditValue(d.contractValue)}`)
+  if (d.contractBalance != null) lines.push(`Tarif bilanț: ${fmtAuditValue(d.contractBalance)}`)
+  return lines.length ? lines.join("\n") : undefined
+}
+
+function buildChangeDetails(current: any, previous: any): string | undefined {
+  if (!current) return undefined
+  const lines: string[] = []
+  if (String(current.startDate ?? "") !== String(previous?.startDate ?? ""))
+    lines.push(`Data de start: ${fmtAuditDate(previous?.startDate) ?? "—"} → ${fmtAuditDate(current.startDate) ?? "—"}`)
+  if (String(current.endDate ?? "") !== String(previous?.endDate ?? ""))
+    lines.push(`Data de sfârșit: ${fmtAuditDate(previous?.endDate) ?? "—"} → ${fmtAuditDate(current.endDate) ?? "—"}`)
+  if (String(current.contractValue ?? "") !== String(previous?.contractValue ?? ""))
+    lines.push(`Tarif servicii conta: ${fmtAuditValue(previous?.contractValue) ?? "—"} → ${fmtAuditValue(current.contractValue) ?? "—"}`)
+  if (String(current.contractBalance ?? "") !== String(previous?.contractBalance ?? ""))
+    lines.push(`Tarif bilanț: ${fmtAuditValue(previous?.contractBalance) ?? "—"} → ${fmtAuditValue(current.contractBalance) ?? "—"}`)
+  return lines.length ? lines.join("\n") : undefined
+}
+
 export async function getContractAudit(
   contractId: number
 ): Promise<{ success: true; events: AuditEvent[] } | { success: false; error: string }> {
@@ -226,13 +260,23 @@ export async function getContractAudit(
     const resolveUser = (id?: number | null) =>
       id != null ? (userMap.get(id) ?? `User #${id}`) : "Sistem"
 
+    const sortedDetails: any[] = [...(contract.contractDetails ?? [])].sort(
+      (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    )
+    const appendixIdToDetailIndex = new Map<number, number>()
+    sortedDetails.forEach((d: any, idx: number) => {
+      if (d.appendixId) appendixIdToDetailIndex.set(d.appendixId, idx)
+    })
+
     const events: AuditEvent[] = []
 
     if (contract.generatedAt) {
+      const initialDetail = sortedDetails.find((d: any) => !d.appendixId)
       events.push({
         id: "created",
         name: "Contract generat",
         action: "Generare contract din șablon",
+        details: buildInitialDetails(initialDetail),
         date: contract.generatedAt,
         userDisplay: resolveUser(contract.generatedByUser),
         category: "created",
@@ -253,11 +297,17 @@ export async function getContractAudit(
     }
 
     for (const appendix of contract.appendices ?? []) {
+      const detailIdx = appendixIdToDetailIndex.get(appendix.id)
+      const detail = detailIdx !== undefined ? sortedDetails[detailIdx] : null
+      const prevDetail = detailIdx !== undefined && detailIdx > 0 ? sortedDetails[detailIdx - 1] : null
+      const changeDetails = buildChangeDetails(detail, prevDetail)
+
       if (appendix.uploadedSignedAt) {
         events.push({
           id: `appendix-signed-${appendix.id}`,
           name: "Act adițional semnat",
           action: `Încărcare act adițional semnat: ${appendix.title ?? `Act adițional #${appendix.id}`}`,
+          details: changeDetails,
           date: appendix.uploadedSignedAt,
           userDisplay: resolveUser(appendix.uploadedSignedByUser),
           category: "amended",
@@ -268,6 +318,7 @@ export async function getContractAudit(
           id: `appendix-gen-${appendix.id}`,
           name: "Act adițional generat",
           action: `Generare act adițional: ${appendix.title ?? `Act adițional #${appendix.id}`}`,
+          details: changeDetails,
           date: appendix.generatedAt,
           userDisplay: resolveUser(appendix.generatedByUser),
           category: "amended",
@@ -278,14 +329,15 @@ export async function getContractAudit(
 
     if (contract.terminatedAt) {
       const reasons = contract.reasonsForTermination?.trim()
-      const effectiveDate = contract.terminationDate
-        ? new Date(contract.terminationDate).toLocaleDateString("ro-RO", { day: "2-digit", month: "2-digit", year: "numeric" })
-        : null
+      const effectiveDate = fmtAuditDate(contract.terminationDate)
+      const detailLines: string[] = []
+      if (effectiveDate) detailLines.push(`Data intrării în vigoare: ${effectiveDate}`)
+      if (reasons)        detailLines.push(`Motiv: ${reasons}`)
       events.push({
         id: "terminated",
         name: "Contract încetat",
-        action: effectiveDate ? `Încheiere contract - Data intrării în vigoare: ${effectiveDate}` : "Încheiere contract",
-        details: reasons || undefined,
+        action: "Încheiere contract",
+        details: detailLines.length ? detailLines.join("\n") : undefined,
         date: contract.terminatedAt,
         userDisplay: resolveUser(contract.terminatedByUserId),
         category: "terminated",

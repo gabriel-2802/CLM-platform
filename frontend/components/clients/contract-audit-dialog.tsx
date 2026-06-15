@@ -61,7 +61,7 @@ function AuditTimeline({ events, onDownload }: { events: AuditEvent[]; onDownloa
                 </div>
                 <p className="mt-1 text-sm text-slate-600">{event.action}</p>
                 {event.details && (
-                  <p className="mt-0.5 text-sm text-slate-600">Motiv: {event.details}</p>
+                  <p className="mt-1 text-xs text-slate-500 whitespace-pre-line">{event.details}</p>
                 )}
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
@@ -112,13 +112,18 @@ export function ContractAuditDialog({
     setOpen(true)
     setLoading(true)
     setError(null)
-    const result = await getContractAudit(contractId)
-    if (result.success) {
-      setEvents(result.events)
-    } else {
-      setError(result.error)
+    try {
+      const result = await getContractAudit(contractId)
+      if (result.success) {
+        setEvents(result.events)
+      } else {
+        setError(result.error)
+      }
+    } catch {
+      setError("Eroare la încărcarea auditului.")
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (

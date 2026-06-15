@@ -213,7 +213,16 @@ export function NegocieriDialog({
     load()
   }, [open, load])
 
-  const lastNegotiation = negotiations[0] ?? null
+  // System-generated initial negotiation (createdByUserId === 0) has createdAt set to
+  // the contract's start date, which may be in the future. Pin it to the bottom of the
+  // timeline and exclude it from "Ultima negociere" so the display stays chronological.
+  const displayNegotiations = [
+    ...negotiations.filter((n: Negotiation) => n.createdByUserId !== 0),
+    ...negotiations.filter((n: Negotiation) => n.createdByUserId === 0),
+  ]
+
+  const lastNegotiation =
+    negotiations.find((n: Negotiation) => n.createdByUserId !== 0) ?? negotiations[0] ?? null
   const lastDate = lastNegotiation
     ? (lastNegotiation.resolvedAt ?? lastNegotiation.createdAt)
     : null
@@ -290,7 +299,7 @@ export function NegocieriDialog({
               </div>
             ) : (
               <NegotiationTimeline
-                negotiations={negotiations}
+                negotiations={displayNegotiations}
                 onAction={load}
                 onAccepted={() => setShowAcceptedBanner(true)}
               />

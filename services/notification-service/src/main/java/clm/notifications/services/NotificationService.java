@@ -42,11 +42,11 @@ public class NotificationService {
         List<ContractSummaryDTO> expiring = contractApiService.fetchExpiringContracts();
 
         if (expiring.isEmpty()) {
-            log.info("No expiring contracts found – skipping email.");
+            log.info("No expiring contracts found - skipping email.");
             return;
         }
 
-        String subject = "CLM Platform – Contracte care expiră curând (" +
+        String subject = "CLM Platform - Contracte care expiră curând (" +
                 LocalDate.now().format(DateTimeFormatter.ofPattern("MM.yyyy")) + ")";
         String body = buildHtmlBody(expiring);
 
@@ -59,9 +59,7 @@ public class NotificationService {
                 expiring.size());
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
     // HTML email builder
-    // ─────────────────────────────────────────────────────────────────────────
 
     private String buildHtmlBody(List<ContractSummaryDTO> expiring) {
         StringBuilder sb = new StringBuilder();
@@ -87,13 +85,13 @@ public class NotificationService {
             <body>
             """);
 
-        sb.append("<h1>Contracte care expiră curând – CLM Platform</h1>");
+        sb.append("<h1>Contracte care expiră curând - CLM Platform</h1>");
         sb.append("<p>Generat automat pe <strong>")
           .append(LocalDate.now().format(DATE_FMT))
           .append("</strong></p>");
 
-        // ── Section 1: expiring contracts ───────────────────────────────────
-        sb.append("<h2>&#x26A0; Contracte care expiră în urmatoarele ")
+        // Expiring contracts
+        sb.append("Contracte care expiră în urmatoarele ")
           .append(expiryWarningDays)
           .append(" de zile</h2>");
 
@@ -109,7 +107,6 @@ public class NotificationService {
                       <th>Data început</th>
                       <th>Data expirare</th>
                       <th>Valoare contract</th>
-                      <th>Generat de</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -121,7 +118,6 @@ public class NotificationService {
                   .append("<td>").append(formatDate(c.getContractStartDate())).append("</td>")
                   .append("<td><span class=\"badge-warn\">").append(formatDate(c.getContractEndDate())).append("</span></td>")
                   .append("<td>").append(formatValue(c)).append("</td>")
-                  .append("<td>").append(escapeHtml(orDash(c.getGeneratedByMail()))).append("</td>")
                   .append("</tr>");
             }
             sb.append("</tbody></table>");
@@ -129,7 +125,7 @@ public class NotificationService {
 
         sb.append("""
             <div class="footer">
-              Acest email a fost generat automat de CLM Platform – Notifications Service.<br/>
+              Acest email a fost generat automat de CLM Platform - Notifications Service.<br/>
               Nu răspundeți la acest email.
             </div>
             </body></html>
@@ -137,10 +133,6 @@ public class NotificationService {
 
         return sb.toString();
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private String formatDate(LocalDate date) {
         return date != null ? date.format(DATE_FMT) : "—";

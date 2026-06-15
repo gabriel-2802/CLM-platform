@@ -17,6 +17,7 @@ import {
     uploadDirectAppendix,
     uploadSignedAppendix,
     terminateAppendix,
+    updateContractTerms,
     type AppendixSummary,
 } from "@/actions/appendices"
 import {
@@ -214,8 +215,20 @@ export function ActeAditionaleDialog({
         const res = await uploadSignedAppendix(signAppendixId, fd, signDate || undefined, effectiveDate || undefined)
         if (res.success) {
             toast.success("Act adițional semnat încărcat.")
-            if (signModifica && onUpdateDetails) {
-                onUpdateDetails({ signDate, effectiveDate, panaLa: signPanaLa, tarifConta: signTarifConta, tarifBilant: signTarifBilant })
+            if (signModifica && signAppendixId != null && effectiveDate) {
+                const updateRes = await updateContractTerms(
+                    contractId,
+                    signAppendixId,
+                    effectiveDate,
+                    signPanaLa || undefined,
+                    signTarifConta ? parseFloat(signTarifConta) : undefined,
+                    signTarifBilant ? parseFloat(signTarifBilant) : undefined,
+                )
+                if (updateRes.success && onUpdateDetails) {
+                    onUpdateDetails({ signDate, effectiveDate, panaLa: signPanaLa, tarifConta: signTarifConta, tarifBilant: signTarifBilant })
+                } else if (!updateRes.success) {
+                    toast.error("Eroare la actualizarea termenilor: " + updateRes.error)
+                }
             }
             setView("list")
             loadAppendices()
@@ -245,8 +258,20 @@ export function ActeAditionaleDialog({
         const res = await uploadDirectAppendix(contractId, uploadTitle.trim(), fd, signDate || undefined, effectiveDate || undefined)
         if (res.success) {
             toast.success("Act adițional încărcat.")
-            if (uploadModifica && onUpdateDetails) {
-                onUpdateDetails({ signDate, effectiveDate, panaLa: uploadPanaLa, tarifConta: uploadTarifConta, tarifBilant: uploadTarifBilant })
+            if (uploadModifica && res.data?.id && effectiveDate) {
+                const updateRes = await updateContractTerms(
+                    contractId,
+                    res.data.id,
+                    effectiveDate,
+                    uploadPanaLa || undefined,
+                    uploadTarifConta ? parseFloat(uploadTarifConta) : undefined,
+                    uploadTarifBilant ? parseFloat(uploadTarifBilant) : undefined,
+                )
+                if (updateRes.success && onUpdateDetails) {
+                    onUpdateDetails({ signDate, effectiveDate, panaLa: uploadPanaLa, tarifConta: uploadTarifConta, tarifBilant: uploadTarifBilant })
+                } else if (!updateRes.success) {
+                    toast.error("Eroare la actualizarea termenilor: " + updateRes.error)
+                }
             }
             setUploadTitle("")
             setUploadFile(null)
