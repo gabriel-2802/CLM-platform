@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logback configuration used by the Gatling runner process.
+
+  During a load test the most useful signals are:
+    • Gatling's own progress lines (WARN+ from io.gatling.*)
+    • HTTP errors (DEBUG from io.gatling.http.response only when debugging)
+    • Virtual-user failures (INFO from io.gatling.core.session)
+
+  Keep the root logger at WARN to prevent Netty / async internals
+  from flooding the console and masking real Gatling output.
+-->
+<configuration>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} %-5level [%logger{36}] %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Gatling simulation lifecycle messages (start, end, assertions) -->
+  <logger name="io.gatling.core"         level="WARN"  />
+
+  <!-- Uncomment the line below to log every HTTP request/response for debugging.
+       WARNING: extremely verbose under load; only use with a single user.       -->
+  <!-- <logger name="io.gatling.http"     level="DEBUG" /> -->
+
+  <!-- Virtual-user session errors show as WARN by default -->
+  <logger name="io.gatling.core.session" level="INFO"  />
+
+  <!-- Netty internals — keep quiet -->
+  <logger name="io.netty"                level="WARN"  />
+  <logger name="reactor.netty"           level="WARN"  />
+
+  <root level="WARN">
+    <appender-ref ref="CONSOLE" />
+  </root>
+
+</configuration>

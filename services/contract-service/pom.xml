@@ -40,6 +40,11 @@
 		<byte-buddy.version>1.17.8</byte-buddy.version>
 		<commons-io.version>2.16.1</commons-io.version>
 		<springdoc.version>3.0.3</springdoc.version>
+
+		<!-- Gatling (used only in perf-test profile) -->
+		<gatling.version>3.11.5</gatling.version>
+		<gatling-plugin.version>4.9.6</gatling-plugin.version>
+		<build-helper-plugin.version>3.6.0</build-helper-plugin.version>
 	</properties>
 
 	<!-- ==================== Dependencies ==================== -->
@@ -250,6 +255,10 @@
 		</dependencies>
 	</dependencyManagement>
 
+	<!-- ==================== Performance Test Versions ==================== -->
+	<!-- Activate with: mvn -Pperf-test gatling:test -->
+	<!-- These are declared at the top level so the versions are visible in IDE -->
+
 	<!-- ==================== Build ==================== -->
 	<build>
 		<plugins>
@@ -322,5 +331,153 @@
 
 		</plugins>
 	</build>
+
+
+	<!-- ==================== Profiles ==================== -->
+	<profiles>
+
+		<!--
+		  Performance / Load Test Profile
+		  ─────────────────────────────────
+		  Adds src/gatling/java + src/gatling/resources as test sources so that
+		  Gatling simulations are compiled only when this profile is active.
+		  Unit tests (src/test/java) are excluded via Surefire skip flag so the
+		  two suites never interfere.
+
+		  Usage:
+		    mvn -Pperf-test gatling:test
+		    mvn -Pperf-test gatling:test -Dgatling.baseUrl=http://staging:8080
+		-->
+		<profile>
+			<id>perf-test</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+
+			<dependencies>
+				<!--
+				  gatling-charts-highcharts transitively brings in:
+				    gatling-app, gatling-core-java, gatling-http-java
+				  The Highcharts license is free for open-source projects;
+				  replace with io.gatling:gatling-app for commercial closed-source.
+				-->
+				<dependency>
+					<groupId>io.gatling.highcharts</groupId>
+					<artifactId>gatling-charts-highcharts</artifactId>
+					<version>${gatling.version}</version>
+					<scope>test</scope>
+				</dependency>
+			</dependencies>
+
+			<build>
+				<plugins>
+
+					<!-- 1. Expose src/gatling/{java,resources} to Maven's test classpath -->
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>build-helper-maven-plugin</artifactId>
+						<version>${build-helper-plugin.version}</version>
+						<executions>
+							<execution>
+								<id>add-gatling-sources</id>
+								<phase>generate-test-sources</phase>
+								<goals><goal>add-test-source</goal></goals>
+								<configuration>
+									<sources>
+										<source>${project.basedir}/src/gatling/java</source>
+									</sources>
+								</configuration>
+							</execution>
+							<execution>
+								<id>add-gatling-resources</id>
+								<phase>generate-test-resources</phase>
+								<goals><goal>add-test-resource</goal></goals>
+								<configuration>
+									<resources>
+										<resource>
+											<directory>${project.basedir}/src/gatling/resources</directory>
+										</resource>
+									</resources>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<!-- 2. Skip unit tests when running performance tests -->
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<skipTests>true</skipTests>
+						</configuration>
+					</plugin>
+
+					<!-- 3. Gatling runner -->
+					<plugin>
+						<groupId>io.gatling</groupId>
+						<artifactId>gatling-maven-plugin</artifactId>
+						<version>${gatling-plugin.version}</version>
+						<configuration>
+							<!-- Target simulation class -->
+							<simulationClass>clm.demo.simulation.ContractServiceSimulation</simulationClass>
+
+							<!-- Results land in target/gatling-results/<timestamp>/ -->
+							<resultsFolder>${project.basedir}/target/gatling-results</resultsFolder>
+
+							<!--
+							  Tuning flags for the Gatling JVM process.
+							  G1GC + large heap avoids GC pauses skewing latency numbers.
+							  Netty flags keep the HTTP engine happy under high concurrency.
+							-->
+							<jvmArgs>
+								<jvmArg>-server</jvmArg>
+								<jvmArg>-Xms512m</jvmArg>
+								<jvmArg>-Xmx2g</jvmArg>
+								<jvmArg>-XX:+UseG1GC</jvmArg>
+								<jvmArg>-XX:MaxGCPauseMillis=100</jvmArg>
+								<jvmArg>-Dio.netty.noKeySetOptimization=true</jvmArg>
+								<jvmArg>-Djava.net.preferIPv4Stack=true</jvmArg>
+								<jvmArg>-Dfile.encoding=UTF-8</jvmArg>
+								<!-- nginx proxy at https://localhost uses self-signed cert — skip CA chain validation -->
+								<jvmArg>-Dgatling.http.ssl.useInsecureTrustManager=true</jvmArg>
+								<!-- Suppress Java 21 native-access warnings from Netty and Akka internals -->
+								<jvmArg>--enable-native-access=ALL-UNNAMED</jvmArg>
+								<jvmArg>-Dio.netty.tryReflectionSetAccessible=true</jvmArg>
+							</jvmArgs>
+
+							<!--
+							  All -Dgatling.* system properties forwarded to the simulation.
+							  See SimulationConfig for the full list of supported knobs.
+							-->
+							<systemProperties>
+								<gatling.baseUrl>${gatling.baseUrl}</gatling.baseUrl>
+								<gatling.jwtSecret>${gatling.jwtSecret}</gatling.jwtSecret>
+								<gatling.ramp.targetRps>${gatling.ramp.targetRps}</gatling.ramp.targetRps>
+								<gatling.ramp.durationSec>${gatling.ramp.durationSec}</gatling.ramp.durationSec>
+								<gatling.steady.rps>${gatling.steady.rps}</gatling.steady.rps>
+								<gatling.steady.durationSec>${gatling.steady.durationSec}</gatling.steady.durationSec>
+								<gatling.stress.rps>${gatling.stress.rps}</gatling.stress.rps>
+								<gatling.stress.rampSec>${gatling.stress.rampSec}</gatling.stress.rampSec>
+								<gatling.stress.holdSec>${gatling.stress.holdSec}</gatling.stress.holdSec>
+								<gatling.stress.cooldownSec>${gatling.stress.cooldownSec}</gatling.stress.cooldownSec>
+								<gatling.assert.p95Ms>${gatling.assert.p95Ms}</gatling.assert.p95Ms>
+								<gatling.assert.p99Ms>${gatling.assert.p99Ms}</gatling.assert.p99Ms>
+								<gatling.assert.maxErrorPct>${gatling.assert.maxErrorPct}</gatling.assert.maxErrorPct>
+								<!-- legacy range knobs (kept for compat; no longer used by feeders) -->
+								<gatling.data.contractIdMax>${gatling.data.contractIdMax}</gatling.data.contractIdMax>
+								<gatling.data.templateIdMax>${gatling.data.templateIdMax}</gatling.data.templateIdMax>
+								<gatling.data.clientIdMax>${gatling.data.clientIdMax}</gatling.data.clientIdMax>
+								<!-- seed sizing: how much data to create in before{} -->
+								<gatling.seed.templates>${gatling.seed.templates}</gatling.seed.templates>
+								<gatling.seed.contractsPerTemplate>${gatling.seed.contractsPerTemplate}</gatling.seed.contractsPerTemplate>
+							</systemProperties>
+						</configuration>
+					</plugin>
+
+				</plugins>
+			</build>
+		</profile>
+
+	</profiles>
 
 </project>
