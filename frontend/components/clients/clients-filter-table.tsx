@@ -296,7 +296,10 @@ export function ClientsFilterTable({ rows }: { rows: Row[] }) {
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                  {contractsCache[row.id].map((c) => {
+                                  {[...contractsCache[row.id]]
+                                    .sort((a, b) => (b.contractStartDate ?? "").localeCompare(a.contractStartDate ?? ""))
+                                    .slice(0, 10)
+                                    .map((c) => {
                                     const statusColors: Record<string, string> = {
                                       ACTIVE: "bg-green-50 text-green-700 border-green-100",
                                       PENDING_SIGNATURE: "bg-yellow-50 text-yellow-700 border-yellow-100",
