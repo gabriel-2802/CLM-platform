@@ -1,6 +1,7 @@
 "use client"
 
 import { Fragment, useState, useMemo, useCallback } from "react"
+import Link from "next/link"
 import { Filter, ChevronDown, ChevronUp } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -221,9 +222,13 @@ export function ClientsFilterTable({ rows }: { rows: Row[] }) {
                       onClick={() => handleRowClick(row.id)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <span className="font-semibold text-slate-800 hover:text-slate-600 hover:underline select-none">
+                        <Link
+                          href={`/clients/edit/${row.id}?tab=form`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-semibold text-slate-800 hover:text-slate-600 hover:underline"
+                        >
                           {row.name}
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-600">
