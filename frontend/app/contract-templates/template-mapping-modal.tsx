@@ -35,7 +35,6 @@ export function TemplateMappingModal({
   const [mappingTypes, setMappingTypes] = useState<Record<number, string>>({})
   const [manualLabels, setManualLabels] = useState<Record<number, string>>({})
   const [requiredFields, setRequiredFields] = useState<Record<number, boolean>>({})
-  const [fieldSearches, setFieldSearches] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [docError, setDocError] = useState<string | null>(null)
@@ -200,14 +199,17 @@ export function TemplateMappingModal({
     return stripped.length > 50
   }, [htmlContent])
 
-  const filteredOptions = (fieldId: number) => {
-    const q = (fieldSearches[fieldId] || "").toLowerCase()
-    return q
-      ? mappingOptions.filter(
-          (o) => o.label.toLowerCase().includes(q) || o.value.toLowerCase().includes(q)
-        )
-      : mappingOptions
-  }
+  const allOptions = useMemo(() => {
+    const existingValues = new Set(mappingOptions.map((o) => o.value))
+    const customLabels = Object.values(manualLabels)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !existingValues.has(l))
+    const unique = [...new Set(customLabels)]
+    return [
+      ...mappingOptions,
+      ...unique.map((l) => ({ label: l, value: l })),
+    ]
+  }, [mappingOptions, manualLabels])
 
   const parserOptions: HTMLReactParserOptions = {
     replace: (domNode) => {
@@ -226,10 +228,7 @@ export function TemplateMappingModal({
             <span className="inline-flex items-center align-middle mx-0.5 my-0.5 gap-1">
             <Select
                 value={mappingTypes[fieldId] || "MANUAL"}
-                onValueChange={(val) => {
-                  setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))
-                  setFieldSearches((prev) => ({ ...prev, [fieldId]: "" }))
-                }}
+                onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
             >
               <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-red-50 border-red-200 px-2 focus:ring-1 focus:ring-red-300 font-medium">
                 {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" ? (
@@ -246,20 +245,8 @@ export function TemplateMappingModal({
                     <SelectValue placeholder="Selectează câmp..." />
                 )}
               </SelectTrigger>
-              <SelectContent
-                className="max-h-72 overflow-y-auto"
-                header={
-                  <input
-                    className="w-full text-xs outline-none placeholder:text-slate-400 bg-transparent"
-                    placeholder="Caută câmp..."
-                    value={fieldSearches[fieldId] || ""}
-                    onChange={(e) => { e.stopPropagation(); setFieldSearches((prev) => ({ ...prev, [fieldId]: e.target.value })) }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    onPointerDown={(e) => e.stopPropagation()}
-                  />
-                }
-              >
-                {filteredOptions(fieldId).map((opt) => (
+              <SelectContent className="max-h-72 overflow-y-auto">
+                {allOptions.map((opt) => (
                     <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
                       {opt.label}
                     </SelectItem>
@@ -384,10 +371,7 @@ export function TemplateMappingModal({
                         <div className="flex-1 flex items-center gap-2">
                           <Select
                               value={mappingTypes[field.id] || "MANUAL"}
-                              onValueChange={(val) => {
-                                setMappingTypes((prev) => ({ ...prev, [field.id]: val }))
-                                setFieldSearches((prev) => ({ ...prev, [field.id]: "" }))
-                              }}
+                              onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [field.id]: val }))}
                           >
                             <SelectTrigger className="h-8 text-sm bg-red-50 border-red-200 focus:ring-red-300 flex-1">
                               {(mappingTypes[field.id] || "MANUAL") === "MANUAL" ? (
@@ -404,20 +388,8 @@ export function TemplateMappingModal({
                                   <SelectValue placeholder="Selectează date pentru acest câmp..." />
                               )}
                             </SelectTrigger>
-                            <SelectContent
-                              className="max-h-72 overflow-y-auto"
-                              header={
-                                <input
-                                  className="w-full text-xs outline-none placeholder:text-slate-400 bg-transparent"
-                                  placeholder="Caută câmp..."
-                                  value={fieldSearches[field.id] || ""}
-                                  onChange={(e) => { e.stopPropagation(); setFieldSearches((prev) => ({ ...prev, [field.id]: e.target.value })) }}
-                                  onKeyDown={(e) => e.stopPropagation()}
-                                  onPointerDown={(e) => e.stopPropagation()}
-                                />
-                              }
-                            >
-                              {filteredOptions(field.id).map((opt: TemplateMappingOption) => (
+                            <SelectContent className="max-h-72 overflow-y-auto">
+                              {allOptions.map((opt: TemplateMappingOption) => (
                                   <SelectItem key={opt.value} value={opt.value} className="text-sm">
                                     {opt.label}
                                   </SelectItem>
