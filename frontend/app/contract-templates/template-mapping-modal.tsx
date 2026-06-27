@@ -226,33 +226,39 @@ export function TemplateMappingModal({
 
         return (
             <span className="inline-flex items-center align-middle mx-0.5 my-0.5 gap-1">
-            <Select
-                value={mappingTypes[fieldId] || "MANUAL"}
-                onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
-            >
-              <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-red-50 border-red-200 px-2 focus:ring-1 focus:ring-red-300 font-medium">
-                {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" ? (
-                    <input
-                        className="flex-1 bg-transparent outline-none text-[11px] placeholder:text-gray-400 min-w-0"
-                        placeholder="Denumire câmp..."
-                        value={manualLabels[fieldId] || ""}
-                        onChange={(e) => { e.stopPropagation(); setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value })) }}
-                        onClick={(e) => e.stopPropagation()}
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onKeyDown={(e: { stopPropagation(): void }) => e.stopPropagation()}
-                    />
-                ) : (
-                    <SelectValue placeholder="Selectează câmp..." />
-                )}
-              </SelectTrigger>
-              <SelectContent className="max-h-72 overflow-y-auto">
-                {allOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="text-[12px]">
-                      {opt.label}
-                    </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {(mappingTypes[fieldId] || "MANUAL") === "MANUAL" ? (
+                <span className="inline-flex">
+                  <input
+                    autoComplete="off"
+                    className="h-7 w-32 border border-red-200 bg-red-50 rounded-l px-2 text-[11px] outline-none focus:ring-1 focus:ring-red-300 font-medium placeholder:text-gray-400"
+                    placeholder="Denumire câmp..."
+                    value={manualLabels[fieldId] || ""}
+                    onChange={(e) => setManualLabels((prev) => ({ ...prev, [fieldId]: e.target.value }))}
+                  />
+                  <Select value="" onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}>
+                    <SelectTrigger className="h-7 w-7 rounded-l-none border-l-0 border-red-200 bg-red-50 px-1 text-slate-400" />
+                    <SelectContent className="max-h-72 overflow-y-auto">
+                      {allOptions.filter((o) => o.value !== "MANUAL").map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value} className="text-[12px]">{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </span>
+              ) : (
+                <Select
+                  value={mappingTypes[fieldId]}
+                  onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [fieldId]: val }))}
+                >
+                  <SelectTrigger className="h-7 min-w-[150px] max-w-[200px] text-[11px] bg-red-50 border-red-200 px-2 focus:ring-1 focus:ring-red-300 font-medium">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-72 overflow-y-auto">
+                    {allOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="text-[12px]">{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <input
                   type="checkbox"
                   className="w-3 h-3 accent-red-500 cursor-pointer shrink-0"
@@ -369,33 +375,39 @@ export function TemplateMappingModal({
                           {idx + 1}
                         </div>
                         <div className="flex-1 flex items-center gap-2">
-                          <Select
-                              value={mappingTypes[field.id] || "MANUAL"}
+                          {(mappingTypes[field.id] || "MANUAL") === "MANUAL" ? (
+                            <div className="flex flex-1">
+                              <input
+                                autoComplete="off"
+                                className="flex-1 h-8 border border-red-200 bg-red-50 rounded-l px-2 text-sm outline-none focus:ring-1 focus:ring-red-300 placeholder:text-gray-400"
+                                placeholder="Denumire câmp..."
+                                value={manualLabels[field.id] || ""}
+                                onChange={(e) => setManualLabels((prev: Record<number, string>) => ({ ...prev, [field.id]: e.target.value }))}
+                              />
+                              <Select value="" onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [field.id]: val }))}>
+                                <SelectTrigger className="h-8 w-8 rounded-l-none border-l-0 border-red-200 bg-red-50 px-1.5 text-slate-400" />
+                                <SelectContent className="max-h-72 overflow-y-auto">
+                                  {allOptions.filter((o) => o.value !== "MANUAL").map((opt: TemplateMappingOption) => (
+                                    <SelectItem key={opt.value} value={opt.value} className="text-sm">{opt.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <Select
+                              value={mappingTypes[field.id]}
                               onValueChange={(val) => setMappingTypes((prev) => ({ ...prev, [field.id]: val }))}
-                          >
-                            <SelectTrigger className="h-8 text-sm bg-red-50 border-red-200 focus:ring-red-300 flex-1">
-                              {(mappingTypes[field.id] || "MANUAL") === "MANUAL" ? (
-                                  <input
-                                      className="flex-1 bg-transparent outline-none text-sm placeholder:text-gray-400 min-w-0"
-                                      placeholder="Denumire câmp..."
-                                      value={manualLabels[field.id] || ""}
-                                      onChange={(e) => { e.stopPropagation(); setManualLabels((prev: Record<number, string>) => ({ ...prev, [field.id]: e.target.value })) }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onPointerDown={(e) => e.stopPropagation()}
-                                      onKeyDown={(e: { stopPropagation(): void }) => e.stopPropagation()}
-                                  />
-                              ) : (
-                                  <SelectValue placeholder="Selectează date pentru acest câmp..." />
-                              )}
-                            </SelectTrigger>
-                            <SelectContent className="max-h-72 overflow-y-auto">
-                              {allOptions.map((opt: TemplateMappingOption) => (
-                                  <SelectItem key={opt.value} value={opt.value} className="text-sm">
-                                    {opt.label}
-                                  </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            >
+                              <SelectTrigger className="h-8 text-sm bg-red-50 border-red-200 focus:ring-red-300 flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-72 overflow-y-auto">
+                                {allOptions.map((opt: TemplateMappingOption) => (
+                                  <SelectItem key={opt.value} value={opt.value} className="text-sm">{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
                           <label className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 cursor-pointer select-none">
                             <input
                                 type="checkbox"

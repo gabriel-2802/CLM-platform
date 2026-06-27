@@ -31,9 +31,10 @@ type DataTableProps<TData, TValue> = {
   searchParamKey?: string; // when provided, persist the global search value in the URL under this key
   primaryControl?: React.ReactNode; // replaces the default search input when provided
   showGlobalSearch?: boolean; // toggles visibility of the default global search; defaults to true when primaryControl is not set
+  expandedRowContent?: (row: TanstackRow<TData>) => React.ReactNode;
 };
 
-export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComponent: RowComponent, stickyHeader = false, leftFilters, searchParamKey, primaryControl, showGlobalSearch = undefined }: DataTableProps<TData, TValue>) {
+export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComponent: RowComponent, stickyHeader = false, leftFilters, searchParamKey, primaryControl, showGlobalSearch = undefined, expandedRowContent }: DataTableProps<TData, TValue>) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -41,6 +42,13 @@ export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComp
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = React.useState<string>(initialSearch);
+  const [expandedRowId, setExpandedRowId] = React.useState<string | null>(null);
+
+  const handleRowClick = React.useCallback((e: React.MouseEvent, rowId: string) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button, a, input, select, textarea, [role='combobox'], [data-radix-collection-item]")) return;
+    setExpandedRowId((prev) => (prev === rowId ? null : rowId));
+  }, []);
 
   const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -155,17 +163,26 @@ export function DataTable<TData, TValue>({ columns, data, pageSize = 10, rowComp
                   RowComponent ? (
                     <RowComponent key={row.id} row={row} />
                   ) : (
+                    <React.Fragment key={row.id}>
                       <TableRow
-                        key={row.id}
                         data-state={row.getIsSelected() && "selected"}
-                        className="transition-colors"
+                        className={`transition-colors${expandedRowContent ? " cursor-pointer hover:bg-slate-50" : ""}`}
+                        onClick={expandedRowContent ? (e) => handleRowClick(e, row.id) : undefined}
                       >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="px-3 py-2 md:px-4 border-b align-middle">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </TableRow>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="px-3 py-2 md:px-4 border-b align-middle">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                      {expandedRowContent && expandedRowId === row.id && (
+                        <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
+                          <TableCell colSpan={columns.length} className="px-6 py-4 border-b">
+                            {expandedRowContent(row)}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
                   )
                 ))
               ) : (
