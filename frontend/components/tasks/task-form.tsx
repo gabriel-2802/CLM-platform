@@ -278,7 +278,7 @@ export default function TaskForm({ initial, options, loadOptions, onSubmit, subm
 										)}
 									</div>
 									{!done && (
-										<Button type="submit" disabled={busy} className="bg-indigo-800 text-white hover:bg-indigo-700">{submitLabel}</Button>
+										<Button type="submit" disabled={busy}>{submitLabel}</Button>
 									)}
 								</div>
 		</form>

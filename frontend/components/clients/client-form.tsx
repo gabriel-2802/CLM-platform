@@ -282,7 +282,7 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
       </div>
 
       <div className="md:col-span-2 flex justify-end gap-2 mt-4">
-        <Button type="submit" disabled={busy} className="bg-indigo-800 text-white hover:bg-indigo-700">{submitLabel}</Button>
+        <Button type="submit" disabled={busy}>{submitLabel}</Button>
       </div>
     </form>
   );
