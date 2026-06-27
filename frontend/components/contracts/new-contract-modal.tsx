@@ -103,6 +103,10 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
   const dynamicClientFieldValues = new Set(clientFields.map((f) => f.value))
   const clientSource = { ...(clientTemplateSource ?? {}) }
   const manualFields = templateFields.filter((f) => !dynamicClientFieldValues.has(f.fieldLabel))
+  const requiredManualFields = manualFields.filter((f) => f.isRequired === true)
+  const uniqueRequiredManualFields = requiredManualFields.filter(
+    (f, i, arr) => arr.findIndex((x) => x.fieldLabel === f.fieldLabel) === i
+  )
 
   const isFormValid =
     selectedClientId !== "" &&
@@ -111,7 +115,7 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
     Boolean(localDeLa) &&
     Boolean(localPanaLa) &&
     Boolean(localTarifBilant) &&
-    manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
+    uniqueRequiredManualFields.every((f) => (manualValues[f.id] ?? "").trim() !== "")
 
   const fmt = (val: number | undefined | null) => val != null ? String(parseFloat(String(val)).toFixed(2)) : ""
 
@@ -141,7 +145,9 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
     clientFields.forEach((f) => { mappings[f.value] = formatMappingValue(getClientFieldValue(f.value)) })
     const overrides: Record<string, string> = { deLa: localDeLa, panaLa: localPanaLa, tarifConta: localTarifConta, tarifBilant: localTarifBilant }
     EXTRA_MAPPING_FIELDS.forEach((f) => { mappings[f] = overrides[f] ?? "" })
-    manualFields.forEach((f) => { if (f.fieldLabel) mappings[f.fieldLabel] = manualValues[f.id] ?? "" })
+    const labelToValue: Record<string, string> = {}
+    uniqueRequiredManualFields.forEach((f) => { if (f.fieldLabel) labelToValue[f.fieldLabel] = manualValues[f.id] ?? "" })
+    manualFields.forEach((f) => { if (f.fieldLabel) mappings[f.fieldLabel] = labelToValue[f.fieldLabel] ?? manualValues[f.id] ?? "" })
     return mappings
   }
 
@@ -258,19 +264,19 @@ export function NewContractModal({ onSuccess }: { onSuccess?: () => void }) {
                     <div className="text-xs text-muted-foreground bg-blue-50 border border-blue-100 rounded px-3 py-2">
                       Câmpurile etichetate la fișa clientului sunt completate automat din baza de date.
                     </div>
-                    {manualFields.length > 0 && (
+                    {uniqueRequiredManualFields.length > 0 && (
                       <>
                         <h4 className="font-medium text-sm text-muted-foreground pt-2 border-t pb-2">Câmpuri suplimentare</h4>
-                        {manualFields.map((field, idx) => {
+                        {uniqueRequiredManualFields.map((field, idx) => {
                           const label = field.fieldLabel === "MANUAL" ? `Câmp manual #${idx + 1}` : field.fieldLabel
                           return (
                             <div key={field.id} className="space-y-2">
-                              <Label>{label} {field.isRequired && <span className="text-red-500">*</span>}</Label>
+                              <Label>{label} <span className="text-red-500">*</span></Label>
                               <Input
                                 placeholder={`Introduceți valoarea pentru ${label}...`}
                                 value={manualValues[field.id] ?? ""}
                                 onChange={(e) => setManualValues((prev) => ({ ...prev, [field.id]: e.target.value }))}
-                                required={field.isRequired}
+                                required
                               />
                             </div>
                           )

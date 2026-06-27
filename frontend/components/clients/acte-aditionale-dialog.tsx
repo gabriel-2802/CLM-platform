@@ -189,13 +189,19 @@ export function ActeAditionaleDialog({
 
     const dynamicClientFieldValues = new Set(clientFields.map((f) => f.value))
     const manualFields = templateFields.filter((f) => !dynamicClientFieldValues.has(f.fieldLabel))
+    const requiredManualFields = manualFields.filter((f) => f.isRequired === true)
+    const uniqueRequiredManualFields = requiredManualFields.filter(
+        (f, i, arr) => arr.findIndex((x) => x.fieldLabel === f.fieldLabel) === i
+    )
 
     const buildMappings = (): Record<string, string> => {
         const mappings: Record<string, string> = {}
         clientFields.forEach((f) => { mappings[f.value] = formatMappingValue(getClientFieldValue(f.value)) })
         EXTRA_MAPPING_FIELDS.forEach((field) => { mappings[field] = formatMappingValue(clientSource[field]) })
 
-        manualFields.forEach((f) => { if (f.fieldLabel) mappings[f.fieldLabel] = manualValues[f.id] ?? "" })
+        const labelToValue: Record<string, string> = {}
+        uniqueRequiredManualFields.forEach((f) => { if (f.fieldLabel) labelToValue[f.fieldLabel] = manualValues[f.id] ?? "" })
+        manualFields.forEach((f) => { if (f.fieldLabel) mappings[f.fieldLabel] = labelToValue[f.fieldLabel] ?? manualValues[f.id] ?? "" })
         return mappings
     }
 
@@ -203,7 +209,7 @@ export function ActeAditionaleDialog({
         genTitle.trim() !== "" &&
         selectedTemplate !== "" &&
         !loadingFields &&
-        manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
+        uniqueRequiredManualFields.every((f) => (manualValues[f.id] ?? "").trim() !== "")
 
     const openSignView = (appendix: AppendixSummary) => {
         setSignAppendixId(appendix.id)
@@ -596,7 +602,7 @@ export function ActeAditionaleDialog({
                             </div>
                         )}
 
-                        {manualFields.filter((f) => f.isRequired !== false).map((f) => (
+                        {uniqueRequiredManualFields.map((f) => (
                             <div key={f.id} className="space-y-1">
                                 <Label>
                                     {f.fieldLabel}

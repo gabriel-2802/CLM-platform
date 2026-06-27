@@ -98,13 +98,18 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
   const clientSource = { ...(clientTemplateSource ?? {}), ...client }
   const manualFields = templateFields.filter((f) => !dynamicClientFieldValues.has(f.fieldLabel))
 
+  const requiredManualFields = manualFields.filter((f) => f.isRequired === true)
+  const uniqueRequiredManualFields = requiredManualFields.filter(
+    (f, i, arr) => arr.findIndex((x) => x.fieldLabel === f.fieldLabel) === i
+  )
+
   const isFormValid =
       selectedTemplate !== "" &&
       !loadingFields &&
       Boolean(localDeLa) &&
       Boolean(localPanaLa) &&
       Boolean(localTarifBilant) &&
-      manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
+      uniqueRequiredManualFields.every((f) => (manualValues[f.id] ?? "").trim() !== "")
 
   const fmt = (val: number | undefined | null) =>
       val != null ? String(parseFloat(String(val)).toFixed(2)) : ""
@@ -151,9 +156,13 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
       mappings[field] = localOverrides[field] ?? ""
     })
 
+    const labelToValue: Record<string, string> = {}
+    uniqueRequiredManualFields.forEach((field) => {
+      if (field.fieldLabel) labelToValue[field.fieldLabel] = manualValues[field.id] ?? ""
+    })
     manualFields.forEach((field) => {
       if (!field.fieldLabel) return
-      mappings[field.fieldLabel] = manualValues[field.id] ?? ""
+      mappings[field.fieldLabel] = labelToValue[field.fieldLabel] ?? manualValues[field.id] ?? ""
     })
 
     return mappings
@@ -288,7 +297,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
                         <h4 className="font-medium text-sm text-muted-foreground pt-2 border-t pb-2">
                           Câmpuri suplimentare
                         </h4>
-                        {manualFields.filter((f) => f.isRequired !== false).map((field, idx) => {
+                        {uniqueRequiredManualFields.map((field, idx) => {
                           const label =
                               field.fieldLabel === "MANUAL"
                                   ? `Câmp manual #${idx + 1}`
