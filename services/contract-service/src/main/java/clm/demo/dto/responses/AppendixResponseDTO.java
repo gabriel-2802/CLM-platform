@@ -30,6 +30,9 @@ public class AppendixResponseDTO {
     private String notes;
     private LocalDate signDate;
     private LocalDate effectiveDate;
+    private LocalDate pendingEndDate;
+    private java.math.BigDecimal pendingValue;
+    private java.math.BigDecimal pendingBalance;
 
     private List<DocumentFieldValueResponseDTO> fieldValues;
 }

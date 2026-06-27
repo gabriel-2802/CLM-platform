@@ -95,6 +95,11 @@ export function ActeAditionaleDialog({
     const [manualValues, setManualValues] = useState<Record<number, string>>({})
     const [genNotes, setGenNotes] = useState("")
     const [generating, setGenerating] = useState(false)
+    const [genModifica, setGenModifica] = useState(false)
+    const [genEffectiveDate, setGenEffectiveDate] = useState("")
+    const [genPanaLa, setGenPanaLa] = useState("")
+    const [genTarifConta, setGenTarifConta] = useState("")
+    const [genTarifBilant, setGenTarifBilant] = useState("")
 
     const loadAppendices = useCallback(async () => {
         setLoadingList(true)
@@ -119,6 +124,11 @@ export function ActeAditionaleDialog({
                 setSelectedTemplate("")
                 setTemplateFields([])
                 setManualValues({})
+                setGenModifica(false)
+                setGenEffectiveDate(client.deLa ?? "")
+                setGenPanaLa(client.panaLa ?? "")
+                setGenTarifConta(client.tarifConta != null ? String(client.tarifConta) : "")
+                setGenTarifBilant(client.tarifBilant != null ? String(client.tarifBilant) : "")
             }
         )
     }, [view, client.id])
@@ -195,15 +205,17 @@ export function ActeAditionaleDialog({
         !loadingFields &&
         manualFields.every((f) => (f.isRequired ? (manualValues[f.id] ?? "").trim() !== "" : true))
 
-    const openSignView = (appendixId: number) => {
-        setSignAppendixId(appendixId)
+    const openSignView = (appendix: AppendixSummary) => {
+        setSignAppendixId(appendix.id)
         setSignFile(null)
-        setSignModifica(false)
         setSignDate("")
-        setEffectiveDate(client.deLa ?? "")
-        setSignPanaLa(client.panaLa ?? "")
-        setSignTarifConta(client.tarifConta != null ? String(client.tarifConta) : "")
-        setSignTarifBilant(client.tarifBilant != null ? String(client.tarifBilant) : "")
+        const storedEffectiveDate = appendix.effectiveDate ?? ""
+        const hasPendingTerms = !!storedEffectiveDate
+        setEffectiveDate(storedEffectiveDate || (client.deLa ?? ""))
+        setSignModifica(hasPendingTerms)
+        setSignPanaLa(hasPendingTerms ? (appendix.pendingEndDate ?? "") : (client.panaLa ?? ""))
+        setSignTarifConta(hasPendingTerms ? (appendix.pendingValue != null ? String(appendix.pendingValue) : "") : (client.tarifConta != null ? String(client.tarifConta) : ""))
+        setSignTarifBilant(hasPendingTerms ? (appendix.pendingBalance != null ? String(appendix.pendingBalance) : "") : (client.tarifBilant != null ? String(client.tarifBilant) : ""))
         setView("sign")
     }
 
@@ -292,12 +304,17 @@ export function ActeAditionaleDialog({
             title: genTitle.trim(),
             notes: genNotes || null,
             mappings: buildMappings(),
+            effectiveDate: genModifica && genEffectiveDate ? genEffectiveDate : null,
+            pendingEndDate: genModifica && genPanaLa ? genPanaLa : null,
+            pendingValue: genModifica && genTarifConta ? parseFloat(genTarifConta) : null,
+            pendingBalance: genModifica && genTarifBilant ? parseFloat(genTarifBilant) : null,
         })
         if (res.success) {
             toast.success("Act adițional generat.")
             setGenTitle("")
             setSelectedTemplate("")
             setGenNotes("")
+            setGenModifica(false)
             setView("list")
             loadAppendices()
             router.refresh()
@@ -405,7 +422,7 @@ export function ActeAditionaleDialog({
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
-                                                        onClick={() => openSignView(a.id)}
+                                                        onClick={() => openSignView(a)}
                                                     >
                                                         Încarcă semnat
                                                     </Button>
@@ -602,6 +619,20 @@ export function ActeAditionaleDialog({
                                 onChange={(e) => setGenNotes(e.target.value)}
                             />
                         </div>
+
+                        <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                            <Checkbox
+                                checked={genModifica}
+                                onCheckedChange={(v) => setGenModifica(v === true)}
+                            />
+                            <span>Modifica valoarea/data contractului</span>
+                        </label>
+                        {genModifica && detailFields(
+                            genEffectiveDate, setGenEffectiveDate,
+                            genPanaLa, setGenPanaLa,
+                            genTarifConta, setGenTarifConta,
+                            genTarifBilant, setGenTarifBilant
+                        )}
 
                         <DialogFooter className="pt-2">
                             <Button variant="outline" onClick={() => setView("list")}>

@@ -14,6 +14,11 @@ export type AppendixSummary = {
     generatedByMail?: string | null
     notes?: string | null
     createdAt?: string | null
+    effectiveDate?: string | null
+    signDate?: string | null
+    pendingEndDate?: string | null
+    pendingValue?: number | null
+    pendingBalance?: number | null
 }
 
 export type GenerateAppendixPayload = {
@@ -24,6 +29,9 @@ export type GenerateAppendixPayload = {
     mappings: Record<string, string>
     signDate?: string | null
     effectiveDate?: string | null
+    pendingEndDate?: string | null
+    pendingValue?: number | null
+    pendingBalance?: number | null
 }
 
 type SessionUser = {

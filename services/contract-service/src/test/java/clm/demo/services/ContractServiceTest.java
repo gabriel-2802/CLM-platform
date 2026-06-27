@@ -1,7 +1,10 @@
 package clm.demo.services;
 
+import clm.demo.dto.requests.ContractUpdateRequest;
 import clm.demo.dto.requests.RenegotiateContractRequest;
+import clm.demo.dto.responses.ContractResponseDTO;
 import clm.demo.exceptions.exceptions.InvalidContractStateException;
+import clm.demo.exceptions.exceptions.InvalidContractUpdateException;
 import clm.demo.exceptions.exceptions.ResourceNotFoundException;
 import clm.demo.mappers.ContractGenerationMapper;
 import clm.demo.mappers.GeneratedContractMapper;
@@ -51,6 +54,82 @@ class ContractServiceTest {
     @Mock DocumentGenerationUtil        documentGenerationUtil;
 
     @InjectMocks ContractService service;
+
+    @Nested
+    class UpdateContractTerms {
+
+        private Contract contract;
+
+        @BeforeEach
+        void setUp() {
+            contract = TestDataFactory.contract(1L, ContractStatus.ACTIVE);
+            when(contractRepository.findById(1L)).thenReturn(Optional.of(contract));
+            when(contractDetailsRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+            when(contractMapper.toResponseDTO(any(), any())).thenReturn(new ContractResponseDTO());
+        }
+
+        private Appendix appendixWithEffectiveDate(Long id, LocalDate effectiveDate) {
+            Appendix a = mock(Appendix.class);
+            when(a.getId()).thenReturn(id);
+            when(a.getEffectiveDate()).thenReturn(effectiveDate);
+            when(appendixRepository.findById(id)).thenReturn(Optional.of(a));
+            return a;
+        }
+
+        @Test
+        void should_skip_date_validation_when_appendix_effective_date_is_null() {
+            appendixWithEffectiveDate(1L, null);
+            ContractUpdateRequest req = new ContractUpdateRequest(
+                    1, 1, LocalDate.of(2026, 6, 1), LocalDate.of(2027, 1, 1), null, BigDecimal.valueOf(15_000));
+
+            // should not throw — null effectiveDate means no validation
+            ContractResponseDTO result = service.updateContractTerms(1L, req);
+            assertThat(result).isNotNull();
+        }
+
+        @Test
+        void should_succeed_when_appendix_effective_date_matches_start_date() {
+            LocalDate date = LocalDate.of(2026, 6, 1);
+            appendixWithEffectiveDate(1L, date);
+            ContractUpdateRequest req = new ContractUpdateRequest(
+                    1, 1, date, LocalDate.of(2027, 1, 1), null, BigDecimal.valueOf(15_000));
+
+            ContractResponseDTO result = service.updateContractTerms(1L, req);
+            assertThat(result).isNotNull();
+        }
+
+        @Test
+        void should_throw_when_appendix_effective_date_does_not_match_start_date() {
+            appendixWithEffectiveDate(1L, LocalDate.of(2026, 5, 1));
+            ContractUpdateRequest req = new ContractUpdateRequest(
+                    1, 1, LocalDate.of(2026, 6, 1), LocalDate.of(2027, 1, 1), null, BigDecimal.valueOf(15_000));
+
+            assertThatThrownBy(() -> service.updateContractTerms(1L, req))
+                    .isInstanceOf(InvalidContractUpdateException.class)
+                    .hasMessageContaining("must match");
+        }
+
+        @Test
+        void should_throw_when_contract_not_active() {
+            Contract pending = TestDataFactory.contract(2L, ContractStatus.PENDING_SIGNATURE);
+            when(contractRepository.findById(2L)).thenReturn(Optional.of(pending));
+            ContractUpdateRequest req = new ContractUpdateRequest(
+                    1, 1, LocalDate.of(2026, 6, 1), null, null, BigDecimal.valueOf(5_000));
+
+            assertThatThrownBy(() -> service.updateContractTerms(2L, req))
+                    .isInstanceOf(InvalidContractStateException.class)
+                    .hasMessageContaining("PENDING_SIGNATURE");
+        }
+
+        @Test
+        void should_throw_when_no_fields_provided() {
+            ContractUpdateRequest req = new ContractUpdateRequest(1, 1, LocalDate.of(2026, 6, 1), null, null, null);
+
+            assertThatThrownBy(() -> service.updateContractTerms(1L, req))
+                    .isInstanceOf(InvalidContractUpdateException.class)
+                    .hasMessageContaining("At least one");
+        }
+    }
 
     @Nested
     class RenegotiateContract {

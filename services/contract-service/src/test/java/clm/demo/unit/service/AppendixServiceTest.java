@@ -220,7 +220,7 @@ class AppendixServiceTest {
         void should_throw_when_contract_not_found() {
             when(contractRepository.findById(99L)).thenReturn(Optional.empty());
 
-            GenAppendixRequest req = new GenAppendixRequest(99L, 1L, "Title", 1L, null, Map.of("k", "v"));
+            GenAppendixRequest req = new GenAppendixRequest(99L, 1L, "Title", 1L, null, Map.of("k", "v"), null, null, null, null);
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -233,7 +233,7 @@ class AppendixServiceTest {
             when(contractRepository.findById(1L)).thenReturn(Optional.of(contract));
             when(templateRepository.findById(99L)).thenReturn(Optional.empty());
 
-            GenAppendixRequest req = new GenAppendixRequest(1L, 99L, "Title", 1L, null, Map.of("k", "v"));
+            GenAppendixRequest req = new GenAppendixRequest(1L, 99L, "Title", 1L, null, Map.of("k", "v"), null, null, null, null);
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(ResourceNotFoundException.class)
@@ -248,7 +248,7 @@ class AppendixServiceTest {
             when(contractRepository.findById(1L)).thenReturn(Optional.of(contract));
             when(templateRepository.findById(2L)).thenReturn(Optional.of(template));
 
-            GenAppendixRequest req = new GenAppendixRequest(1L, 2L, "Title", 1L, null, Map.of("k", "v"));
+            GenAppendixRequest req = new GenAppendixRequest(1L, 2L, "Title", 1L, null, Map.of("k", "v"), null, null, null, null);
 
             assertThatThrownBy(() -> service.generateAppendix(req))
                     .isInstanceOf(TemplateIncompleteException.class)

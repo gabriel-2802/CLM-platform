@@ -261,7 +261,7 @@ public class ContractService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Appendix not found: " + request.appendixId()));
 
-        if (!appendix.getEffectiveDate().equals(request.startDate())) {
+        if (appendix.getEffectiveDate() != null && !appendix.getEffectiveDate().equals(request.startDate())) {
             throw new InvalidContractUpdateException(
                     "Appendix effective date must match the requested start date: " + request.startDate());
         }

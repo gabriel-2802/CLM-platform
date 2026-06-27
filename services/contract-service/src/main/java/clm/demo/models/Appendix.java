@@ -48,4 +48,13 @@ public class Appendix extends Document {
 
     @Column(name = "effective_date")
     private LocalDate effectiveDate;
+
+    @Column(name = "pending_end_date")
+    private LocalDate pendingEndDate;
+
+    @Column(name = "pending_value", precision = 15, scale = 2)
+    private java.math.BigDecimal pendingValue;
+
+    @Column(name = "pending_balance", precision = 15, scale = 2)
+    private java.math.BigDecimal pendingBalance;
 }

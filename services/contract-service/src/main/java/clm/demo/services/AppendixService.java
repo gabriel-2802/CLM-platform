@@ -82,6 +82,10 @@ public class AppendixService {
                 .generatedByUser(Objects.nonNull(request.userId()) ? request.userId().intValue() : null)
                 .notes(request.notes())
                 .appendixStatus(AppendixStatus.DRAFT)
+                .effectiveDate(request.effectiveDate())
+                .pendingEndDate(request.pendingEndDate())
+                .pendingValue(request.pendingValue())
+                .pendingBalance(request.pendingBalance())
                 .build();
 
         appendix = appendixRepository.save(appendix);

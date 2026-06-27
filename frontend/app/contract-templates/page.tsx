@@ -1,4 +1,4 @@
-import { getTemplates, deleteTemplate } from "@/actions/contract-templates"
+import { getTemplates } from "@/actions/contract-templates"
 import { UploadTemplateDialog } from "@/components/upload-template-dialog"
 import { TemplateMappingModal } from "./template-mapping-modal"
 import { AuthenticatedDownloadLink } from "@/components/authenticated-download-link"
@@ -26,7 +26,6 @@ export default async function ContractTemplatesPage() {
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Etichetat</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Creat la</th>
                 <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Actualizat la</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-100 uppercase tracking-wide whitespace-nowrap">Acțiuni</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-100">
@@ -81,13 +80,6 @@ export default async function ContractTemplatesPage() {
                     </td>
                     <td className="px-4 py-2 whitespace-nowrap text-slate-500">
                       {template.updatedAt ? new Date(template.updatedAt).toLocaleDateString("ro-RO") : "—"}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-right">
-                      <form action={deleteTemplate.bind(null, template.id)}>
-                        <button type="submit" className="text-red-600 hover:text-red-900 transition-colors text-xs">
-                          Șterge
-                        </button>
-                      </form>
                     </td>
                   </tr>
                 ))
