@@ -80,7 +80,7 @@ export function TemplateMappingModal({
               initialTypes[f.id] = "MANUAL"
               initialLabels[f.id] = label === "MANUAL" ? "" : label
             }
-            initialRequired[f.id] = f.isRequired ?? true
+            initialRequired[f.id] = f.isRequired ?? f.required ?? true
           })
           setMappingTypes(initialTypes)
           setManualLabels(initialLabels)

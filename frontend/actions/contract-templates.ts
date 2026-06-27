@@ -23,6 +23,7 @@ export type TemplateField = {
   fieldPosition?: number | null;
   fieldLabel?: string | null;
   isRequired?: boolean;
+  required?: boolean;
 };
 
 export type TemplateDetails = {
@@ -163,7 +164,7 @@ export async function updateTemplateMappings(templateId: number, mappings: { fie
       fieldId: m.fieldId,
       fieldLabel: m.fieldLabel,
       dataType: "STRING",
-      isRequired: m.isRequired ?? true,
+      required: m.isRequired ?? true,
       formatPattern: ""
     }))
   };
