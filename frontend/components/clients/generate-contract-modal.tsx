@@ -288,7 +288,7 @@ export function GenerateContractModal({ client }: { client: ClientForContract })
                         <h4 className="font-medium text-sm text-muted-foreground pt-2 border-t pb-2">
                           Câmpuri suplimentare
                         </h4>
-                        {manualFields.map((field, idx) => {
+                        {manualFields.filter((f) => f.isRequired !== false).map((field, idx) => {
                           const label =
                               field.fieldLabel === "MANUAL"
                                   ? `Câmp manual #${idx + 1}`

@@ -579,7 +579,7 @@ export function ActeAditionaleDialog({
                             </div>
                         )}
 
-                        {manualFields.map((f) => (
+                        {manualFields.filter((f) => f.isRequired !== false).map((f) => (
                             <div key={f.id} className="space-y-1">
                                 <Label>
                                     {f.fieldLabel}
