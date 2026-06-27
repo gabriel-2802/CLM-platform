@@ -206,7 +206,7 @@ export default function ClientForm({ initial, onSubmit, submitLabel = "Save" }: 
         <Label className="mb-2 text-indigo-800">Administratie <span className="text-red-500">*</span></Label>
         <Select value={administratie} onValueChange={setAdministratie}>
           <SelectTrigger><SelectValue placeholder="Selecteaza administratie" /></SelectTrigger>
-          <SelectContent>
+          <SelectContent className="max-h-60 overflow-y-auto">
             {enums.administrations.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
           </SelectContent>
         </Select>
