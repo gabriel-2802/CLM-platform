@@ -199,6 +199,11 @@ export function ActeAditionaleDialog({
         clientFields.forEach((f) => { mappings[f.value] = formatMappingValue(getClientFieldValue(f.value)) })
         EXTRA_MAPPING_FIELDS.forEach((field) => { mappings[field] = formatMappingValue(clientSource[field]) })
 
+        if (genEffectiveDate) mappings["deLa"] = genEffectiveDate
+        if (genPanaLa) mappings["panaLa"] = genPanaLa
+        if (genTarifConta) mappings["tarifConta"] = genTarifConta
+        if (genTarifBilant) mappings["tarifBilant"] = genTarifBilant
+
         const labelToValue: Record<string, string> = {}
         uniqueRequiredManualFields.forEach((f) => { if (f.fieldLabel) labelToValue[f.fieldLabel] = manualValues[f.id] ?? "" })
         manualFields.forEach((f) => { if (f.fieldLabel) mappings[f.fieldLabel] = labelToValue[f.fieldLabel] ?? manualValues[f.id] ?? "" })
