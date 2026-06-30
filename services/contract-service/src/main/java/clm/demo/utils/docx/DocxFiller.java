@@ -120,12 +120,13 @@ public class DocxFiller {
                     return labelToValue.get(label);
                 });
 
+        // advance globalIndex by ALL placeholders found, not just filled ones
+        globalIndex.addAndGet(result.spans().size());
+
         if (!result.anyFilled()) return;
 
         // step 3: delta-based writeback
         DocxUtils.writebackSpans(runs, runStarts, result.text(), result.spans());
-
-        globalIndex.addAndGet(result.filledCount());
     }
 }
 

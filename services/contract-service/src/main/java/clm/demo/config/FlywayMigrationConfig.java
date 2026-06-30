@@ -41,8 +41,10 @@ public class FlywayMigrationConfig {
                     .outOfOrder(false)
                     .failOnMissingLocations(false)
                     .cleanDisabled(true)
+                    .connectRetries(10)
+                    .connectRetriesInterval(3)
                     .load();
-            
+
             // repair flyway metadata if needed
             repair(flyway);
             flyway.migrate();

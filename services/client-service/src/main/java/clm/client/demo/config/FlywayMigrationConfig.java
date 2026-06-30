@@ -26,6 +26,8 @@ public class FlywayMigrationConfig {
                     .failOnMissingLocations(false)
                     .cleanDisabled(true)
                     .ignoreMigrationPatterns("*:pending")
+                    .connectRetries(10)
+                    .connectRetriesInterval(3)
                     .load();
 
             // Attempt repair if there's a checksum mismatch
@@ -46,6 +48,8 @@ public class FlywayMigrationConfig {
                             .failOnMissingLocations(false)
                             .cleanDisabled(true)
                             .ignoreMigrationPatterns("*:pending")
+                            .connectRetries(10)
+                            .connectRetriesInterval(3)
                             .load();
                 } else {
                     throw e;

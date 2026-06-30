@@ -72,10 +72,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
+        var userIdClaim = claims.get("userId");
+        var principalName = userIdClaim != null ? userIdClaim.toString() : subject;
+
         var authorities = extractAuthorities(claims);
-        var auth = new UsernamePasswordAuthenticationToken(subject, null, authorities);
+        var auth = new UsernamePasswordAuthenticationToken(principalName, null, authorities);
         SecurityContextHolder.getContext().setAuthentication(auth);
-        log.debug("Authenticated request for subject '{}' with roles {}", subject, authorities);
+        log.debug("Authenticated request for subject '{}' with roles {}", principalName, authorities);
     }
 
     private List<SimpleGrantedAuthority> extractAuthorities(Claims claims) {

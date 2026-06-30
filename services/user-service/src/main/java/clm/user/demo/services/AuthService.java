@@ -81,7 +81,7 @@ public class AuthService {
         log.info(LOG_USER_REGISTERED, request.email());
 
         UserDetails userDetails = UserDetailsServiceImpl.toUserDetails(user);
-        String token = tokenProvider.generateToken(userDetails);
+        String token = tokenProvider.generateToken(userDetails, user.getId());
         return AuthResponse.of(token, jwtExpirationMs, UserResponse.from(user));
     }
 
@@ -102,7 +102,7 @@ public class AuthService {
         User user = userRepository.findByEmail(request.email())
                 .orElseThrow(InvalidCredentialsException::new);
 
-        String token = tokenProvider.generateToken(userDetails);
+        String token = tokenProvider.generateToken(userDetails, user.getId());
         log.debug(LOG_TOKEN_ISSUED, request.email());
         return AuthResponse.of(token, jwtExpirationMs, UserResponse.from(user));
     }

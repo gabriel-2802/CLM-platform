@@ -33,6 +33,8 @@ public class FlywayConfig {
                     .outOfOrder(false)
                     .failOnMissingLocations(false)
                     .cleanDisabled(true)
+                    .connectRetries(10)
+                    .connectRetriesInterval(3)
                     .load();
 
             flyway.migrate();
